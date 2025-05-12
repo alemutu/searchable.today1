@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { FileText, Plus, Trash2, User, Activity, Thermometer, Heart, Settings as Lungs, Droplets, Clock, AlertTriangle, Stethoscope, ChevronDown, ChevronRight } from 'lucide-react';
+import { FileText, Plus, Trash2, User, Activity, Thermometer, Heart, Lungs, Droplets, AlertTriangle, Stethoscope, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
@@ -30,21 +30,6 @@ interface ConsultationFormData {
     priority: string;
     notes: string;
   }[];
-  patientHistory: {
-    presentingIllness: string;
-    gynecologicalHistory: string;
-    pastMedicalSurgicalHistory: string;
-  };
-  familySocioeconomicHistory: string;
-  generalExamination: string;
-  systemicExamination: {
-    cardiovascular: string;
-    respiratory: string;
-    gastrointestinal: string;
-    centralNervous: string;
-    musculoskeletal: string;
-    other: string;
-  };
 }
 
 const ConsultationForm: React.FC = () => {
@@ -59,39 +44,27 @@ const ConsultationForm: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showLabTestModal, setShowLabTestModal] = useState(false);
   const [showRadiologyModal, setShowRadiologyModal] = useState(false);
-  const [collapsedSections, setCollapsedSections] = useState({
+  const [collapsedSections, setCollapsedSections] = useState<{[key: string]: boolean}>({
     patientHistory: false,
-    familySocioeconomicHistory: false,
+    familyHistory: false,
     generalExamination: false,
     systemicExamination: false
   });
+  const [medicationSearch, setMedicationSearch] = useState('');
+  const [medicationSuggestions, setMedicationSuggestions] = useState<string[]>([]);
   
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch } = useForm<ConsultationFormData>({
     defaultValues: {
       prescriptions: [{ medication: '', dosage: '', frequency: '', duration: '', instructions: '' }],
       labTests: [],
       radiologyTests: [],
-      medicalCertificate: false,
-      patientHistory: {
-        presentingIllness: '',
-        gynecologicalHistory: '',
-        pastMedicalSurgicalHistory: ''
-      },
-      familySocioeconomicHistory: '',
-      generalExamination: '',
-      systemicExamination: {
-        cardiovascular: '',
-        respiratory: '',
-        gastrointestinal: '',
-        centralNervous: '',
-        musculoskeletal: '',
-        other: ''
-      }
+      medicalCertificate: false
     }
   });
 
   const labTests = watch('labTests');
   const radiologyTests = watch('radiologyTests');
+  const prescriptions = watch('prescriptions');
 
   useEffect(() => {
     if (patientId) {
@@ -322,33 +295,26 @@ const ConsultationForm: React.FC = () => {
     ]}
   ];
 
-  // Medication options for dropdown
-  const medicationOptions = [
-    'Amoxicillin', 'Azithromycin', 'Ciprofloxacin', 'Doxycycline', 'Metronidazole',
-    'Paracetamol', 'Ibuprofen', 'Naproxen', 'Aspirin', 'Diclofenac',
-    'Omeprazole', 'Ranitidine', 'Famotidine', 'Pantoprazole', 'Lansoprazole',
-    'Atorvastatin', 'Simvastatin', 'Rosuvastatin', 'Pravastatin', 'Lovastatin',
-    'Lisinopril', 'Enalapril', 'Ramipril', 'Captopril', 'Benazepril',
-    'Metformin', 'Glimepiride', 'Glipizide', 'Glyburide', 'Sitagliptin',
-    'Amlodipine', 'Nifedipine', 'Diltiazem', 'Verapamil', 'Felodipine',
-    'Loratadine', 'Cetirizine', 'Fexofenadine', 'Diphenhydramine', 'Chlorpheniramine',
-    'Fluoxetine', 'Sertraline', 'Escitalopram', 'Paroxetine', 'Citalopram'
+  // Available medications for search
+  const availableMedications = [
+    'Acetaminophen', 'Amoxicillin', 'Atorvastatin', 'Azithromycin', 'Cephalexin',
+    'Ciprofloxacin', 'Citalopram', 'Diazepam', 'Doxycycline', 'Fluoxetine',
+    'Hydrochlorothiazide', 'Ibuprofen', 'Levothyroxine', 'Lisinopril', 'Loratadine',
+    'Metformin', 'Metoprolol', 'Omeprazole', 'Prednisone', 'Sertraline',
+    'Simvastatin', 'Tramadol', 'Warfarin', 'Zolpidem'
   ];
 
-  // Frequency options for dropdown
-  const frequencyOptions = [
-    'Once daily', 'Twice daily', 'Three times daily', 'Four times daily',
-    'Every 4 hours', 'Every 6 hours', 'Every 8 hours', 'Every 12 hours',
-    'Once weekly', 'Twice weekly', 'As needed', 'Before meals', 'After meals',
-    'At bedtime', 'In the morning'
-  ];
-
-  // Duration options for dropdown
-  const durationOptions = [
-    '3 days', '5 days', '7 days', '10 days', '14 days',
-    '3 weeks', '4 weeks', '6 weeks', '8 weeks',
-    '3 months', '6 months', 'Indefinite', 'As directed'
-  ];
+  // Handle medication search
+  useEffect(() => {
+    if (medicationSearch.length > 1) {
+      const filteredMeds = availableMedications.filter(med => 
+        med.toLowerCase().includes(medicationSearch.toLowerCase())
+      );
+      setMedicationSuggestions(filteredMeds.slice(0, 5));
+    } else {
+      setMedicationSuggestions([]);
+    }
+  }, [medicationSearch]);
 
   const addLabTest = (test: { name: string, price: number }) => {
     const currentTests = watch('labTests') || [];
@@ -362,9 +328,8 @@ const ConsultationForm: React.FC = () => {
       }
     ]);
     setShowLabTestModal(false);
-    
     addNotification({
-      message: `${test.name} added to lab tests`,
+      message: `Added ${test.name} to lab tests`,
       type: 'success',
       duration: 2000
     });
@@ -382,9 +347,8 @@ const ConsultationForm: React.FC = () => {
       }
     ]);
     setShowRadiologyModal(false);
-    
     addNotification({
-      message: `${test.name} added to radiology tests`,
+      message: `Added ${test.name} to radiology tests`,
       type: 'success',
       duration: 2000
     });
@@ -394,9 +358,8 @@ const ConsultationForm: React.FC = () => {
     const currentTests = watch('labTests');
     const testName = currentTests[index].testName;
     setValue('labTests', currentTests.filter((_, i) => i !== index));
-    
     addNotification({
-      message: `${testName} removed from lab tests`,
+      message: `Removed ${testName} from lab tests`,
       type: 'info',
       duration: 2000
     });
@@ -406,9 +369,8 @@ const ConsultationForm: React.FC = () => {
     const currentTests = watch('radiologyTests');
     const testName = currentTests[index].testName;
     setValue('radiologyTests', currentTests.filter((_, i) => i !== index));
-    
     addNotification({
-      message: `${testName} removed from radiology tests`,
+      message: `Removed ${testName} from radiology tests`,
       type: 'info',
       duration: 2000
     });
@@ -436,11 +398,19 @@ const ConsultationForm: React.FC = () => {
     }).format(amount);
   };
 
-  const toggleSection = (section: keyof typeof collapsedSections) => {
+  const toggleSection = (section: string) => {
     setCollapsedSections(prev => ({
       ...prev,
       [section]: !prev[section]
     }));
+  };
+
+  const selectMedication = (medication: string, index: number) => {
+    const updatedPrescriptions = [...prescriptions];
+    updatedPrescriptions[index].medication = medication;
+    setValue('prescriptions', updatedPrescriptions);
+    setMedicationSearch('');
+    setMedicationSuggestions([]);
   };
 
   if (isLoading) {
@@ -460,8 +430,8 @@ const ConsultationForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <div className="max-w-6xl mx-auto">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         {/* Patient Header */}
         <div className="bg-gradient-to-r from-primary-700 to-primary-600 rounded-lg shadow-sm p-3 mb-3">
           <div className="flex items-center">
@@ -535,50 +505,43 @@ const ConsultationForm: React.FC = () => {
           <div className="w-1/4 space-y-4">
             {/* Vital Signs */}
             <div className="bg-white rounded-lg shadow-sm p-4">
-              <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
-                <Activity className="h-4 w-4 text-primary-500 mr-2" />
-                Vital Signs
-              </h3>
+              <h3 className="text-md font-medium text-gray-900 mb-3">Vital Signs</h3>
               <div className="space-y-2">
                 <div className="flex justify-between items-center">
                   <div className="flex items-center">
-                    <Heart className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-700">BP</span>
+                    <Activity className="h-4 w-4 text-primary-500 mr-2" />
+                    <span className="text-sm">Blood Pressure</span>
                   </div>
                   <span className="text-sm font-medium">120/80 mmHg</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center">
-                    <Activity className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-700">Pulse</span>
+                    <Heart className="h-4 w-4 text-primary-500 mr-2" />
+                    <span className="text-sm">Heart Rate</span>
                   </div>
                   <span className="text-sm font-medium">72 bpm</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center">
-                    <Thermometer className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-700">Temp</span>
+                    <Thermometer className="h-4 w-4 text-primary-500 mr-2" />
+                    <span className="text-sm">Temperature</span>
                   </div>
                   <span className="text-sm font-medium">36.8°C</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center">
-                    <Droplets className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-700">SpO2</span>
+                    <Lungs className="h-4 w-4 text-primary-500 mr-2" />
+                    <span className="text-sm">Respiratory Rate</span>
                   </div>
-                  <span className="text-sm font-medium">98%</span>
+                  <span className="text-sm font-medium">16 bpm</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <div className="flex items-center">
-                    <Lungs className="h-4 w-4 text-gray-400 mr-2" />
-                    <span className="text-sm text-gray-700">Resp</span>
+                    <Droplets className="h-4 w-4 text-primary-500 mr-2" />
+                    <span className="text-sm">SpO2</span>
                   </div>
-                  <span className="text-sm font-medium">16/min</span>
+                  <span className="text-sm font-medium">98%</span>
                 </div>
-              </div>
-              <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500 flex items-center">
-                <Clock className="h-3 w-3 mr-1" />
-                <span>Recorded: Today, 10:30 AM</span>
               </div>
             </div>
 
@@ -588,14 +551,14 @@ const ConsultationForm: React.FC = () => {
               
               {patient.medical_history?.allergies && patient.medical_history.allergies.length > 0 && (
                 <div className="mb-3">
-                  <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center">
-                    <AlertTriangle className="h-3 w-3 text-error-500 mr-1" />
-                    Allergies
-                  </h4>
-                  <ul className="text-sm text-gray-600 pl-4 list-disc">
+                  <div className="flex items-center text-error-600 mb-1">
+                    <AlertTriangle className="h-4 w-4 mr-1" />
+                    <h4 className="text-sm font-medium">Allergies</h4>
+                  </div>
+                  <ul className="pl-6 text-sm space-y-1">
                     {patient.medical_history.allergies.map((allergy: any, index: number) => (
-                      <li key={index}>
-                        {allergy.allergen} - {allergy.reaction} ({allergy.severity})
+                      <li key={index} className="list-disc">
+                        <span className="font-medium">{allergy.allergen}</span>: {allergy.reaction}
                       </li>
                     ))}
                   </ul>
@@ -604,10 +567,10 @@ const ConsultationForm: React.FC = () => {
               
               {patient.medical_history?.chronicConditions && patient.medical_history.chronicConditions.length > 0 && (
                 <div className="mb-3">
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Chronic Conditions</h4>
-                  <ul className="text-sm text-gray-600 pl-4 list-disc">
+                  <h4 className="text-sm font-medium mb-1">Chronic Conditions</h4>
+                  <ul className="pl-6 text-sm space-y-1">
                     {patient.medical_history.chronicConditions.map((condition: string, index: number) => (
-                      <li key={index}>{condition}</li>
+                      <li key={index} className="list-disc">{condition}</li>
                     ))}
                   </ul>
                 </div>
@@ -615,19 +578,19 @@ const ConsultationForm: React.FC = () => {
               
               {patient.medical_history?.currentMedications && patient.medical_history.currentMedications.length > 0 && (
                 <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Current Medications</h4>
-                  <ul className="text-sm text-gray-600 pl-4 list-disc">
+                  <h4 className="text-sm font-medium mb-1">Current Medications</h4>
+                  <ul className="pl-6 text-sm space-y-1">
                     {patient.medical_history.currentMedications.map((medication: any, index: number) => (
-                      <li key={index}>
-                        {medication.name} {medication.dosage && `- ${medication.dosage}`} {medication.frequency && `(${medication.frequency})`}
+                      <li key={index} className="list-disc">
+                        {medication.name} {medication.dosage && `(${medication.dosage})`} {medication.frequency && `- ${medication.frequency}`}
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
               
-              {(!patient.medical_history?.allergies || patient.medical_history.allergies.length === 0) &&
-               (!patient.medical_history?.chronicConditions || patient.medical_history.chronicConditions.length === 0) &&
+              {(!patient.medical_history?.allergies || patient.medical_history.allergies.length === 0) && 
+               (!patient.medical_history?.chronicConditions || patient.medical_history.chronicConditions.length === 0) && 
                (!patient.medical_history?.currentMedications || patient.medical_history.currentMedications.length === 0) && (
                 <p className="text-sm text-gray-500 italic">No medical history recorded</p>
               )}
@@ -636,7 +599,7 @@ const ConsultationForm: React.FC = () => {
 
           {/* Right Side - Main Content */}
           <div className="w-3/4">
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-white rounded-lg shadow-sm">
               <div className="max-h-[calc(100vh-250px)] overflow-y-auto p-6">
                 {/* Assessment Tab */}
                 {activeTab === 'assessment' && (
@@ -647,7 +610,7 @@ const ConsultationForm: React.FC = () => {
                       <label htmlFor="chiefComplaint" className="form-label">Chief Complaint</label>
                       <textarea
                         id="chiefComplaint"
-                        rows={2}
+                        rows={3}
                         {...register('chiefComplaint', { required: 'Chief complaint is required' })}
                         className="form-input"
                         placeholder="Patient's main complaint"
@@ -657,180 +620,149 @@ const ConsultationForm: React.FC = () => {
                       )}
                     </div>
 
-                    {/* 1. Patient History (Collapsible) */}
-                    <div className="border rounded-lg overflow-hidden">
-                      <div 
-                        className="flex justify-between items-center p-3 bg-gray-50 cursor-pointer"
-                        onClick={() => toggleSection('patientHistory')}
-                      >
+                    {/* Patient History Section */}
+                    <div>
+                      <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('patientHistory')}>
                         <h3 className="text-md font-medium text-gray-900">Patient History</h3>
-                        {collapsedSections.patientHistory ? (
-                          <ChevronRight className="h-5 w-5 text-gray-500" />
-                        ) : (
-                          <ChevronDown className="h-5 w-5 text-gray-500" />
-                        )}
+                        {collapsedSections.patientHistory ? 
+                          <ChevronRight className="h-5 w-5 text-gray-400" /> : 
+                          <ChevronDown className="h-5 w-5 text-gray-400" />
+                        }
                       </div>
                       
                       {!collapsedSections.patientHistory && (
-                        <div className="p-4 space-y-4">
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-1">History of Presenting Illness</h4>
-                            <textarea
-                              rows={2}
-                              className="form-input text-sm"
-                              placeholder="Enter details about the history of presenting illness..."
-                              {...register('patientHistory.presentingIllness')}
-                            />
-                          </div>
+                        <div className="mt-2 bg-gray-50 p-4 rounded-lg">
+                          <h4 className="text-sm font-medium text-gray-700 mb-1">History of Presenting Illness</h4>
+                          <textarea
+                            rows={3}
+                            className="form-input text-sm"
+                            placeholder="Enter details about the history of presenting illness..."
+                          />
                           
                           {patient.gender === 'Female' && (
-                            <div>
+                            <div className="mt-3">
                               <h4 className="text-sm font-medium text-gray-700 mb-1">Gynecological/Obstetric History</h4>
                               <textarea
                                 rows={2}
                                 className="form-input text-sm"
                                 placeholder="Enter gynecological or obstetric history if applicable..."
-                                {...register('patientHistory.gynecologicalHistory')}
                               />
                             </div>
                           )}
                           
-                          <div>
+                          <div className="mt-3">
                             <h4 className="text-sm font-medium text-gray-700 mb-1">Past Medical and Surgical History</h4>
                             <textarea
                               rows={2}
                               className="form-input text-sm"
                               placeholder="Enter past medical and surgical history..."
-                              {...register('patientHistory.pastMedicalSurgicalHistory')}
                             />
                           </div>
                         </div>
                       )}
                     </div>
 
-                    {/* 2. Family and Socioeconomic History (Collapsible) */}
-                    <div className="border rounded-lg overflow-hidden">
-                      <div 
-                        className="flex justify-between items-center p-3 bg-gray-50 cursor-pointer"
-                        onClick={() => toggleSection('familySocioeconomicHistory')}
-                      >
+                    {/* Family and Socioeconomic History */}
+                    <div>
+                      <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('familyHistory')}>
                         <h3 className="text-md font-medium text-gray-900">Family and Socioeconomic History</h3>
-                        {collapsedSections.familySocioeconomicHistory ? (
-                          <ChevronRight className="h-5 w-5 text-gray-500" />
-                        ) : (
-                          <ChevronDown className="h-5 w-5 text-gray-500" />
-                        )}
+                        {collapsedSections.familyHistory ? 
+                          <ChevronRight className="h-5 w-5 text-gray-400" /> : 
+                          <ChevronDown className="h-5 w-5 text-gray-400" />
+                        }
                       </div>
                       
-                      {!collapsedSections.familySocioeconomicHistory && (
-                        <div className="p-4">
+                      {!collapsedSections.familyHistory && (
+                        <div className="mt-2">
                           <textarea
                             rows={3}
                             className="form-input"
                             placeholder="Enter family history and socioeconomic information..."
-                            {...register('familySocioeconomicHistory')}
                           />
                         </div>
                       )}
                     </div>
 
-                    {/* 3. General Examination (Collapsible) */}
-                    <div className="border rounded-lg overflow-hidden">
-                      <div 
-                        className="flex justify-between items-center p-3 bg-gray-50 cursor-pointer"
-                        onClick={() => toggleSection('generalExamination')}
-                      >
+                    {/* General Examination */}
+                    <div>
+                      <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('generalExamination')}>
                         <h3 className="text-md font-medium text-gray-900">General Examination</h3>
-                        {collapsedSections.generalExamination ? (
-                          <ChevronRight className="h-5 w-5 text-gray-500" />
-                        ) : (
-                          <ChevronDown className="h-5 w-5 text-gray-500" />
-                        )}
+                        {collapsedSections.generalExamination ? 
+                          <ChevronRight className="h-5 w-5 text-gray-400" /> : 
+                          <ChevronDown className="h-5 w-5 text-gray-400" />
+                        }
                       </div>
                       
                       {!collapsedSections.generalExamination && (
-                        <div className="p-4">
+                        <div className="mt-2">
                           <textarea
                             rows={3}
                             className="form-input"
                             placeholder="Enter general examination findings..."
-                            {...register('generalExamination')}
                           />
                         </div>
                       )}
                     </div>
 
-                    {/* 4. Systemic Examination (Collapsible) */}
-                    <div className="border rounded-lg overflow-hidden">
-                      <div 
-                        className="flex justify-between items-center p-3 bg-gray-50 cursor-pointer"
-                        onClick={() => toggleSection('systemicExamination')}
-                      >
+                    {/* Systemic Examination */}
+                    <div>
+                      <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('systemicExamination')}>
                         <h3 className="text-md font-medium text-gray-900">Systemic Examination</h3>
-                        {collapsedSections.systemicExamination ? (
-                          <ChevronRight className="h-5 w-5 text-gray-500" />
-                        ) : (
-                          <ChevronDown className="h-5 w-5 text-gray-500" />
-                        )}
+                        {collapsedSections.systemicExamination ? 
+                          <ChevronRight className="h-5 w-5 text-gray-400" /> : 
+                          <ChevronDown className="h-5 w-5 text-gray-400" />
+                        }
                       </div>
                       
                       {!collapsedSections.systemicExamination && (
-                        <div className="p-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-700 mb-1">Cardiovascular System</h4>
-                              <textarea
-                                rows={2}
-                                className="form-input text-sm"
-                                placeholder="Enter cardiovascular findings..."
-                                {...register('systemicExamination.cardiovascular')}
-                              />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-700 mb-1">Respiratory System</h4>
-                              <textarea
-                                rows={2}
-                                className="form-input text-sm"
-                                placeholder="Enter respiratory findings..."
-                                {...register('systemicExamination.respiratory')}
-                              />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-700 mb-1">Gastrointestinal System</h4>
-                              <textarea
-                                rows={2}
-                                className="form-input text-sm"
-                                placeholder="Enter gastrointestinal findings..."
-                                {...register('systemicExamination.gastrointestinal')}
-                              />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-700 mb-1">Central Nervous System</h4>
-                              <textarea
-                                rows={2}
-                                className="form-input text-sm"
-                                placeholder="Enter neurological findings..."
-                                {...register('systemicExamination.centralNervous')}
-                              />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-700 mb-1">Musculoskeletal</h4>
-                              <textarea
-                                rows={2}
-                                className="form-input text-sm"
-                                placeholder="Enter musculoskeletal findings..."
-                                {...register('systemicExamination.musculoskeletal')}
-                              />
-                            </div>
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-700 mb-1">Other Systems/Examination</h4>
-                              <textarea
-                                rows={2}
-                                className="form-input text-sm"
-                                placeholder="Enter other examination findings..."
-                                {...register('systemicExamination.other')}
-                              />
-                            </div>
+                        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-1">Cardiovascular System</h4>
+                            <textarea
+                              rows={2}
+                              className="form-input text-sm"
+                              placeholder="Enter cardiovascular findings..."
+                            />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-1">Respiratory System</h4>
+                            <textarea
+                              rows={2}
+                              className="form-input text-sm"
+                              placeholder="Enter respiratory findings..."
+                            />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-1">Gastrointestinal System</h4>
+                            <textarea
+                              rows={2}
+                              className="form-input text-sm"
+                              placeholder="Enter gastrointestinal findings..."
+                            />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-1">Central Nervous System</h4>
+                            <textarea
+                              rows={2}
+                              className="form-input text-sm"
+                              placeholder="Enter neurological findings..."
+                            />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-1">Musculoskeletal</h4>
+                            <textarea
+                              rows={2}
+                              className="form-input text-sm"
+                              placeholder="Enter musculoskeletal findings..."
+                            />
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 mb-1">Other Systems/Examination</h4>
+                            <textarea
+                              rows={2}
+                              className="form-input text-sm"
+                              placeholder="Enter other examination findings..."
+                            />
                           </div>
                         </div>
                       )}
@@ -840,7 +772,7 @@ const ConsultationForm: React.FC = () => {
                       <label htmlFor="diagnosis" className="form-label">Diagnosis</label>
                       <textarea
                         id="diagnosis"
-                        rows={2}
+                        rows={3}
                         {...register('diagnosis', { required: 'Diagnosis is required' })}
                         className="form-input"
                         placeholder="Clinical diagnosis"
@@ -1030,17 +962,9 @@ const ConsultationForm: React.FC = () => {
                               type="button"
                               onClick={() => {
                                 setPrescriptionCount(prev => prev - 1);
-                                // Remove this prescription from the form data
-                                const currentPrescriptions = watch('prescriptions');
-                                setValue('prescriptions', 
-                                  currentPrescriptions.filter((_, i) => i !== index)
-                                );
-                                
-                                addNotification({
-                                  message: 'Medication removed',
-                                  type: 'info',
-                                  duration: 2000
-                                });
+                                const currentPrescriptions = [...prescriptions];
+                                currentPrescriptions.splice(index, 1);
+                                setValue('prescriptions', currentPrescriptions);
                               }}
                               className="text-error-600 hover:text-error-700"
                             >
@@ -1050,26 +974,39 @@ const ConsultationForm: React.FC = () => {
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                          <div>
+                          <div className="relative">
                             <label className="form-label">Medication Name</label>
-                            <div className="relative">
-                              <input
-                                type="text"
-                                list={`medications-${index}`}
-                                {...register(`prescriptions.${index}.medication` as const, {
-                                  required: 'Medication name is required'
-                                })}
-                                className="form-input"
-                                placeholder="Enter or select medication"
-                              />
-                              <datalist id={`medications-${index}`}>
-                                {medicationOptions.map((med, i) => (
-                                  <option key={i} value={med} />
+                            <input
+                              type="text"
+                              {...register(`prescriptions.${index}.medication` as const, {
+                                required: 'Medication name is required'
+                              })}
+                              className="form-input"
+                              placeholder="Search medication..."
+                              onChange={(e) => {
+                                // Update the form value
+                                const updatedPrescriptions = [...prescriptions];
+                                updatedPrescriptions[index].medication = e.target.value;
+                                setValue('prescriptions', updatedPrescriptions);
+                                
+                                // Update search term for suggestions
+                                setMedicationSearch(e.target.value);
+                              }}
+                            />
+                            
+                            {/* Medication suggestions dropdown */}
+                            {medicationSearch && medicationSuggestions.length > 0 && (
+                              <div className="absolute z-10 w-full mt-1 bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-auto">
+                                {medicationSuggestions.map((med, i) => (
+                                  <div 
+                                    key={i}
+                                    className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                                    onClick={() => selectMedication(med, index)}
+                                  >
+                                    {med}
+                                  </div>
                                 ))}
-                              </datalist>
-                            </div>
-                            {errors.prescriptions?.[index]?.medication && (
-                              <p className="form-error">{errors.prescriptions[index]?.medication?.message}</p>
+                              </div>
                             )}
                           </div>
 
@@ -1083,9 +1020,6 @@ const ConsultationForm: React.FC = () => {
                               className="form-input"
                               placeholder="e.g., 500mg"
                             />
-                            {errors.prescriptions?.[index]?.dosage && (
-                              <p className="form-error">{errors.prescriptions[index]?.dosage?.message}</p>
-                            )}
                           </div>
 
                           <div>
@@ -1097,13 +1031,16 @@ const ConsultationForm: React.FC = () => {
                               className="form-input"
                             >
                               <option value="">Select frequency</option>
-                              {frequencyOptions.map((option, i) => (
-                                <option key={i} value={option}>{option}</option>
-                              ))}
+                              <option value="Once daily">Once daily</option>
+                              <option value="Twice daily">Twice daily</option>
+                              <option value="Three times daily">Three times daily</option>
+                              <option value="Four times daily">Four times daily</option>
+                              <option value="Every 4 hours">Every 4 hours</option>
+                              <option value="Every 6 hours">Every 6 hours</option>
+                              <option value="Every 8 hours">Every 8 hours</option>
+                              <option value="Every 12 hours">Every 12 hours</option>
+                              <option value="As needed">As needed</option>
                             </select>
-                            {errors.prescriptions?.[index]?.frequency && (
-                              <p className="form-error">{errors.prescriptions[index]?.frequency?.message}</p>
-                            )}
                           </div>
 
                           <div>
@@ -1115,13 +1052,17 @@ const ConsultationForm: React.FC = () => {
                               className="form-input"
                             >
                               <option value="">Select duration</option>
-                              {durationOptions.map((option, i) => (
-                                <option key={i} value={option}>{option}</option>
-                              ))}
+                              <option value="3 days">3 days</option>
+                              <option value="5 days">5 days</option>
+                              <option value="7 days">7 days</option>
+                              <option value="10 days">10 days</option>
+                              <option value="14 days">14 days</option>
+                              <option value="1 month">1 month</option>
+                              <option value="2 months">2 months</option>
+                              <option value="3 months">3 months</option>
+                              <option value="6 months">6 months</option>
+                              <option value="Indefinite">Indefinite</option>
                             </select>
-                            {errors.prescriptions?.[index]?.duration && (
-                              <p className="form-error">{errors.prescriptions[index]?.duration?.message}</p>
-                            )}
                           </div>
 
                           <div className="sm:col-span-2">
@@ -1130,7 +1071,7 @@ const ConsultationForm: React.FC = () => {
                               {...register(`prescriptions.${index}.instructions` as const)}
                               className="form-input"
                               rows={2}
-                              placeholder="Any special instructions for this medication"
+                              placeholder="Take with food, avoid alcohol, etc."
                             />
                           </div>
                         </div>
@@ -1184,25 +1125,25 @@ const ConsultationForm: React.FC = () => {
                   </div>
                 )}
               </div>
-              
-              <div className="border-t border-gray-200 p-4 bg-gray-50 flex justify-end space-x-4">
-                <button
-                  type="button"
-                  onClick={() => navigate('/patients')}
-                  className="btn btn-outline"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="btn btn-primary"
-                >
-                  {isSubmitting ? 'Submitting...' : 'Complete Consultation'}
-                </button>
-              </div>
             </div>
           </div>
+        </div>
+
+        <div className="flex justify-end space-x-4">
+          <button
+            type="button"
+            onClick={() => navigate('/patients')}
+            className="btn btn-outline"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="btn btn-primary"
+          >
+            {isSubmitting ? 'Submitting...' : 'Complete Consultation'}
+          </button>
         </div>
       </form>
 
