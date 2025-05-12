@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { FileText, Plus, Trash2, User, Activity, Thermometer, Heart, Settings as Lungs, Droplets, AlertTriangle, Stethoscope, ChevronDown, ChevronRight } from 'lucide-react';
+import { FileText, Plus, Trash2, User, Activity, AlertTriangle, Pill, FileImage, Microscope, DollarSign, Printer, Save, ArrowLeft } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
@@ -11,6 +11,12 @@ interface ConsultationFormData {
   treatmentPlan: string;
   notes: string;
   medicalCertificate: boolean;
+  medicalCertificateDetails: {
+    startDate: string;
+    endDate: string;
+    reason: string;
+    recommendations: string;
+  };
   prescriptions: {
     medication: string;
     dosage: string;
@@ -44,27 +50,51 @@ const ConsultationForm: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showLabTestModal, setShowLabTestModal] = useState(false);
   const [showRadiologyModal, setShowRadiologyModal] = useState(false);
-  const [collapsedSections, setCollapsedSections] = useState<{[key: string]: boolean}>({
-    patientHistory: false,
-    familyHistory: false,
-    generalExamination: false,
-    systemicExamination: false
-  });
+  const [showMedicalCertificate, setShowMedicalCertificate] = useState(false);
   const [medicationSearch, setMedicationSearch] = useState('');
   const [medicationSuggestions, setMedicationSuggestions] = useState<string[]>([]);
+  const [selectedMedicationIndex, setSelectedMedicationIndex] = useState<number | null>(null);
   
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch } = useForm<ConsultationFormData>({
     defaultValues: {
       prescriptions: [{ medication: '', dosage: '', frequency: '', duration: '', instructions: '' }],
       labTests: [],
       radiologyTests: [],
-      medicalCertificate: false
+      medicalCertificate: false,
+      medicalCertificateDetails: {
+        startDate: new Date().toISOString().split('T')[0],
+        endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        reason: '',
+        recommendations: ''
+      }
     }
   });
 
   const labTests = watch('labTests');
   const radiologyTests = watch('radiologyTests');
-  const prescriptions = watch('prescriptions');
+  const medicalCertificate = watch('medicalCertificate');
+  const medicalCertificateDetails = watch('medicalCertificateDetails');
+
+  // Common medications for search
+  const commonMedications = [
+    'Acetaminophen', 'Amoxicillin', 'Atorvastatin', 'Azithromycin', 'Cephalexin',
+    'Ciprofloxacin', 'Doxycycline', 'Hydrochlorothiazide', 'Ibuprofen', 'Levothyroxine',
+    'Lisinopril', 'Metformin', 'Metoprolol', 'Omeprazole', 'Prednisone',
+    'Sertraline', 'Simvastatin', 'Tramadol', 'Warfarin', 'Zoloft'
+  ];
+
+  // Frequency options
+  const frequencyOptions = [
+    'Once daily', 'Twice daily', 'Three times daily', 'Four times daily',
+    'Every 4 hours', 'Every 6 hours', 'Every 8 hours', 'Every 12 hours',
+    'As needed', 'Before meals', 'After meals', 'At bedtime'
+  ];
+
+  // Duration options
+  const durationOptions = [
+    '3 days', '5 days', '7 days', '10 days', '14 days', '21 days',
+    '1 month', '2 months', '3 months', '6 months', 'Indefinitely'
+  ];
 
   useEffect(() => {
     if (patientId) {
@@ -73,6 +103,18 @@ const ConsultationForm: React.FC = () => {
       setIsLoading(false);
     }
   }, [patientId]);
+
+  useEffect(() => {
+    // Filter medications based on search term
+    if (medicationSearch.trim() && selectedMedicationIndex !== null) {
+      const filtered = commonMedications.filter(med => 
+        med.toLowerCase().includes(medicationSearch.toLowerCase())
+      );
+      setMedicationSuggestions(filtered);
+    } else {
+      setMedicationSuggestions([]);
+    }
+  }, [medicationSearch, selectedMedicationIndex]);
 
   const fetchPatient = async () => {
     try {
@@ -230,7 +272,7 @@ const ConsultationForm: React.FC = () => {
       }
 
       addNotification({
-        message: 'Consultation saved successfully',
+        message: 'Consultation completed successfully',
         type: 'success'
       });
 
@@ -238,7 +280,7 @@ const ConsultationForm: React.FC = () => {
     } catch (error: any) {
       console.error('Error submitting consultation:', error.message);
       addNotification({
-        message: `Error saving consultation: ${error.message}`,
+        message: `Error: ${error.message}`,
         type: 'error'
       });
     } finally {
@@ -294,27 +336,6 @@ const ConsultationForm: React.FC = () => {
       { name: 'MRI - Knee', price: 10000 }
     ]}
   ];
-
-  // Available medications for search
-  const availableMedications = [
-    'Acetaminophen', 'Amoxicillin', 'Atorvastatin', 'Azithromycin', 'Cephalexin',
-    'Ciprofloxacin', 'Citalopram', 'Diazepam', 'Doxycycline', 'Fluoxetine',
-    'Hydrochlorothiazide', 'Ibuprofen', 'Levothyroxine', 'Lisinopril', 'Loratadine',
-    'Metformin', 'Metoprolol', 'Omeprazole', 'Prednisone', 'Sertraline',
-    'Simvastatin', 'Tramadol', 'Warfarin', 'Zolpidem'
-  ];
-
-  // Handle medication search
-  useEffect(() => {
-    if (medicationSearch.length > 1) {
-      const filteredMeds = availableMedications.filter(med => 
-        med.toLowerCase().includes(medicationSearch.toLowerCase())
-      );
-      setMedicationSuggestions(filteredMeds.slice(0, 5));
-    } else {
-      setMedicationSuggestions([]);
-    }
-  }, [medicationSearch]);
 
   const addLabTest = (test: { name: string, price: number }) => {
     const currentTests = watch('labTests') || [];
@@ -398,19 +419,140 @@ const ConsultationForm: React.FC = () => {
     }).format(amount);
   };
 
-  const toggleSection = (section: string) => {
-    setCollapsedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
-  const selectMedication = (medication: string, index: number) => {
+  const handleMedicationSelect = (medication: string, index: number) => {
+    const prescriptions = watch('prescriptions');
     const updatedPrescriptions = [...prescriptions];
     updatedPrescriptions[index].medication = medication;
     setValue('prescriptions', updatedPrescriptions);
     setMedicationSearch('');
     setMedicationSuggestions([]);
+    setSelectedMedicationIndex(null);
+  };
+
+  const printMedicalCertificate = () => {
+    const certificateWindow = window.open('', '_blank');
+    if (!certificateWindow) return;
+
+    const startDate = new Date(medicalCertificateDetails.startDate);
+    const endDate = new Date(medicalCertificateDetails.endDate);
+    const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+
+    certificateWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Medical Certificate</title>
+        <style>
+          body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+          }
+          .header {
+            text-align: center;
+            margin-bottom: 30px;
+            border-bottom: 2px solid #333;
+            padding-bottom: 10px;
+          }
+          .logo {
+            font-size: 24px;
+            font-weight: bold;
+            color: #00afaf;
+          }
+          .hospital-info {
+            margin-top: 5px;
+            font-size: 14px;
+          }
+          .title {
+            text-align: center;
+            font-size: 22px;
+            font-weight: bold;
+            margin: 20px 0;
+            text-decoration: underline;
+          }
+          .content {
+            margin: 20px 0;
+          }
+          .footer {
+            margin-top: 50px;
+            display: flex;
+            justify-content: space-between;
+          }
+          .signature {
+            border-top: 1px solid #333;
+            padding-top: 5px;
+            width: 200px;
+            text-align: center;
+          }
+          .date {
+            text-align: right;
+            margin-top: 20px;
+          }
+          @media print {
+            body {
+              padding: 0;
+              margin: 0;
+            }
+            .no-print {
+              display: none;
+            }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo">${hospital?.name || 'Hospital Management System'}</div>
+          <div class="hospital-info">
+            ${hospital?.address || '123 Hospital Street'}<br>
+            Phone: ${hospital?.phone || '(123) 456-7890'} | Email: ${hospital?.email || 'info@hospital.com'}
+          </div>
+        </div>
+
+        <div class="title">MEDICAL CERTIFICATE</div>
+
+        <div class="content">
+          <p>This is to certify that <strong>${patient?.first_name} ${patient?.last_name}</strong>, 
+          ${patient?.gender}, ${new Date().getFullYear() - new Date(patient?.date_of_birth).getFullYear()} years old, 
+          has been examined by me on <strong>${new Date().toLocaleDateString()}</strong>.</p>
+          
+          <p>Diagnosis: <strong>${watch('diagnosis')}</strong></p>
+          
+          <p>The patient is advised to rest for <strong>${daysDiff} day(s)</strong> 
+          from <strong>${startDate.toLocaleDateString()}</strong> to <strong>${endDate.toLocaleDateString()}</strong> 
+          due to ${medicalCertificateDetails.reason || 'medical reasons'}.</p>
+          
+          <p>Recommendations: ${medicalCertificateDetails.recommendations || 'Follow the prescribed treatment plan and rest as advised.'}</p>
+        </div>
+
+        <div class="footer">
+          <div class="signature">
+            Dr. ${user?.first_name} ${user?.last_name}<br>
+            ${user?.specialization || 'Physician'}<br>
+            License No: ____________
+          </div>
+        </div>
+
+        <div class="date">
+          Date: ${new Date().toLocaleDateString()}
+        </div>
+        
+        <div class="no-print" style="margin-top: 30px; text-align: center;">
+          <button onclick="window.print();" style="padding: 10px 20px; background: #00afaf; color: white; border: none; border-radius: 4px; cursor: pointer;">
+            Print Certificate
+          </button>
+        </div>
+      </body>
+      </html>
+    `);
+    
+    certificateWindow.document.close();
+    
+    // Auto print
+    setTimeout(() => {
+      certificateWindow.print();
+    }, 500);
   };
 
   if (isLoading) {
@@ -430,8 +572,8 @@ const ConsultationForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+    <div className="max-w-7xl mx-auto">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Patient Header */}
         <div className="bg-gradient-to-r from-primary-700 to-primary-600 rounded-lg shadow-sm p-3 mb-3">
           <div className="flex items-center">
@@ -450,157 +592,171 @@ const ConsultationForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-3">
-          <div className="flex border-b border-gray-200">
-            <button
-              type="button"
-              className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
-                activeTab === 'assessment'
-                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-              onClick={() => setActiveTab('assessment')}
-            >
-              Assessment
-            </button>
-            <button
-              type="button"
-              className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
-                activeTab === 'diagnostics'
-                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-              onClick={() => setActiveTab('diagnostics')}
-            >
-              Diagnostic Tests
-            </button>
-            <button
-              type="button"
-              className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
-                activeTab === 'medications'
-                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-              onClick={() => setActiveTab('medications')}
-            >
-              Medications
-            </button>
-            <button
-              type="button"
-              className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
-                activeTab === 'notes'
-                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-              onClick={() => setActiveTab('notes')}
-            >
-              Notes
-            </button>
-          </div>
-        </div>
+        {/* Main Content Area */}
+        <div className="flex flex-col md:flex-row space-y-6 md:space-y-0 md:space-x-6">
+          {/* Left Column - Vital Signs & Medical History */}
+          <div className="w-full md:w-1/4">
+            <div className="space-y-4">
+              {/* Vital Signs */}
+              <div className="bg-white rounded-lg shadow-sm p-4">
+                <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
+                  <Activity className="h-4 w-4 text-primary-500 mr-2" />
+                  Vital Signs
+                </h3>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Temperature:</span>
+                    <span className="font-medium">36.8°C</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Heart Rate:</span>
+                    <span className="font-medium">78 bpm</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Blood Pressure:</span>
+                    <span className="font-medium">120/80 mmHg</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Respiratory Rate:</span>
+                    <span className="font-medium">16 breaths/min</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Oxygen Saturation:</span>
+                    <span className="font-medium">98%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Weight:</span>
+                    <span className="font-medium">70 kg</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">Height:</span>
+                    <span className="font-medium">175 cm</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-600">BMI:</span>
+                    <span className="font-medium">22.9</span>
+                  </div>
+                </div>
+              </div>
 
-        <div className="flex space-x-4">
-          {/* Left Side - Vital Signs and Medical History */}
-          <div className="w-1/4 space-y-4">
-            {/* Vital Signs */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <h3 className="text-md font-medium text-gray-900 mb-3">Vital Signs</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <Activity className="h-4 w-4 text-primary-500 mr-2" />
-                    <span className="text-sm">Blood Pressure</span>
-                  </div>
-                  <span className="text-sm font-medium">120/80 mmHg</span>
+              {/* Medical History */}
+              <div className="bg-white rounded-lg shadow-sm p-4">
+                <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
+                  <FileText className="h-4 w-4 text-primary-500 mr-2" />
+                  Medical History
+                </h3>
+                
+                {/* Allergies */}
+                <div className="mb-3">
+                  <h4 className="text-sm font-medium text-gray-700 mb-1">Allergies</h4>
+                  {patient.medical_history?.allergies?.length > 0 ? (
+                    <div className="space-y-1">
+                      {patient.medical_history.allergies.map((allergy: any, index: number) => (
+                        <div key={index} className="flex items-start">
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium text-error-600">{allergy.allergen}</p>
+                            <p className="text-xs text-gray-500">{allergy.reaction} - {allergy.severity}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">No known allergies</p>
+                  )}
                 </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <Heart className="h-4 w-4 text-primary-500 mr-2" />
-                    <span className="text-sm">Heart Rate</span>
-                  </div>
-                  <span className="text-sm font-medium">72 bpm</span>
+                
+                {/* Chronic Conditions */}
+                <div className="mb-3">
+                  <h4 className="text-sm font-medium text-gray-700 mb-1">Chronic Conditions</h4>
+                  {patient.medical_history?.chronicConditions?.length > 0 ? (
+                    <ul className="list-disc list-inside text-xs text-gray-600 space-y-1">
+                      {patient.medical_history.chronicConditions.map((condition: string, index: number) => (
+                        <li key={index}>{condition}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className="text-xs text-gray-500">No chronic conditions</p>
+                  )}
                 </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <Thermometer className="h-4 w-4 text-primary-500 mr-2" />
-                    <span className="text-sm">Temperature</span>
-                  </div>
-                  <span className="text-sm font-medium">36.8°C</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <Lungs className="h-4 w-4 text-primary-500 mr-2" />
-                    <span className="text-sm">Respiratory Rate</span>
-                  </div>
-                  <span className="text-sm font-medium">16 bpm</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <div className="flex items-center">
-                    <Droplets className="h-4 w-4 text-primary-500 mr-2" />
-                    <span className="text-sm">SpO2</span>
-                  </div>
-                  <span className="text-sm font-medium">98%</span>
+                
+                {/* Current Medications */}
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-1">Current Medications</h4>
+                  {patient.medical_history?.currentMedications?.length > 0 ? (
+                    <div className="space-y-1">
+                      {patient.medical_history.currentMedications.map((medication: any, index: number) => (
+                        <div key={index} className="flex items-start">
+                          <Pill className="h-3 w-3 text-primary-500 mt-0.5 mr-1 flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-xs font-medium">{medication.name}</p>
+                            {medication.dosage && medication.frequency && (
+                              <p className="text-xs text-gray-500">{medication.dosage} - {medication.frequency}</p>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500">No current medications</p>
+                  )}
                 </div>
               </div>
             </div>
-
-            {/* Medical History */}
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <h3 className="text-md font-medium text-gray-900 mb-3">Medical History</h3>
-              
-              {patient.medical_history?.allergies && patient.medical_history.allergies.length > 0 && (
-                <div className="mb-3">
-                  <div className="flex items-center text-error-600 mb-1">
-                    <AlertTriangle className="h-4 w-4 mr-1" />
-                    <h4 className="text-sm font-medium">Allergies</h4>
-                  </div>
-                  <ul className="pl-6 text-sm space-y-1">
-                    {patient.medical_history.allergies.map((allergy: any, index: number) => (
-                      <li key={index} className="list-disc">
-                        <span className="font-medium">{allergy.allergen}</span>: {allergy.reaction}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              
-              {patient.medical_history?.chronicConditions && patient.medical_history.chronicConditions.length > 0 && (
-                <div className="mb-3">
-                  <h4 className="text-sm font-medium mb-1">Chronic Conditions</h4>
-                  <ul className="pl-6 text-sm space-y-1">
-                    {patient.medical_history.chronicConditions.map((condition: string, index: number) => (
-                      <li key={index} className="list-disc">{condition}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              
-              {patient.medical_history?.currentMedications && patient.medical_history.currentMedications.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium mb-1">Current Medications</h4>
-                  <ul className="pl-6 text-sm space-y-1">
-                    {patient.medical_history.currentMedications.map((medication: any, index: number) => (
-                      <li key={index} className="list-disc">
-                        {medication.name} {medication.dosage && `(${medication.dosage})`} {medication.frequency && `- ${medication.frequency}`}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              
-              {(!patient.medical_history?.allergies || patient.medical_history.allergies.length === 0) && 
-               (!patient.medical_history?.chronicConditions || patient.medical_history.chronicConditions.length === 0) && 
-               (!patient.medical_history?.currentMedications || patient.medical_history.currentMedications.length === 0) && (
-                <p className="text-sm text-gray-500 italic">No medical history recorded</p>
-              )}
-            </div>
           </div>
 
-          {/* Right Side - Main Content */}
-          <div className="w-3/4">
-            <div className="bg-white rounded-lg shadow-sm">
-              <div className="max-h-[calc(100vh-250px)] overflow-y-auto p-6">
+          {/* Right Column - Main Form Content */}
+          <div className="w-full md:w-3/4">
+            <div className="bg-white rounded-lg shadow-sm mb-3">
+              <div className="flex border-b border-gray-200">
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'assessment'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('assessment')}
+                >
+                  Assessment
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'diagnostics'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('diagnostics')}
+                >
+                  Diagnostic Tests
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'medications'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('medications')}
+                >
+                  Medications
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'notes'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('notes')}
+                >
+                  Notes
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className="p-6 max-h-[calc(100vh-250px)] overflow-y-auto">
                 {/* Assessment Tab */}
                 {activeTab === 'assessment' && (
                   <div className="space-y-6">
@@ -620,152 +776,166 @@ const ConsultationForm: React.FC = () => {
                       )}
                     </div>
 
-                    {/* Patient History Section */}
                     <div>
-                      <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('patientHistory')}>
-                        <h3 className="text-md font-medium text-gray-900">Patient History</h3>
-                        {collapsedSections.patientHistory ? 
-                          <ChevronRight className="h-5 w-5 text-gray-400" /> : 
-                          <ChevronDown className="h-5 w-5 text-gray-400" />
-                        }
-                      </div>
-                      
-                      {!collapsedSections.patientHistory && (
-                        <div className="mt-2 bg-gray-50 p-4 rounded-lg">
-                          <h4 className="text-sm font-medium text-gray-700 mb-1">History of Presenting Illness</h4>
-                          <textarea
-                            rows={3}
-                            className="form-input text-sm"
-                            placeholder="Enter details about the history of presenting illness..."
-                          />
-                          
-                          {patient.gender === 'Female' && (
-                            <div className="mt-3">
-                              <h4 className="text-sm font-medium text-gray-700 mb-1">Gynecological/Obstetric History</h4>
-                              <textarea
-                                rows={2}
-                                className="form-input text-sm"
-                                placeholder="Enter gynecological or obstetric history if applicable..."
-                              />
-                            </div>
-                          )}
-                          
+                      <h3 className="text-md font-medium text-gray-900 mb-2 flex items-center justify-between">
+                        <span>Patient History</span>
+                        <button 
+                          type="button" 
+                          className="text-xs text-primary-600 hover:text-primary-800"
+                          onClick={() => {
+                            const element = document.getElementById('patientHistorySection');
+                            if (element) {
+                              element.classList.toggle('hidden');
+                            }
+                          }}
+                        >
+                          Show/Hide
+                        </button>
+                      </h3>
+                      <div id="patientHistorySection" className="bg-gray-50 p-4 rounded-lg">
+                        <h4 className="text-sm font-medium text-gray-700 mb-1">History of Presenting Illness</h4>
+                        <textarea
+                          rows={3}
+                          className="form-input text-sm"
+                          placeholder="Enter details about the history of presenting illness..."
+                        />
+                        
+                        {patient.gender === 'Female' && (
                           <div className="mt-3">
-                            <h4 className="text-sm font-medium text-gray-700 mb-1">Past Medical and Surgical History</h4>
+                            <h4 className="text-sm font-medium text-gray-700 mb-1">Gynecological/Obstetric History</h4>
                             <textarea
                               rows={2}
                               className="form-input text-sm"
-                              placeholder="Enter past medical and surgical history..."
+                              placeholder="Enter gynecological or obstetric history if applicable..."
                             />
                           </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Family and Socioeconomic History */}
-                    <div>
-                      <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('familyHistory')}>
-                        <h3 className="text-md font-medium text-gray-900">Family and Socioeconomic History</h3>
-                        {collapsedSections.familyHistory ? 
-                          <ChevronRight className="h-5 w-5 text-gray-400" /> : 
-                          <ChevronDown className="h-5 w-5 text-gray-400" />
-                        }
-                      </div>
-                      
-                      {!collapsedSections.familyHistory && (
-                        <div className="mt-2">
+                        )}
+                        
+                        <div className="mt-3">
+                          <h4 className="text-sm font-medium text-gray-700 mb-1">Past Medical and Surgical History</h4>
                           <textarea
-                            rows={3}
-                            className="form-input"
-                            placeholder="Enter family history and socioeconomic information..."
+                            rows={2}
+                            className="form-input text-sm"
+                            placeholder="Enter past medical and surgical history..."
                           />
                         </div>
-                      )}
+                      </div>
                     </div>
 
-                    {/* General Examination */}
                     <div>
-                      <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('generalExamination')}>
-                        <h3 className="text-md font-medium text-gray-900">General Examination</h3>
-                        {collapsedSections.generalExamination ? 
-                          <ChevronRight className="h-5 w-5 text-gray-400" /> : 
-                          <ChevronDown className="h-5 w-5 text-gray-400" />
-                        }
-                      </div>
-                      
-                      {!collapsedSections.generalExamination && (
-                        <div className="mt-2">
+                      <h3 className="text-md font-medium text-gray-900 mb-2 flex items-center justify-between">
+                        <span>Family and Socioeconomic History</span>
+                        <button 
+                          type="button" 
+                          className="text-xs text-primary-600 hover:text-primary-800"
+                          onClick={() => {
+                            const element = document.getElementById('familyHistorySection');
+                            if (element) {
+                              element.classList.toggle('hidden');
+                            }
+                          }}
+                        >
+                          Show/Hide
+                        </button>
+                      </h3>
+                      <textarea
+                        id="familyHistorySection"
+                        rows={3}
+                        className="form-input"
+                        placeholder="Enter family history and socioeconomic information..."
+                      />
+                    </div>
+
+                    <div>
+                      <h3 className="text-md font-medium text-gray-900 mb-2 flex items-center justify-between">
+                        <span>General Examination</span>
+                        <button 
+                          type="button" 
+                          className="text-xs text-primary-600 hover:text-primary-800"
+                          onClick={() => {
+                            const element = document.getElementById('generalExamSection');
+                            if (element) {
+                              element.classList.toggle('hidden');
+                            }
+                          }}
+                        >
+                          Show/Hide
+                        </button>
+                      </h3>
+                      <textarea
+                        id="generalExamSection"
+                        rows={3}
+                        className="form-input"
+                        placeholder="Enter general examination findings..."
+                      />
+                    </div>
+
+                    <div>
+                      <h3 className="text-md font-medium text-gray-900 mb-2 flex items-center justify-between">
+                        <span>Systemic Examination</span>
+                        <button 
+                          type="button" 
+                          className="text-xs text-primary-600 hover:text-primary-800"
+                          onClick={() => {
+                            const element = document.getElementById('systemicExamSection');
+                            if (element) {
+                              element.classList.toggle('hidden');
+                            }
+                          }}
+                        >
+                          Show/Hide
+                        </button>
+                      </h3>
+                      <div id="systemicExamSection" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-1">Cardiovascular System</h4>
                           <textarea
-                            rows={3}
-                            className="form-input"
-                            placeholder="Enter general examination findings..."
+                            rows={2}
+                            className="form-input text-sm"
+                            placeholder="Enter cardiovascular findings..."
                           />
                         </div>
-                      )}
-                    </div>
-
-                    {/* Systemic Examination */}
-                    <div>
-                      <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('systemicExamination')}>
-                        <h3 className="text-md font-medium text-gray-900">Systemic Examination</h3>
-                        {collapsedSections.systemicExamination ? 
-                          <ChevronRight className="h-5 w-5 text-gray-400" /> : 
-                          <ChevronDown className="h-5 w-5 text-gray-400" />
-                        }
-                      </div>
-                      
-                      {!collapsedSections.systemicExamination && (
-                        <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-1">Cardiovascular System</h4>
-                            <textarea
-                              rows={2}
-                              className="form-input text-sm"
-                              placeholder="Enter cardiovascular findings..."
-                            />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-1">Respiratory System</h4>
-                            <textarea
-                              rows={2}
-                              className="form-input text-sm"
-                              placeholder="Enter respiratory findings..."
-                            />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-1">Gastrointestinal System</h4>
-                            <textarea
-                              rows={2}
-                              className="form-input text-sm"
-                              placeholder="Enter gastrointestinal findings..."
-                            />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-1">Central Nervous System</h4>
-                            <textarea
-                              rows={2}
-                              className="form-input text-sm"
-                              placeholder="Enter neurological findings..."
-                            />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-1">Musculoskeletal</h4>
-                            <textarea
-                              rows={2}
-                              className="form-input text-sm"
-                              placeholder="Enter musculoskeletal findings..."
-                            />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-medium text-gray-700 mb-1">Other Systems/Examination</h4>
-                            <textarea
-                              rows={2}
-                              className="form-input text-sm"
-                              placeholder="Enter other examination findings..."
-                            />
-                          </div>
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-1">Respiratory System</h4>
+                          <textarea
+                            rows={2}
+                            className="form-input text-sm"
+                            placeholder="Enter respiratory findings..."
+                          />
                         </div>
-                      )}
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-1">Gastrointestinal System</h4>
+                          <textarea
+                            rows={2}
+                            className="form-input text-sm"
+                            placeholder="Enter gastrointestinal findings..."
+                          />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-1">Central Nervous System</h4>
+                          <textarea
+                            rows={2}
+                            className="form-input text-sm"
+                            placeholder="Enter neurological findings..."
+                          />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-1">Musculoskeletal</h4>
+                          <textarea
+                            rows={2}
+                            className="form-input text-sm"
+                            placeholder="Enter musculoskeletal findings..."
+                          />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-700 mb-1">Other Systems/Examination</h4>
+                          <textarea
+                            rows={2}
+                            className="form-input text-sm"
+                            placeholder="Enter other examination findings..."
+                          />
+                        </div>
+                      </div>
                     </div>
 
                     <div>
@@ -962,9 +1132,12 @@ const ConsultationForm: React.FC = () => {
                               type="button"
                               onClick={() => {
                                 setPrescriptionCount(prev => prev - 1);
-                                const currentPrescriptions = [...prescriptions];
-                                currentPrescriptions.splice(index, 1);
-                                setValue('prescriptions', currentPrescriptions);
+                                // Remove this prescription from the form
+                                const prescriptions = watch('prescriptions');
+                                setValue('prescriptions', [
+                                  ...prescriptions.slice(0, index),
+                                  ...prescriptions.slice(index + 1)
+                                ]);
                               }}
                               className="text-error-600 hover:text-error-700"
                             >
@@ -983,25 +1156,35 @@ const ConsultationForm: React.FC = () => {
                               })}
                               className="form-input"
                               placeholder="Search medication..."
+                              value={selectedMedicationIndex === index ? medicationSearch : watch(`prescriptions.${index}.medication`)}
                               onChange={(e) => {
-                                // Update the form value
-                                const updatedPrescriptions = [...prescriptions];
-                                updatedPrescriptions[index].medication = e.target.value;
-                                setValue('prescriptions', updatedPrescriptions);
-                                
-                                // Update search term for suggestions
-                                setMedicationSearch(e.target.value);
+                                if (selectedMedicationIndex === index) {
+                                  setMedicationSearch(e.target.value);
+                                } else {
+                                  setSelectedMedicationIndex(index);
+                                  setMedicationSearch(e.target.value);
+                                  setValue(`prescriptions.${index}.medication`, e.target.value);
+                                }
+                              }}
+                              onFocus={() => {
+                                setSelectedMedicationIndex(index);
+                                setMedicationSearch(watch(`prescriptions.${index}.medication`));
+                              }}
+                              onBlur={() => {
+                                // Delay to allow clicking on suggestions
+                                setTimeout(() => {
+                                  setSelectedMedicationIndex(null);
+                                  setMedicationSuggestions([]);
+                                }, 200);
                               }}
                             />
-                            
-                            {/* Medication suggestions dropdown */}
-                            {medicationSearch && medicationSuggestions.length > 0 && (
-                              <div className="absolute z-10 w-full mt-1 bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-auto">
+                            {selectedMedicationIndex === index && medicationSuggestions.length > 0 && (
+                              <div className="absolute z-10 w-full mt-1 bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-y-auto">
                                 {medicationSuggestions.map((med, i) => (
-                                  <div 
+                                  <div
                                     key={i}
                                     className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                                    onClick={() => selectMedication(med, index)}
+                                    onClick={() => handleMedicationSelect(med, index)}
                                   >
                                     {med}
                                   </div>
@@ -1031,15 +1214,9 @@ const ConsultationForm: React.FC = () => {
                               className="form-input"
                             >
                               <option value="">Select frequency</option>
-                              <option value="Once daily">Once daily</option>
-                              <option value="Twice daily">Twice daily</option>
-                              <option value="Three times daily">Three times daily</option>
-                              <option value="Four times daily">Four times daily</option>
-                              <option value="Every 4 hours">Every 4 hours</option>
-                              <option value="Every 6 hours">Every 6 hours</option>
-                              <option value="Every 8 hours">Every 8 hours</option>
-                              <option value="Every 12 hours">Every 12 hours</option>
-                              <option value="As needed">As needed</option>
+                              {frequencyOptions.map((option, i) => (
+                                <option key={i} value={option}>{option}</option>
+                              ))}
                             </select>
                           </div>
 
@@ -1052,16 +1229,9 @@ const ConsultationForm: React.FC = () => {
                               className="form-input"
                             >
                               <option value="">Select duration</option>
-                              <option value="3 days">3 days</option>
-                              <option value="5 days">5 days</option>
-                              <option value="7 days">7 days</option>
-                              <option value="10 days">10 days</option>
-                              <option value="14 days">14 days</option>
-                              <option value="1 month">1 month</option>
-                              <option value="2 months">2 months</option>
-                              <option value="3 months">3 months</option>
-                              <option value="6 months">6 months</option>
-                              <option value="Indefinite">Indefinite</option>
+                              {durationOptions.map((option, i) => (
+                                <option key={i} value={option}>{option}</option>
+                              ))}
                             </select>
                           </div>
 
@@ -1071,7 +1241,7 @@ const ConsultationForm: React.FC = () => {
                               {...register(`prescriptions.${index}.instructions` as const)}
                               className="form-input"
                               rows={2}
-                              placeholder="Take with food, avoid alcohol, etc."
+                              placeholder="e.g., Take with food, avoid alcohol"
                             />
                           </div>
                         </div>
@@ -1110,17 +1280,79 @@ const ConsultationForm: React.FC = () => {
                       />
                     </div>
 
-                    <div className="flex items-center">
-                      <input
-                        type="checkbox"
-                        id="medicalCertificate"
-                        {...register('medicalCertificate')}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                      />
-                      <label htmlFor="medicalCertificate" className="ml-2 flex items-center text-sm font-medium text-gray-700">
-                        <FileText className="h-5 w-5 mr-1" />
-                        Issue Medical Certificate
-                      </label>
+                    <div className="border-t border-gray-200 pt-4">
+                      <div className="flex items-center mb-4">
+                        <input
+                          type="checkbox"
+                          id="medicalCertificate"
+                          {...register('medicalCertificate')}
+                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                          onChange={(e) => setShowMedicalCertificate(e.target.checked)}
+                        />
+                        <label htmlFor="medicalCertificate" className="ml-2 flex items-center text-sm font-medium text-gray-700">
+                          <FileText className="h-5 w-5 mr-1" />
+                          Issue Medical Certificate
+                        </label>
+                      </div>
+
+                      {showMedicalCertificate && (
+                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 space-y-4">
+                          <h3 className="text-md font-medium text-gray-900">Medical Certificate Details</h3>
+                          
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                              <label className="form-label">Start Date</label>
+                              <input
+                                type="date"
+                                {...register('medicalCertificateDetails.startDate')}
+                                className="form-input"
+                                defaultValue={new Date().toISOString().split('T')[0]}
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="form-label">End Date</label>
+                              <input
+                                type="date"
+                                {...register('medicalCertificateDetails.endDate')}
+                                className="form-input"
+                                defaultValue={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
+                              />
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <label className="form-label">Reason</label>
+                            <input
+                              type="text"
+                              {...register('medicalCertificateDetails.reason')}
+                              className="form-input"
+                              placeholder="e.g., Medical condition requiring rest"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="form-label">Recommendations</label>
+                            <textarea
+                              {...register('medicalCertificateDetails.recommendations')}
+                              className="form-input"
+                              rows={2}
+                              placeholder="e.g., Rest, avoid strenuous activities"
+                            />
+                          </div>
+                          
+                          <div className="flex justify-end">
+                            <button
+                              type="button"
+                              onClick={printMedicalCertificate}
+                              className="btn btn-outline inline-flex items-center"
+                            >
+                              <Printer className="h-4 w-4 mr-2" />
+                              Preview & Print
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1133,16 +1365,27 @@ const ConsultationForm: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/patients')}
-            className="btn btn-outline"
+            className="btn btn-outline inline-flex items-center"
           >
+            <ArrowLeft className="h-5 w-5 mr-2" />
             Cancel
           </button>
           <button
             type="submit"
-            disabled={isSubmitting}
-            className="btn btn-primary"
+            disabled={isSubmitting || isSaving}
+            className="btn btn-primary inline-flex items-center"
           >
-            {isSubmitting ? 'Submitting...' : 'Complete Consultation'}
+            {isSubmitting || isSaving ? (
+              <>
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                Submitting...
+              </>
+            ) : (
+              <>
+                <Save className="h-5 w-5 mr-2" />
+                Complete Consultation
+              </>
+            )}
           </button>
         </div>
       </form>
