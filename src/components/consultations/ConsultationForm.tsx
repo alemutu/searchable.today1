@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { FileText, Plus, Trash2, User, Stethoscope, Pill, Activity, FileBarChart2, X, ChevronRight, Heart, Thermometer, Droplets, Clock, ArrowRight } from 'lucide-react';
+import { FileText, Plus, Trash2, User, Activity, CheckCircle, AlertTriangle, Pill, Stethoscope } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
@@ -44,8 +44,9 @@ const ConsultationForm: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showLabTestModal, setShowLabTestModal] = useState(false);
   const [showRadiologyModal, setShowRadiologyModal] = useState(false);
-  const [searchMedication, setSearchMedication] = useState('');
-  const [showMedicationDropdown, setShowMedicationDropdown] = useState(false);
+  const [showMedicationSearch, setShowMedicationSearch] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [medicationSuggestions, setMedicationSuggestions] = useState<string[]>([]);
   
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch } = useForm<ConsultationFormData>({
     defaultValues: {
@@ -184,11 +185,6 @@ const ConsultationForm: React.FC = () => {
           })));
 
         if (labError) throw labError;
-        
-        addNotification({
-          message: `${data.labTests.length} lab tests ordered successfully`,
-          type: 'success'
-        });
       }
 
       // If radiology tests were ordered, create radiology orders
@@ -206,11 +202,6 @@ const ConsultationForm: React.FC = () => {
           })));
 
         if (radiologyError) throw radiologyError;
-        
-        addNotification({
-          message: `${data.radiologyTests.length} radiology tests ordered successfully`,
-          type: 'success'
-        });
       }
 
       // If prescriptions were added, create pharmacy order
@@ -231,15 +222,10 @@ const ConsultationForm: React.FC = () => {
           });
 
         if (pharmacyError) throw pharmacyError;
-        
-        addNotification({
-          message: `${data.prescriptions.filter(p => p.medication).length} medications sent to pharmacy`,
-          type: 'success'
-        });
       }
 
       addNotification({
-        message: 'Consultation completed successfully',
+        message: 'Consultation saved successfully',
         type: 'success'
       });
 
@@ -247,7 +233,7 @@ const ConsultationForm: React.FC = () => {
     } catch (error: any) {
       console.error('Error submitting consultation:', error.message);
       addNotification({
-        message: `Error: ${error.message}`,
+        message: `Error saving consultation: ${error.message}`,
         type: 'error'
       });
     } finally {
@@ -304,45 +290,25 @@ const ConsultationForm: React.FC = () => {
     ]}
   ];
 
-  // Common medications for search/suggestions
+  // Common medications for suggestions
   const commonMedications = [
-    { name: 'Amoxicillin', dosage: '500mg' },
-    { name: 'Paracetamol', dosage: '500mg' },
-    { name: 'Ibuprofen', dosage: '400mg' },
-    { name: 'Metformin', dosage: '500mg' },
-    { name: 'Atorvastatin', dosage: '20mg' },
-    { name: 'Omeprazole', dosage: '20mg' },
-    { name: 'Lisinopril', dosage: '10mg' },
-    { name: 'Amlodipine', dosage: '5mg' },
-    { name: 'Metoprolol', dosage: '50mg' },
-    { name: 'Losartan', dosage: '50mg' }
+    'Amoxicillin', 'Azithromycin', 'Atorvastatin', 'Lisinopril', 'Metformin',
+    'Amlodipine', 'Metoprolol', 'Omeprazole', 'Losartan', 'Albuterol',
+    'Gabapentin', 'Hydrochlorothiazide', 'Sertraline', 'Simvastatin', 'Levothyroxine'
   ];
 
-  // Frequency options
-  const frequencyOptions = [
-    { value: 'once_daily', label: 'Once daily' },
-    { value: 'twice_daily', label: 'Twice daily' },
-    { value: 'three_times_daily', label: 'Three times daily' },
-    { value: 'four_times_daily', label: 'Four times daily' },
-    { value: 'every_morning', label: 'Every morning' },
-    { value: 'every_evening', label: 'Every evening' },
-    { value: 'every_other_day', label: 'Every other day' },
-    { value: 'as_needed', label: 'As needed (PRN)' },
-    { value: 'weekly', label: 'Weekly' }
+  // Common frequencies
+  const frequencies = [
+    'Once daily', 'Twice daily', 'Three times daily', 'Four times daily',
+    'Every morning', 'Every evening', 'Every 4 hours', 'Every 6 hours',
+    'Every 8 hours', 'Every 12 hours', 'As needed', 'With meals'
   ];
 
-  // Duration options
-  const durationOptions = [
-    { value: '3_days', label: '3 days' },
-    { value: '5_days', label: '5 days' },
-    { value: '7_days', label: '7 days' },
-    { value: '10_days', label: '10 days' },
-    { value: '14_days', label: '14 days' },
-    { value: '1_month', label: '1 month' },
-    { value: '2_months', label: '2 months' },
-    { value: '3_months', label: '3 months' },
-    { value: '6_months', label: '6 months' },
-    { value: 'ongoing', label: 'Ongoing/Continuous' }
+  // Common durations
+  const durations = [
+    '3 days', '5 days', '7 days', '10 days', '14 days',
+    '1 week', '2 weeks', '3 weeks', '1 month', '2 months',
+    '3 months', '6 months', 'Indefinite'
   ];
 
   const addLabTest = (test: { name: string, price: number }) => {
@@ -357,12 +323,6 @@ const ConsultationForm: React.FC = () => {
       }
     ]);
     setShowLabTestModal(false);
-    
-    addNotification({
-      message: `${test.name} added to lab tests`,
-      type: 'success',
-      duration: 2000
-    });
   };
 
   const addRadiologyTest = (test: { name: string, price: number }) => {
@@ -377,36 +337,16 @@ const ConsultationForm: React.FC = () => {
       }
     ]);
     setShowRadiologyModal(false);
-    
-    addNotification({
-      message: `${test.name} added to radiology tests`,
-      type: 'success',
-      duration: 2000
-    });
   };
 
   const removeLabTest = (index: number) => {
     const currentTests = watch('labTests');
-    const testName = currentTests[index].testName;
     setValue('labTests', currentTests.filter((_, i) => i !== index));
-    
-    addNotification({
-      message: `${testName} removed from lab tests`,
-      type: 'info',
-      duration: 2000
-    });
   };
 
   const removeRadiologyTest = (index: number) => {
     const currentTests = watch('radiologyTests');
-    const testName = currentTests[index].testName;
     setValue('radiologyTests', currentTests.filter((_, i) => i !== index));
-    
-    addNotification({
-      message: `${testName} removed from radiology tests`,
-      type: 'info',
-      duration: 2000
-    });
   };
 
   const updateLabTestPriority = (index: number, priority: string) => {
@@ -431,27 +371,30 @@ const ConsultationForm: React.FC = () => {
     }).format(amount);
   };
 
-  const handleAddMedication = (medication?: { name: string, dosage: string }) => {
-    const index = prescriptionCount - 1;
-    if (medication) {
-      setValue(`prescriptions.${index}.medication`, medication.name);
-      setValue(`prescriptions.${index}.dosage`, medication.dosage);
-    }
-    setShowMedicationDropdown(false);
-    setSearchMedication('');
-    
-    if (medication) {
-      addNotification({
-        message: `${medication.name} added to prescription`,
-        type: 'success',
-        duration: 2000
-      });
+  const handleMedicationSearch = (term: string) => {
+    setSearchTerm(term);
+    if (term.length > 1) {
+      const filtered = commonMedications.filter(med => 
+        med.toLowerCase().includes(term.toLowerCase())
+      );
+      setMedicationSuggestions(filtered);
+      setShowMedicationSearch(true);
+    } else {
+      setMedicationSuggestions([]);
+      setShowMedicationSearch(false);
     }
   };
 
-  const filteredMedications = commonMedications.filter(med => 
-    med.name.toLowerCase().includes(searchMedication.toLowerCase())
-  );
+  const selectMedication = (medication: string, index: number) => {
+    const currentPrescriptions = [...prescriptions];
+    currentPrescriptions[index] = {
+      ...currentPrescriptions[index],
+      medication
+    };
+    setValue('prescriptions', currentPrescriptions);
+    setShowMedicationSearch(false);
+    setSearchTerm('');
+  };
 
   const calculateAge = (dateOfBirth: string) => {
     const birthDate = new Date(dateOfBirth);
@@ -484,294 +427,302 @@ const ConsultationForm: React.FC = () => {
 
   return (
     <div className="max-w-6xl mx-auto">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Main container with sidebar layout */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {/* Header with patient info and close button */}
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-            <div className="flex items-center">
-              <div className="h-12 w-12 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 text-xl font-bold">
-                {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Main container with left sidebar and right content */}
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Left sidebar with vital signs and medical history */}
+          <div className="md:w-1/4 space-y-4">
+            {/* Vital Signs */}
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Vital Signs</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center">
+                    <svg className="h-4 w-4 text-error-500 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M20.42 4.58a5.4 5.4 0 0 0-7.65 0l-.77.78-.77-.78a5.4 5.4 0 0 0-7.65 0C1.46 6.7 1.33 10.28 4 13l8 8 8-8c2.67-2.72 2.54-6.3.42-8.42z"></path>
+                    </svg>
+                    <span className="text-xs text-gray-600">BP</span>
+                  </div>
+                  <span className="text-xs font-medium">120/80 mmHg</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center">
+                    <svg className="h-4 w-4 text-primary-500 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+                    </svg>
+                    <span className="text-xs text-gray-600">Pulse</span>
+                  </div>
+                  <span className="text-xs font-medium">72 bpm</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center">
+                    <svg className="h-4 w-4 text-warning-500 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"></path>
+                    </svg>
+                    <span className="text-xs text-gray-600">Temp</span>
+                  </div>
+                  <span className="text-xs font-medium">37.2°C</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center">
+                    <svg className="h-4 w-4 text-info-500 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M19 11V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6"></path>
+                      <path d="M3 11v8a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-8"></path>
+                      <path d="M12 11v8"></path>
+                      <path d="M8 11v8"></path>
+                      <path d="M16 11v8"></path>
+                    </svg>
+                    <span className="text-xs text-gray-600">SpO2</span>
+                  </div>
+                  <span className="text-xs font-medium">98%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center">
+                    <svg className="h-4 w-4 text-success-500 mr-2" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 8a5 5 0 0 0-10 0v7h10V8z"></path>
+                      <path d="M13 15v2"></path>
+                    </svg>
+                    <span className="text-xs text-gray-600">Resp</span>
+                  </div>
+                  <span className="text-xs font-medium">16/min</span>
+                </div>
               </div>
-              <div className="ml-3">
-                <h2 className="text-lg font-medium text-gray-900">hello</h2>
-                <div className="flex items-center text-sm text-gray-500">
-                  <span>{calculateAge(patient.date_of_birth)} years, {patient.gender.toLowerCase()}</span>
-                  <span className="mx-2">•</span>
-                  <Stethoscope className="h-4 w-4 mr-1" />
-                  <span>General Consultation</span>
-                  <span className="mx-2">•</span>
-                  <Clock className="h-4 w-4 mr-1" />
-                  <span>May 12, 2025</span>
+              <div className="mt-2 pt-2 border-t border-gray-100 text-xs text-gray-500">
+                Recorded: May 12, 2025 3:56 PM
+              </div>
+            </div>
+
+            {/* Medical History */}
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <h3 className="text-sm font-medium text-gray-700 mb-3">Medical History</h3>
+              
+              <div className="space-y-3">
+                <div className="cursor-pointer">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-medium text-primary-600">Patient History Summary</h4>
+                    <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Show patient history summary</p>
+                </div>
+                
+                <div className="cursor-pointer">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xs font-medium text-primary-600">Analyzing Patient Data</h4>
+                    <svg className="h-4 w-4 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Evaluating vital signs and symptoms to suggest...</p>
                 </div>
               </div>
             </div>
-            <button 
-              type="button" 
-              onClick={() => navigate('/patients')}
-              className="text-gray-400 hover:text-gray-500"
-            >
-              <X className="h-6 w-6" />
-            </button>
           </div>
 
-          <div className="flex">
-            {/* Left sidebar with vital signs and medical history */}
-            <div className="w-64 border-r border-gray-200 bg-gray-50 p-4 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-              <div className="space-y-6">
-                <div>
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Vital Signs</h3>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <Heart className="h-4 w-4 text-error-500 mr-2" />
-                        <span className="text-sm text-gray-700">BP</span>
-                      </div>
-                      <span className="text-sm font-medium">32322</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <Activity className="h-4 w-4 text-primary-500 mr-2" />
-                        <span className="text-sm text-gray-700">Pulse</span>
-                      </div>
-                      <span className="text-sm font-medium">22 bpm</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <Thermometer className="h-4 w-4 text-warning-500 mr-2" />
-                        <span className="text-sm text-gray-700">Temp</span>
-                      </div>
-                      <span className="text-sm font-medium">22°C</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <Droplets className="h-4 w-4 text-primary-500 mr-2" />
-                        <span className="text-sm text-gray-700">SpO2</span>
-                      </div>
-                      <span className="text-sm font-medium">22%</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center">
-                        <Activity className="h-4 w-4 text-success-500 mr-2" />
-                        <span className="text-sm text-gray-700">Resp</span>
-                      </div>
-                      <span className="text-sm font-medium">22/min</span>
-                    </div>
+          {/* Right content area */}
+          <div className="md:w-3/4">
+            {/* Patient Header */}
+            <div className="bg-white rounded-lg shadow-sm p-4 mb-4">
+              <div className="flex items-center">
+                <div className="h-12 w-12 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 text-lg font-bold">
+                  {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
+                </div>
+                <div className="ml-4">
+                  <h2 className="text-lg font-bold text-gray-900">
+                    {patient.first_name} {patient.last_name}
+                  </h2>
+                  <div className="flex items-center text-sm text-gray-500">
+                    <span>{calculateAge(patient.date_of_birth)} years • {patient.gender}</span>
+                    <span className="mx-2">•</span>
+                    <span>General Consultation</span>
+                    <span className="mx-2">•</span>
+                    <span>May 12, 2025</span>
                   </div>
-                  <div className="mt-2 text-xs text-gray-500">
-                    Recorded: May 12, 2025 3:56 PM
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Medical History</h3>
-                </div>
-
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2 flex items-center">
-                    <FileText className="h-4 w-4 mr-1 text-primary-500" />
-                    Patient History Summary
-                  </h3>
-                  <button className="text-xs text-primary-600 hover:text-primary-700 flex items-center">
-                    Show patient history summary
-                    <ChevronRight className="h-3 w-3 ml-1" />
-                  </button>
-                </div>
-
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2 flex items-center">
-                    <FileBarChart2 className="h-4 w-4 mr-1 text-primary-500" />
-                    Analyzing Patient Data
-                  </h3>
-                  <button className="text-xs text-primary-600 hover:text-primary-700 flex items-center">
-                    Evaluating vital signs and symptoms to suggest...
-                    <ChevronRight className="h-3 w-3 ml-1" />
-                  </button>
                 </div>
               </div>
             </div>
 
-            {/* Main content area */}
-            <div className="flex-1 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 200px)' }}>
-              {/* Tabs */}
-              <div className="border-b border-gray-200">
-                <nav className="flex">
-                  <button
-                    type="button"
-                    className={`flex items-center py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                      activeTab === 'assessment'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                    onClick={() => setActiveTab('assessment')}
-                  >
-                    <Stethoscope className="h-5 w-5 mr-2" />
+            {/* Tabs */}
+            <div className="bg-white rounded-lg shadow-sm mb-4">
+              <div className="flex border-b border-gray-200">
+                <button
+                  type="button"
+                  className={`flex-1 py-3 px-4 text-center text-sm font-medium ${
+                    activeTab === 'assessment'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('assessment')}
+                >
+                  <div className="flex items-center justify-center">
+                    <Stethoscope className="h-4 w-4 mr-2" />
                     Assessment
-                  </button>
-                  <button
-                    type="button"
-                    className={`flex items-center py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                      activeTab === 'medications'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                    onClick={() => setActiveTab('medications')}
-                  >
-                    <Pill className="h-5 w-5 mr-2" />
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-3 px-4 text-center text-sm font-medium ${
+                    activeTab === 'medications'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('medications')}
+                >
+                  <div className="flex items-center justify-center">
+                    <Pill className="h-4 w-4 mr-2" />
                     Medications
-                  </button>
-                  <button
-                    type="button"
-                    className={`flex items-center py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                      activeTab === 'diagnostics'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                    onClick={() => setActiveTab('diagnostics')}
-                  >
-                    <Activity className="h-5 w-5 mr-2" />
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-3 px-4 text-center text-sm font-medium ${
+                    activeTab === 'diagnostics'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('diagnostics')}
+                >
+                  <div className="flex items-center justify-center">
+                    <Activity className="h-4 w-4 mr-2" />
                     Diagnostic Tests
-                  </button>
-                  <button
-                    type="button"
-                    className={`flex items-center py-4 px-6 text-center border-b-2 font-medium text-sm ${
-                      activeTab === 'notes'
-                        ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                    onClick={() => setActiveTab('notes')}
-                  >
-                    <FileText className="h-5 w-5 mr-2" />
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-3 px-4 text-center text-sm font-medium ${
+                    activeTab === 'notes'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('notes')}
+                >
+                  <div className="flex items-center justify-center">
+                    <FileText className="h-4 w-4 mr-2" />
                     Notes
-                  </button>
-                </nav>
+                  </div>
+                </button>
               </div>
+            </div>
 
-              {/* Assessment Tab */}
-              {activeTab === 'assessment' && (
-                <div className="p-6 space-y-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Chief Complaints</label>
-                    <textarea
-                      {...register('chiefComplaint', { required: 'Chief complaint is required' })}
-                      className="form-input w-full"
-                      rows={3}
-                      placeholder="Enter chief complaints, separated by commas..."
-                    />
-                    {errors.chiefComplaint && (
-                      <p className="form-error">{errors.chiefComplaint.message}</p>
-                    )}
+            {/* Assessment Tab */}
+            {activeTab === 'assessment' && (
+              <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
+                <div>
+                  <h3 className="text-md font-medium text-gray-900 mb-2">Chief Complaints</h3>
+                  <textarea
+                    id="chiefComplaint"
+                    rows={3}
+                    {...register('chiefComplaint', { required: 'Chief complaint is required' })}
+                    className="form-input"
+                    placeholder="Enter chief complaints, separated by commas..."
+                  />
+                  {errors.chiefComplaint && (
+                    <p className="form-error">{errors.chiefComplaint.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-md font-medium text-gray-900">Symptoms</h3>
+                    <button
+                      type="button"
+                      className="text-primary-600 hover:text-primary-700 text-sm flex items-center"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Symptom
+                    </button>
                   </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Symptoms</label>
-                    <div className="flex items-center">
-                      <input
-                        type="text"
-                        className="form-input flex-1"
-                        placeholder="Enter symptom..."
-                      />
-                      <button
-                        type="button"
-                        className="ml-2 p-2 bg-primary-500 text-white rounded-md hover:bg-primary-600"
-                      >
-                        <Plus className="h-5 w-5" />
-                      </button>
-                    </div>
-                    <div className="mt-2 text-sm text-gray-500">
-                      No symptoms added yet
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <label className="block text-sm font-medium text-gray-700">Patient History</label>
-                      <ChevronRight className="h-5 w-5 text-gray-400" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex items-center justify-between">
-                      <label className="block text-sm font-medium text-gray-700">Family and Socioeconomic History</label>
-                      <ChevronRight className="h-5 w-5 text-gray-400" />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis</label>
-                    <textarea
-                      {...register('diagnosis', { required: 'Diagnosis is required' })}
-                      className="form-input w-full"
-                      rows={3}
-                      placeholder="Clinical diagnosis"
-                    />
-                    {errors.diagnosis && (
-                      <p className="form-error">{errors.diagnosis.message}</p>
-                    )}
+                  <div className="text-sm text-gray-500 p-4 bg-gray-50 rounded-md text-center">
+                    No symptoms added yet
                   </div>
                 </div>
-              )}
 
-              {/* Medications Tab */}
-              {activeTab === 'medications' && (
-                <div className="p-6 space-y-6">
-                  <div className="relative">
-                    <div className="flex items-center">
-                      <div className="relative flex-1">
-                        <input
-                          type="text"
-                          value={searchMedication}
-                          onChange={(e) => {
-                            setSearchMedication(e.target.value);
-                            setShowMedicationDropdown(true);
-                          }}
-                          onFocus={() => setShowMedicationDropdown(true)}
-                          className="form-input w-full pl-10"
-                          placeholder="Search medications..."
-                        />
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <Search className="h-5 w-5 text-gray-400" />
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPrescriptionCount(prev => prev + 1);
-                          handleAddMedication();
-                        }}
-                        className="ml-2 btn btn-primary flex items-center"
-                      >
-                        <Plus className="h-5 w-5 mr-1" />
-                        Add Custom
-                      </button>
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-md font-medium text-gray-900">Patient History</h3>
+                    <svg className="h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-md font-medium text-gray-900">Family and Socioeconomic History</h3>
+                    <svg className="h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 18 15 12 9 6"></polyline>
+                    </svg>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="diagnosis" className="form-label">Diagnosis</label>
+                  <textarea
+                    id="diagnosis"
+                    rows={3}
+                    {...register('diagnosis', { required: 'Diagnosis is required' })}
+                    className="form-input"
+                    placeholder="Clinical diagnosis"
+                  />
+                  {errors.diagnosis && (
+                    <p className="form-error">{errors.diagnosis.message}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Medications Tab */}
+            {activeTab === 'medications' && (
+              <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
+                <div className="flex justify-between items-center">
+                  <div className="relative w-full max-w-md">
+                    <input
+                      type="text"
+                      placeholder="Search medications..."
+                      value={searchTerm}
+                      onChange={(e) => handleMedicationSearch(e.target.value)}
+                      className="form-input pl-10 pr-4 py-2 w-full"
+                    />
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <svg className="h-5 w-5 text-gray-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                      </svg>
                     </div>
                     
-                    {showMedicationDropdown && searchMedication && (
-                      <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-auto">
-                        {filteredMedications.length > 0 ? (
-                          filteredMedications.map((med, idx) => (
-                            <div
-                              key={idx}
-                              className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
-                              onClick={() => handleAddMedication(med)}
-                            >
-                              <div className="font-medium">{med.name}</div>
-                              <div className="text-sm text-gray-500">{med.dosage}</div>
-                            </div>
-                          ))
-                        ) : (
-                          <div className="px-4 py-2 text-gray-500">No medications found</div>
-                        )}
+                    {showMedicationSearch && medicationSuggestions.length > 0 && (
+                      <div className="absolute z-10 w-full bg-white mt-1 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {medicationSuggestions.map((med, idx) => (
+                          <div
+                            key={idx}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                            onClick={() => selectMedication(med, 0)}
+                          >
+                            {med}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
-
-                  {prescriptions.some(p => p.medication) ? (
-                    <div className="space-y-4">
-                      {prescriptions.map((_, index) => (
+                  
+                  <button
+                    type="button"
+                    className="btn btn-primary inline-flex items-center"
+                    onClick={() => setPrescriptionCount(prev => prev + 1)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Custom
+                  </button>
+                </div>
+                
+                {prescriptions.some(p => p.medication) ? (
+                  <div className="space-y-4">
+                    {prescriptions.map((prescription, index) => (
+                      prescription.medication && (
                         <div key={index} className="border rounded-lg p-4 space-y-4">
                           <div className="flex justify-between items-center">
-                            <h3 className="text-lg font-medium text-gray-900">Medication #{index + 1}</h3>
+                            <h3 className="text-lg font-medium text-gray-900">{prescription.medication}</h3>
                             {index > 0 && (
                               <button
                                 type="button"
@@ -779,13 +730,6 @@ const ConsultationForm: React.FC = () => {
                                   const updatedPrescriptions = [...prescriptions];
                                   updatedPrescriptions.splice(index, 1);
                                   setValue('prescriptions', updatedPrescriptions);
-                                  setPrescriptionCount(prev => prev - 1);
-                                  
-                                  addNotification({
-                                    message: 'Medication removed',
-                                    type: 'info',
-                                    duration: 2000
-                                  });
                                 }}
                                 className="text-error-600 hover:text-error-700"
                               >
@@ -795,17 +739,6 @@ const ConsultationForm: React.FC = () => {
                           </div>
 
                           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                            <div>
-                              <label className="form-label">Medication Name</label>
-                              <input
-                                type="text"
-                                {...register(`prescriptions.${index}.medication` as const, {
-                                  required: 'Medication name is required'
-                                })}
-                                className="form-input"
-                              />
-                            </div>
-
                             <div>
                               <label className="form-label">Dosage</label>
                               <input
@@ -826,10 +759,8 @@ const ConsultationForm: React.FC = () => {
                                 className="form-input"
                               >
                                 <option value="">Select frequency</option>
-                                {frequencyOptions.map(option => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
+                                {frequencies.map((freq, i) => (
+                                  <option key={i} value={freq}>{freq}</option>
                                 ))}
                               </select>
                             </div>
@@ -843,10 +774,8 @@ const ConsultationForm: React.FC = () => {
                                 className="form-input"
                               >
                                 <option value="">Select duration</option>
-                                {durationOptions.map(option => (
-                                  <option key={option.value} value={option.value}>
-                                    {option.label}
-                                  </option>
+                                {durations.map((dur, i) => (
+                                  <option key={i} value={dur}>{dur}</option>
                                 ))}
                               </select>
                             </div>
@@ -861,228 +790,318 @@ const ConsultationForm: React.FC = () => {
                             </div>
                           </div>
                         </div>
+                      )
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="h-16 w-16 text-gray-300 mb-4 flex items-center justify-center">
+                      <Pill className="h-12 w-12" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">No medications prescribed yet</h3>
+                    <p className="text-sm text-gray-500 max-w-md mb-6">
+                      Search above or click Add Custom to prescribe medications
+                    </p>
+                    <button
+                      type="button"
+                      className="text-primary-600 hover:text-primary-700 text-sm font-medium"
+                    >
+                      Skip prescribing medications
+                    </button>
+                  </div>
+                )}
+                
+                {Array.from({ length: prescriptionCount }).map((_, index) => (
+                  !prescriptions[index]?.medication && (
+                    <div key={index} className="border rounded-lg p-4 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-medium text-gray-900">Medication #{index + 1}</h3>
+                        {index > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const updatedPrescriptions = [...prescriptions];
+                              updatedPrescriptions.splice(index, 1);
+                              setValue('prescriptions', updatedPrescriptions);
+                              setPrescriptionCount(prev => prev - 1);
+                            }}
+                            className="text-error-600 hover:text-error-700"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="form-label">Medication Name</label>
+                          <input
+                            type="text"
+                            {...register(`prescriptions.${index}.medication` as const, {
+                              required: 'Medication name is required'
+                            })}
+                            className="form-input"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="form-label">Dosage</label>
+                          <input
+                            type="text"
+                            {...register(`prescriptions.${index}.dosage` as const, {
+                              required: 'Dosage is required'
+                            })}
+                            className="form-input"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="form-label">Frequency</label>
+                          <select
+                            {...register(`prescriptions.${index}.frequency` as const, {
+                              required: 'Frequency is required'
+                            })}
+                            className="form-input"
+                          >
+                            <option value="">Select frequency</option>
+                            {frequencies.map((freq, i) => (
+                              <option key={i} value={freq}>{freq}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="form-label">Duration</label>
+                          <select
+                            {...register(`prescriptions.${index}.duration` as const, {
+                              required: 'Duration is required'
+                            })}
+                            className="form-input"
+                          >
+                            <option value="">Select duration</option>
+                            {durations.map((dur, i) => (
+                              <option key={i} value={dur}>{dur}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="sm:col-span-2">
+                          <label className="form-label">Special Instructions</label>
+                          <textarea
+                            {...register(`prescriptions.${index}.instructions` as const)}
+                            className="form-input"
+                            rows={2}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                ))}
+              </div>
+            )}
+
+            {/* Diagnostic Tests Tab */}
+            {activeTab === 'diagnostics' && (
+              <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
+                <h2 className="text-xl font-semibold text-gray-900">Diagnostic Tests</h2>
+                
+                <div className="flex justify-between items-center">
+                  <div className="space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowLabTestModal(true)}
+                      className="btn btn-primary inline-flex items-center"
+                    >
+                      Order Lab Tests
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowRadiologyModal(true)}
+                      className="btn btn-secondary inline-flex items-center"
+                    >
+                      Order Radiology
+                    </button>
+                  </div>
+                  
+                  <div className="text-sm text-gray-500">
+                    {labTests.length + radiologyTests.length} test(s) ordered
+                  </div>
+                </div>
+                
+                {/* Lab Tests Section */}
+                {labTests.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-md font-medium text-gray-900 mb-2">Laboratory Tests</h3>
+                    <div className="space-y-3">
+                      {labTests.map((test, index) => (
+                        <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-blue-50 border-blue-200">
+                          <div className="flex-1">
+                            <div className="flex items-center">
+                              <span className="font-medium text-gray-900">{test.testName}</span>
+                              <span className="ml-2 text-sm font-medium text-primary-600">{formatCurrency(test.price)}</span>
+                              <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+                                test.priority === 'urgent' 
+                                  ? 'bg-error-100 text-error-800' 
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {test.priority === 'urgent' ? 'Urgent' : 'Normal'}
+                              </span>
+                            </div>
+                            {test.notes && (
+                              <p className="mt-1 text-sm text-gray-600">{test.notes}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <select 
+                              className="form-input py-1 text-sm"
+                              value={test.priority}
+                              onChange={(e) => updateLabTestPriority(index, e.target.value)}
+                            >
+                              <option value="normal">Normal</option>
+                              <option value="urgent">Urgent</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => removeLabTest(index)}
+                              className="text-error-600 hover:text-error-900"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </div>
                       ))}
                     </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <div className="h-16 w-16 text-gray-300 mb-4 flex items-center justify-center">
-                        <Pill className="h-12 w-12" />
-                      </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-1">No medications prescribed yet</h3>
-                      <p className="text-gray-500 max-w-md mb-6">
-                        Search above or click Add Custom to prescribe medications
-                      </p>
-                      <button
-                        type="button"
-                        className="text-primary-600 hover:text-primary-700 text-sm font-medium"
-                        onClick={() => setActiveTab('diagnostics')}
-                      >
-                        Skip prescribing medications
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Diagnostic Tests Tab */}
-              {activeTab === 'diagnostics' && (
-                <div className="p-6 space-y-6">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-lg font-medium text-gray-900">Diagnostic Tests</h2>
-                    <div className="space-x-2">
-                      <button
-                        type="button"
-                        onClick={() => setShowLabTestModal(true)}
-                        className="btn btn-primary inline-flex items-center"
-                      >
-                        Order Lab Tests
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setShowRadiologyModal(true)}
-                        className="btn btn-secondary inline-flex items-center"
-                      >
-                        Order Radiology
-                      </button>
-                    </div>
                   </div>
-                  
-                  {/* Lab Tests Section */}
-                  {labTests.length > 0 && (
-                    <div className="mt-4">
-                      <h3 className="text-md font-medium text-gray-900 mb-2">Laboratory Tests</h3>
-                      <div className="space-y-3">
-                        {labTests.map((test, index) => (
-                          <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-blue-50 border-blue-200">
-                            <div className="flex-1">
-                              <div className="flex items-center">
-                                <span className="font-medium text-gray-900">{test.testName}</span>
-                                <span className="ml-2 text-sm font-medium text-primary-600">{formatCurrency(test.price)}</span>
-                                <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-                                  test.priority === 'urgent' 
-                                    ? 'bg-error-100 text-error-800' 
-                                    : 'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {test.priority === 'urgent' ? 'Urgent' : 'Normal'}
-                                </span>
-                              </div>
-                              {test.notes && (
-                                <p className="mt-1 text-sm text-gray-600">{test.notes}</p>
-                              )}
+                )}
+                
+                {/* Radiology Tests Section */}
+                {radiologyTests.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-md font-medium text-gray-900 mb-2">Radiology Tests</h3>
+                    <div className="space-y-3">
+                      {radiologyTests.map((test, index) => (
+                        <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-indigo-50 border-indigo-200">
+                          <div className="flex-1">
+                            <div className="flex items-center">
+                              <span className="font-medium text-gray-900">{test.testName}</span>
+                              <span className="ml-2 text-sm font-medium text-primary-600">{formatCurrency(test.price)}</span>
+                              <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+                                test.priority === 'urgent' 
+                                  ? 'bg-error-100 text-error-800' 
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {test.priority === 'urgent' ? 'Urgent' : 'Normal'}
+                              </span>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <select 
-                                className="form-input py-1 text-sm"
-                                value={test.priority}
-                                onChange={(e) => updateLabTestPriority(index, e.target.value)}
-                              >
-                                <option value="normal">Normal</option>
-                                <option value="urgent">Urgent</option>
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => removeLabTest(index)}
-                                className="text-error-600 hover:text-error-900"
-                              >
-                                <Trash2 className="h-5 w-5" />
-                              </button>
-                            </div>
+                            {test.notes && (
+                              <p className="mt-1 text-sm text-gray-600">{test.notes}</p>
+                            )}
                           </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Radiology Tests Section */}
-                  {radiologyTests.length > 0 && (
-                    <div className="mt-4">
-                      <h3 className="text-md font-medium text-gray-900 mb-2">Radiology Tests</h3>
-                      <div className="space-y-3">
-                        {radiologyTests.map((test, index) => (
-                          <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-indigo-50 border-indigo-200">
-                            <div className="flex-1">
-                              <div className="flex items-center">
-                                <span className="font-medium text-gray-900">{test.testName}</span>
-                                <span className="ml-2 text-sm font-medium text-primary-600">{formatCurrency(test.price)}</span>
-                                <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-                                  test.priority === 'urgent' 
-                                    ? 'bg-error-100 text-error-800' 
-                                    : 'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {test.priority === 'urgent' ? 'Urgent' : 'Normal'}
-                                </span>
-                              </div>
-                              {test.notes && (
-                                <p className="mt-1 text-sm text-gray-600">{test.notes}</p>
-                              )}
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <select 
-                                className="form-input py-1 text-sm"
-                                value={test.priority}
-                                onChange={(e) => updateRadiologyTestPriority(index, e.target.value)}
-                              >
-                                <option value="normal">Normal</option>
-                                <option value="urgent">Urgent</option>
-                              </select>
-                              <button
-                                type="button"
-                                onClick={() => removeRadiologyTest(index)}
-                                className="text-error-600 hover:text-error-900"
-                              >
-                                <Trash2 className="h-5 w-5" />
-                              </button>
-                            </div>
+                          <div className="flex items-center space-x-2">
+                            <select 
+                              className="form-input py-1 text-sm"
+                              value={test.priority}
+                              onChange={(e) => updateRadiologyTestPriority(index, e.target.value)}
+                            >
+                              <option value="normal">Normal</option>
+                              <option value="urgent">Urgent</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => removeRadiologyTest(index)}
+                              className="text-error-600 hover:text-error-900"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
                           </div>
-                        ))}
-                      </div>
+                        </div>
+                      ))}
                     </div>
-                  )}
-                  
-                  {labTests.length === 0 && radiologyTests.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-12 text-center">
-                      <div className="h-16 w-16 text-gray-300 mb-4 flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="h-12 w-12">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                        </svg>
-                      </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-1">No diagnostic tests ordered yet</h3>
-                      <p className="text-gray-500 max-w-md mb-6">
-                        Order lab tests or radiology using the buttons above
-                      </p>
+                  </div>
+                )}
+                
+                {labTests.length === 0 && radiologyTests.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="h-16 w-16 text-gray-300 mb-4 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="h-12 w-12">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                      </svg>
                     </div>
-                  )}
-                  
-                  {/* Total Cost Summary */}
-                  {(labTests.length > 0 || radiologyTests.length > 0) && (
-                    <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-md font-medium text-gray-900">Total Cost</h3>
-                        <span className="text-lg font-bold text-primary-600">
-                          {formatCurrency(
-                            labTests.reduce((sum, test) => sum + test.price, 0) +
-                            radiologyTests.reduce((sum, test) => sum + test.price, 0)
-                          )}
-                        </span>
-                      </div>
-                      <p className="mt-1 text-xs text-gray-500">
-                        Patient will be directed to billing for payment after test ordering
-                      </p>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">No diagnostic tests ordered yet</h3>
+                    <p className="text-gray-500 max-w-md mb-6">
+                      Order lab tests or radiology using the buttons above
+                    </p>
+                  </div>
+                )}
+                
+                {/* Total Cost Summary */}
+                {(labTests.length > 0 || radiologyTests.length > 0) && (
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-md font-medium text-gray-900">Total Cost</h3>
+                      <span className="text-lg font-bold text-primary-600">
+                        {formatCurrency(
+                          labTests.reduce((sum, test) => sum + test.price, 0) +
+                          radiologyTests.reduce((sum, test) => sum + test.price, 0)
+                        )}
+                      </span>
                     </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Patient will be directed to billing for payment after test ordering
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Notes Tab */}
+            {activeTab === 'notes' && (
+              <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
+                <h2 className="text-xl font-semibold text-gray-900">Additional Information</h2>
+                
+                <div>
+                  <label htmlFor="treatmentPlan" className="form-label">Treatment Plan</label>
+                  <textarea
+                    id="treatmentPlan"
+                    rows={4}
+                    {...register('treatmentPlan', { required: 'Treatment plan is required' })}
+                    className="form-input"
+                    placeholder="Detailed treatment plan"
+                  />
+                  {errors.treatmentPlan && (
+                    <p className="form-error">{errors.treatmentPlan.message}</p>
                   )}
                 </div>
-              )}
-
-              {/* Notes Tab */}
-              {activeTab === 'notes' && (
-                <div className="p-6 space-y-6">
-                  <h2 className="text-lg font-medium text-gray-900">Additional Information</h2>
-                  
-                  <div>
-                    <label htmlFor="treatmentPlan" className="form-label">Treatment Plan</label>
-                    <textarea
-                      id="treatmentPlan"
-                      rows={4}
-                      {...register('treatmentPlan', { required: 'Treatment plan is required' })}
-                      className="form-input"
-                      placeholder="Detailed treatment plan"
-                    />
-                    {errors.treatmentPlan && (
-                      <p className="form-error">{errors.treatmentPlan.message}</p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label htmlFor="notes" className="form-label">Notes</label>
-                    <textarea
-                      id="notes"
-                      rows={4}
-                      {...register('notes')}
-                      className="form-input"
-                      placeholder="Any additional notes or observations"
-                    />
-                  </div>
-
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="medicalCertificate"
-                      {...register('medicalCertificate')}
-                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="medicalCertificate" className="ml-2 flex items-center text-sm font-medium text-gray-700">
-                      <FileText className="h-5 w-5 mr-1" />
-                      Issue Medical Certificate
-                    </label>
-                  </div>
+                
+                <div>
+                  <label htmlFor="notes" className="form-label">Notes</label>
+                  <textarea
+                    id="notes"
+                    rows={4}
+                    {...register('notes')}
+                    className="form-input"
+                    placeholder="Any additional notes or observations"
+                  />
                 </div>
-              )}
-            </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="medicalCertificate"
+                    {...register('medicalCertificate')}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="medicalCertificate" className="ml-2 flex items-center text-sm font-medium text-gray-700">
+                    <FileText className="h-5 w-5 mr-1" />
+                    Issue Medical Certificate
+                  </label>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Footer with navigation buttons */}
-        <div className="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+        <div className="flex justify-end space-x-4">
           <button
             type="button"
             onClick={() => navigate('/patients')}
@@ -1090,30 +1109,13 @@ const ConsultationForm: React.FC = () => {
           >
             Cancel
           </button>
-          
-          {activeTab !== 'notes' ? (
-            <button
-              type="button"
-              onClick={() => {
-                // Navigate to next tab
-                if (activeTab === 'assessment') setActiveTab('medications');
-                else if (activeTab === 'medications') setActiveTab('diagnostics');
-                else if (activeTab === 'diagnostics') setActiveTab('notes');
-              }}
-              className="btn btn-primary flex items-center"
-            >
-              Next
-              <ArrowRight className="h-5 w-5 ml-2" />
-            </button>
-          ) : (
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="btn btn-primary"
-            >
-              {isSubmitting ? 'Submitting...' : 'Complete Consultation'}
-            </button>
-          )}
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="btn btn-primary"
+          >
+            {isSubmitting ? 'Submitting...' : 'Complete Consultation'}
+          </button>
         </div>
       </form>
 
