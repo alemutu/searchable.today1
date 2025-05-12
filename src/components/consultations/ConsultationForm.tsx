@@ -3,8 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
-import { FileText, Plus, Trash2, Stethoscope, Activity, Search, Pill, FlaskRound as Flask, FileImage, AlertCircle, ArrowRight } from 'lucide-react';
-import { useNotification } from '../common/NotificationProvider';
+import { FileText, Plus, Trash2, Stethoscope, Activity, Search, Pill, FlaskRound as Flask, FileImage, AlertCircle } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
@@ -32,10 +31,9 @@ const ConsultationForm: React.FC = () => {
   const { hospital, user } = useAuthStore();
   const { patientId } = useParams();
   const navigate = useNavigate();
-  const { showNotification } = useNotification();
   const [patient, setPatient] = useState<any>(null);
   const [departments, setDepartments] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'assessment' | 'diagnostics' | 'medications' | 'notes' | 'summary'>('assessment');
+  const [activeTab, setActiveTab] = useState<'assessment' | 'medications' | 'diagnostics' | 'notes' | 'summary'>('assessment');
   const [prescriptionCount, setPrescriptionCount] = useState(1);
   const [showMedicationSearch, setShowMedicationSearch] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -200,7 +198,6 @@ const ConsultationForm: React.FC = () => {
     
     setShowMedicationSearch(false);
     setSearchTerm('');
-    showNotification('success', `Added ${medication.name} to prescription`, 2000);
   };
 
   const handleAddLabTest = (test: any) => {
@@ -216,7 +213,6 @@ const ConsultationForm: React.FC = () => {
       }
     ]);
     setShowLabTestModal(false);
-    showNotification('success', `Added ${test.name} to diagnostic tests`, 2000);
   };
 
   const handleAddRadiologyTest = (test: any) => {
@@ -232,14 +228,11 @@ const ConsultationForm: React.FC = () => {
       }
     ]);
     setShowRadiologyModal(false);
-    showNotification('success', `Added ${test.name} to diagnostic tests`, 2000);
   };
 
   const handleRemoveTest = (index: number) => {
     const currentTests = watch('diagnosticTests');
-    const removedTest = currentTests[index];
     setValue('diagnosticTests', currentTests.filter((_, i) => i !== index));
-    showNotification('info', `Removed ${removedTest.name} from diagnostic tests`, 2000);
   };
 
   const toggleTestUrgency = (index: number) => {
@@ -247,13 +240,6 @@ const ConsultationForm: React.FC = () => {
     const updatedTests = [...currentTests];
     updatedTests[index].urgent = !updatedTests[index].urgent;
     setValue('diagnosticTests', updatedTests);
-    
-    const test = updatedTests[index];
-    if (test.urgent) {
-      showNotification('warning', `Marked ${test.name} as URGENT`, 2000);
-    } else {
-      showNotification('info', `Removed urgency flag from ${test.name}`, 2000);
-    }
   };
 
   const onSubmit = async (data: ConsultationFormData) => {
@@ -279,8 +265,6 @@ const ConsultationForm: React.FC = () => {
         .select();
 
       if (consultationError) throw consultationError;
-      
-      showNotification('success', 'Consultation saved successfully', 2000);
 
       // If there are prescriptions, create a pharmacy order
       if (data.prescriptions && data.prescriptions.length > 0 && data.prescriptions[0].medication) {
@@ -301,7 +285,6 @@ const ConsultationForm: React.FC = () => {
           });
 
         if (pharmacyError) throw pharmacyError;
-        showNotification('info', 'Prescription sent to pharmacy', 2000);
       }
 
       // If there are diagnostic tests, create lab and radiology orders
@@ -324,7 +307,6 @@ const ConsultationForm: React.FC = () => {
             });
 
           if (labError) throw labError;
-          showNotification('info', 'Lab tests ordered successfully', 2000);
         }
 
         // Process radiology tests
@@ -346,7 +328,6 @@ const ConsultationForm: React.FC = () => {
             });
 
           if (radiologyError) throw radiologyError;
-          showNotification('info', 'Radiology tests ordered successfully', 2000);
         }
 
         // Create billing record for diagnostic tests
@@ -367,39 +348,23 @@ const ConsultationForm: React.FC = () => {
           });
 
         if (billingError) throw billingError;
-        showNotification('info', 'Billing record created for diagnostic tests', 2000);
-      }
-
-      // Determine the next flow step based on what was ordered
-      let nextFlowStep = 'post_consultation';
-      
-      if (data.diagnosticTests.length > 0) {
-        if (data.diagnosticTests.some(t => t.type === 'lab')) {
-          nextFlowStep = 'lab_tests';
-        } else if (data.diagnosticTests.some(t => t.type === 'radiology')) {
-          nextFlowStep = 'radiology';
-        }
-      } else if (data.prescriptions.length > 0 && data.prescriptions[0].medication) {
-        nextFlowStep = 'pharmacy';
       }
 
       // Update patient's current flow step
       const { error: patientError } = await supabase
         .from('patients')
         .update({
-          current_flow_step: nextFlowStep
+          current_flow_step: data.diagnosticTests.length > 0 ? 
+            (data.diagnosticTests.some(t => t.type === 'lab') ? 'lab_tests' : 'radiology') : 
+            (data.prescriptions.length > 0 && data.prescriptions[0].medication ? 'pharmacy' : 'post_consultation')
         })
         .eq('id', patientId);
 
       if (patientError) throw patientError;
 
-      showNotification('success', 'Consultation completed successfully', 3000);
-      setTimeout(() => {
-        navigate('/patients');
-      }, 1000);
+      navigate('/patients');
     } catch (error: any) {
       console.error('Error submitting consultation:', error.message);
-      showNotification('warning', `Error: ${error.message}`, 5000);
     }
   };
 
@@ -548,17 +513,6 @@ const ConsultationForm: React.FC = () => {
                 <p className="form-error">{errors.treatmentPlan.message}</p>
               )}
             </div>
-
-            <div className="flex justify-end">
-              <button
-                type="button"
-                className="btn btn-primary inline-flex items-center"
-                onClick={() => setActiveTab('diagnostics')}
-              >
-                Next: Diagnostic Tests
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </button>
-            </div>
           </div>
         )}
 
@@ -649,24 +603,6 @@ const ConsultationForm: React.FC = () => {
                 </div>
               </div>
             )}
-
-            <div className="flex justify-between pt-4">
-              <button
-                type="button"
-                className="btn btn-outline inline-flex items-center"
-                onClick={() => setActiveTab('assessment')}
-              >
-                Back to Assessment
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary inline-flex items-center"
-                onClick={() => setActiveTab('medications')}
-              >
-                Next: Medications
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </button>
-            </div>
           </div>
         )}
 
@@ -705,7 +641,7 @@ const ConsultationForm: React.FC = () => {
                 <button 
                   type="button" 
                   className="text-primary-600 hover:text-primary-800 font-medium"
-                  onClick={() => setActiveTab('notes')}
+                  onClick={() => setActiveTab('diagnostics')}
                 >
                   Skip prescribing medications
                 </button>
@@ -808,13 +744,10 @@ const ConsultationForm: React.FC = () => {
                   <button
                     type="button"
                     className="btn btn-primary inline-flex items-center"
-                    onClick={() => {
-                      showNotification('info', 'Prescription ready to be sent to pharmacy', 2000);
-                      setActiveTab('notes');
-                    }}
+                    onClick={() => setActiveTab('summary')}
                   >
                     <Pill className="h-4 w-4 mr-2" />
-                    Continue to Notes
+                    Send to Pharmacy
                   </button>
                 </div>
               </div>
@@ -849,24 +782,6 @@ const ConsultationForm: React.FC = () => {
                 <FileText className="h-5 w-5 mr-1" />
                 Issue Medical Certificate
               </label>
-            </div>
-
-            <div className="flex justify-between pt-4">
-              <button
-                type="button"
-                className="btn btn-outline inline-flex items-center"
-                onClick={() => setActiveTab('medications')}
-              >
-                Back to Medications
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary inline-flex items-center"
-                onClick={() => setActiveTab('summary')}
-              >
-                Review Summary
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </button>
             </div>
           </div>
         )}
@@ -980,25 +895,26 @@ const ConsultationForm: React.FC = () => {
                 )}
               </div>
             </div>
-
-            <div className="flex justify-between pt-4">
-              <button
-                type="button"
-                className="btn btn-outline inline-flex items-center"
-                onClick={() => setActiveTab('notes')}
-              >
-                Back to Notes
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="btn btn-primary"
-              >
-                {isSubmitting ? 'Submitting...' : 'Complete Consultation'}
-              </button>
-            </div>
           </div>
         )}
+
+        {/* Action Buttons */}
+        <div className="flex justify-end space-x-4">
+          <button
+            type="button"
+            onClick={() => navigate('/patients')}
+            className="btn btn-outline"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="btn btn-primary"
+          >
+            {isSubmitting ? 'Submitting...' : 'Complete Consultation'}
+          </button>
+        </div>
       </form>
 
       {/* Medication Search Modal */}
