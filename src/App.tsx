@@ -53,6 +53,11 @@ import GeneralMedicine from './pages/departments/GeneralMedicine';
 import Cardiology from './pages/departments/Cardiology';
 import Pediatrics from './pages/departments/Pediatrics';
 import Gynecology from './pages/departments/Gynecology';
+import Surgical from './pages/departments/Surgical';
+import Orthopedic from './pages/departments/Orthopedic';
+import Dental from './pages/departments/Dental';
+import EyeClinic from './pages/departments/EyeClinic';
+import Physiotherapy from './pages/departments/Physiotherapy';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading } = useAuthStore();
@@ -155,11 +160,11 @@ const App: React.FC = () => {
           <Route path="departments/cardiology" element={<Cardiology />} />
           <Route path="departments/pediatrics" element={<Pediatrics />} />
           <Route path="departments/gynecology" element={<Gynecology />} />
-          <Route path="departments/surgical" element={<div className="p-4">Surgical Department</div>} />
-          <Route path="departments/orthopedic" element={<div className="p-4">Orthopedic Department</div>} />
-          <Route path="departments/dental" element={<div className="p-4">Dental Department</div>} />
-          <Route path="departments/eye" element={<div className="p-4">Eye Clinic Department</div>} />
-          <Route path="departments/physiotherapy" element={<div className="p-4">Physiotherapy Department</div>} />
+          <Route path="departments/surgical" element={<Surgical />} />
+          <Route path="departments/orthopedic" element={<Orthopedic />} />
+          <Route path="departments/dental" element={<Dental />} />
+          <Route path="departments/eye" element={<EyeClinic />} />
+          <Route path="departments/physiotherapy" element={<Physiotherapy />} />
         </Route>
         
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
