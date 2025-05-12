@@ -3,6 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
+import type { User } from '@supabase/supabase-js';
 import { FileText, Plus, Trash2, Save, ArrowLeft, Pill, Activity, Heart, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Syringe, UserRound, Baby, AlertTriangle, X, ChevronRight, ChevronDown, Microscope, FileImage, Stethoscope, Settings as Lungs, Thermometer, Scale, Ruler, Brain } from 'lucide-react';
 
 interface ConsultationFormData {
@@ -701,7 +702,7 @@ const ConsultationForm: React.FC = () => {
                     onClick={() => setFamilyHistoryExpanded(!familyHistoryExpanded)}
                   >
                     <h3 className="text-sm font-medium text-gray-700 flex items-center">
-                      <User className="h-4 w-4 mr-1.5 text-gray-500" />
+                      <UserRound className="h-4 w-4 mr-1.5 text-gray-500" />
                       Family and Socioeconomic History
                     </h3>
                     {familyHistoryExpanded ? 
