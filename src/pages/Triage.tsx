@@ -1,7 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../lib/store';
-import { Activity, AlertTriangle, Clock, Heart } from 'lucide-react';
+import { 
+  Activity, 
+  AlertTriangle, 
+  Clock, 
+  Heart, 
+  Search, 
+  Filter, 
+  ArrowRight, 
+  FileText, 
+  User, 
+  Calendar, 
+  Stethoscope, 
+  ChevronDown,
+  CheckCircle
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface Patient {
@@ -11,12 +25,16 @@ interface Patient {
   date_of_birth: string;
   current_flow_step: string;
   priority_level: string;
+  arrival_time?: string;
 }
 
 const Triage: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterPriority, setFilterPriority] = useState('all');
   const { hospital } = useAuthStore();
+  const [activeTab, setActiveTab] = useState<'waiting' | 'in_progress'>('in_progress');
 
   useEffect(() => {
     fetchPatients();
@@ -33,7 +51,8 @@ const Triage: React.FC = () => {
           last_name: 'Doe',
           date_of_birth: '1980-05-15',
           current_flow_step: 'registration',
-          priority_level: 'normal'
+          priority_level: 'normal',
+          arrival_time: '09:15 AM'
         },
         {
           id: '00000000-0000-0000-0000-000000000002',
@@ -41,31 +60,35 @@ const Triage: React.FC = () => {
           last_name: 'Smith',
           date_of_birth: '1992-08-22',
           current_flow_step: 'triage',
-          priority_level: 'urgent'
+          priority_level: 'urgent',
+          arrival_time: '09:30 AM'
         },
         {
           id: '00000000-0000-0000-0000-000000000003',
           first_name: 'Robert',
           last_name: 'Johnson',
           date_of_birth: '1975-12-10',
-          current_flow_step: 'registration',
-          priority_level: 'normal'
+          current_flow_step: 'waiting_consultation',
+          priority_level: 'normal',
+          arrival_time: '08:45 AM'
         },
         {
           id: '00000000-0000-0000-0000-000000000004',
           first_name: 'Emily',
           last_name: 'Williams',
           date_of_birth: '1988-03-30',
-          current_flow_step: 'triage',
-          priority_level: 'normal'
+          current_flow_step: 'consultation',
+          priority_level: 'normal',
+          arrival_time: '10:00 AM'
         },
         {
           id: '00000000-0000-0000-0000-000000000005',
           first_name: 'Michael',
           last_name: 'Brown',
           date_of_birth: '1965-07-18',
-          current_flow_step: 'registration',
-          priority_level: 'critical'
+          current_flow_step: 'emergency',
+          priority_level: 'critical',
+          arrival_time: '10:15 AM'
         },
         {
           id: '00000000-0000-0000-0000-000000000006',
@@ -73,7 +96,8 @@ const Triage: React.FC = () => {
           last_name: 'Davis',
           date_of_birth: '1990-04-12',
           current_flow_step: 'registration',
-          priority_level: 'urgent'
+          priority_level: 'urgent',
+          arrival_time: '10:30 AM'
         },
         {
           id: '00000000-0000-0000-0000-000000000007',
@@ -81,7 +105,8 @@ const Triage: React.FC = () => {
           last_name: 'Miller',
           date_of_birth: '1982-09-28',
           current_flow_step: 'registration',
-          priority_level: 'normal'
+          priority_level: 'normal',
+          arrival_time: '10:45 AM'
         }
       ];
       
@@ -119,6 +144,25 @@ const Triage: React.FC = () => {
     return age;
   };
 
+  // Filter patients based on their current flow step and the active tab
+  const filteredPatients = patients.filter(patient => {
+    const matchesSearch = patient.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         patient.last_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesPriority = filterPriority === 'all' || patient.priority_level === filterPriority;
+    
+    if (activeTab === 'waiting') {
+      return patient.current_flow_step === 'registration' && matchesSearch && matchesPriority;
+    } else {
+      return patient.current_flow_step === 'triage' && matchesSearch && matchesPriority;
+    }
+  });
+
+  // Count patients in each category
+  const waitingCount = patients.filter(p => p.current_flow_step === 'registration').length;
+  const inProgressCount = patients.filter(p => p.current_flow_step === 'triage').length;
+  const completedCount = patients.filter(p => p.current_flow_step === 'waiting_consultation').length;
+  const urgentCount = patients.filter(p => p.priority_level === 'urgent').length;
+
   if (isLoading) {
     return (
       <div className="flex justify-center p-8">
@@ -127,145 +171,212 @@ const Triage: React.FC = () => {
     );
   }
 
-  // Filter patients that should be in triage queue (registration or triage status)
-  const triageQueue = patients.filter(patient => 
-    patient.current_flow_step === 'registration' || patient.current_flow_step === 'triage'
-  );
-
   return (
-    <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Triage Queue</h1>
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="card p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Waiting Patients</p>
-              <p className="mt-1 text-3xl font-semibold text-gray-900">
-                {patients.filter(p => p.current_flow_step === 'registration').length}
-              </p>
-            </div>
-            <div className="p-3 rounded-full bg-primary-100">
-              <Clock className="h-6 w-6 text-primary-500" />
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">In Triage</p>
-              <p className="mt-1 text-3xl font-semibold text-gray-900">
-                {patients.filter(p => p.current_flow_step === 'triage').length}
-              </p>
-            </div>
-            <div className="p-3 rounded-full bg-warning-100">
-              <Activity className="h-6 w-6 text-warning-500" />
-            </div>
-          </div>
-        </div>
-
-        <div className="card p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-500">Critical Cases</p>
-              <p className="mt-1 text-3xl font-semibold text-gray-900">
-                {patients.filter(p => p.priority_level === 'critical').length}
-              </p>
-            </div>
-            <div className="p-3 rounded-full bg-error-100">
-              <Heart className="h-6 w-6 text-error-500" />
-            </div>
-          </div>
+    <div className="space-y-4">
+      <div className="flex items-center space-x-2">
+        <Link to="/dashboard" className="text-gray-500 hover:text-gray-700">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </Link>
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Triage</h1>
+          <p className="text-sm text-gray-500">Patient Assessment & Prioritization</p>
         </div>
       </div>
 
-      <div className="card">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Patient
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Age
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Priority
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Wait Time
-                </th>
-                <th scope="col" className="relative px-6 py-3">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {triageQueue.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
-                    No patients in triage queue
-                  </td>
-                </tr>
-              ) : (
-                triageQueue.map((patient) => {
-                  // Calculate a mock wait time based on priority
-                  let waitTime = '10 min';
-                  if (patient.priority_level === 'urgent') waitTime = '5 min';
-                  if (patient.priority_level === 'critical') waitTime = '0 min';
-                  
-                  return (
-                    <tr key={patient.id} className={patient.priority_level === 'critical' ? 'bg-error-50' : ''}>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          {patient.priority_level === 'critical' && (
-                            <AlertTriangle className="h-5 w-5 text-error-500 mr-2" />
-                          )}
-                          <div>
-                            <div className="text-sm font-medium text-gray-900">
-                              {patient.first_name} {patient.last_name}
-                            </div>
-                          </div>
+      <div className="flex space-x-2">
+        <div 
+          className={`flex-1 rounded-lg p-4 flex items-center space-x-2 cursor-pointer ${
+            activeTab === 'waiting' 
+              ? 'bg-white shadow-sm border border-gray-200' 
+              : 'bg-gray-100 hover:bg-gray-200'
+          }`}
+          onClick={() => setActiveTab('waiting')}
+        >
+          <Clock className="h-5 w-5 text-gray-500" />
+          <span className="font-medium">Waiting</span>
+          <span className="ml-auto bg-gray-200 text-gray-800 rounded-full w-6 h-6 flex items-center justify-center text-sm">
+            {waitingCount}
+          </span>
+        </div>
+        
+        <div 
+          className={`flex-1 rounded-lg p-4 flex items-center space-x-2 cursor-pointer ${
+            activeTab === 'in_progress' 
+              ? 'bg-white shadow-sm border border-gray-200' 
+              : 'bg-gray-100 hover:bg-gray-200'
+          }`}
+          onClick={() => setActiveTab('in_progress')}
+        >
+          <Activity className="h-5 w-5 text-primary-500" />
+          <span className="font-medium">In Progress</span>
+          <span className="ml-auto bg-primary-100 text-primary-800 rounded-full w-6 h-6 flex items-center justify-center text-sm">
+            {inProgressCount}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center space-x-2">
+        <div className="relative flex-grow">
+          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <Search className="h-5 w-5 text-gray-400" />
+          </div>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="form-input pl-10 w-full"
+            placeholder="Search in progress patients..."
+          />
+        </div>
+        
+        <div className="relative">
+          <select
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value)}
+            className="form-input appearance-none pr-8"
+          >
+            <option value="all">All Priority</option>
+            <option value="normal">Normal</option>
+            <option value="urgent">Urgent</option>
+            <option value="critical">Critical</option>
+          </select>
+          <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+            <ChevronDown className="h-4 w-4 text-gray-500" />
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm">
+        {filteredPatients.length === 0 ? (
+          <div className="p-8 text-center">
+            <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+              <Clock className="h-6 w-6 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 mb-1">No patients {activeTab === 'waiting' ? 'waiting' : 'in triage'}</h3>
+            <p className="text-gray-500">There are currently no patients in this category</p>
+          </div>
+        ) : (
+          <div className="divide-y divide-gray-200">
+            {filteredPatients.map((patient) => (
+              <div key={patient.id} className="p-4 hover:bg-gray-50">
+                <div className="flex items-center">
+                  <div className="flex-shrink-0 h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium">
+                    {patient.first_name.charAt(0)}
+                  </div>
+                  <div className="ml-4 flex-1">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-medium text-gray-900">{patient.first_name} {patient.last_name}</h3>
+                        <div className="flex items-center text-sm text-gray-500">
+                          <Clock className="h-4 w-4 mr-1" />
+                          <span>Just arrived</span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {calculateAge(patient.date_of_birth)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getPriorityColor(patient.priority_level)}`}>
-                          {patient.priority_level.charAt(0).toUpperCase() + patient.priority_level.slice(1)}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-medium rounded-full ${getPriorityColor(patient.priority_level)}`}>
+                          {patient.priority_level}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          patient.current_flow_step === 'registration' ? 'bg-warning-100 text-warning-800' : 'bg-success-100 text-success-800'
-                        }`}>
-                          {patient.current_flow_step === 'registration' ? 'Waiting' : 'In Triage'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {waitTime}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link to={`/patients/${patient.id}/triage`} className="text-primary-600 hover:text-primary-900">
-                          Start Triage
+                        <Link 
+                          to={`/patients/${patient.id}/triage`}
+                          className="btn btn-primary inline-flex items-center text-sm"
+                        >
+                          Continue Triage <ArrowRight className="h-4 w-4 ml-1" />
                         </Link>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-medium text-gray-900">Triage Overview</h2>
+            <span className="text-sm text-gray-500">Today</span>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
+              <div className="flex items-center">
+                <Clock className="h-5 w-5 text-gray-400 mr-2" />
+                <span className="text-gray-700">Waiting</span>
+              </div>
+              <span className="font-medium">{waitingCount}</span>
+            </div>
+            <div className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
+              <div className="flex items-center">
+                <Activity className="h-5 w-5 text-primary-500 mr-2" />
+                <span className="text-gray-700">In Progress</span>
+              </div>
+              <span className="font-medium">{inProgressCount}</span>
+            </div>
+            <div className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
+              <div className="flex items-center">
+                <CheckCircle className="h-5 w-5 text-success-500 mr-2" />
+                <span className="text-gray-700">Completed</span>
+              </div>
+              <span className="font-medium">{completedCount}</span>
+            </div>
+            <div className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
+              <div className="flex items-center">
+                <AlertTriangle className="h-5 w-5 text-warning-500 mr-2" />
+                <span className="text-gray-700">Urgent</span>
+              </div>
+              <span className="font-medium">{urgentCount}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-medium text-gray-900">Quick Actions</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Link to="/patients" className="flex items-center p-3 rounded-md hover:bg-gray-50 border border-gray-200">
+              <FileText className="h-5 w-5 text-primary-500 mr-2" />
+              <span className="text-gray-700">View Records</span>
+            </Link>
+            <Link to="/reception" className="flex items-center p-3 rounded-md hover:bg-gray-50 border border-gray-200">
+              <User className="h-5 w-5 text-primary-500 mr-2" />
+              <span className="text-gray-700">Reception</span>
+            </Link>
+            <Link to="/consultations" className="flex items-center p-3 rounded-md hover:bg-gray-50 border border-gray-200">
+              <Stethoscope className="h-5 w-5 text-primary-500 mr-2" />
+              <span className="text-gray-700">Consultations</span>
+            </Link>
+            <Link to="/appointments" className="flex items-center p-3 rounded-md hover:bg-gray-50 border border-gray-200">
+              <Calendar className="h-5 w-5 text-primary-500 mr-2" />
+              <span className="text-gray-700">Appointments</span>
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-medium text-gray-900 flex items-center">
+            <Heart className="h-5 w-5 text-error-500 mr-2" />
+            Vital Signs Reference
+          </h2>
+          <ChevronDown className="h-5 w-5 text-gray-400" />
+        </div>
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Blood Pressure</h3>
+            <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="text-gray-600">Normal</div>
+              <div className="text-right">90-120/60-80 mmHg</div>
+              <div className="text-gray-600">Elevated</div>
+              <div className="text-right">120-129/&lt;80 mmHg</div>
+              <div className="text-gray-600">Hypertension</div>
+              <div className="text-right">&gt;130/&gt;80 mmHg</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
