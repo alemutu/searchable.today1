@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { useAuthStore } from '../../lib/store';
-import { FileText, Plus, Trash2, User } from 'lucide-react';
+import { useAuthStore, useNotificationStore } from '../../lib/store';
+import { FileText, Plus, Trash2, User, Activity, AlertTriangle, Stethoscope, Pill, Clock, Calculator, Ruler, Scale, Thermometer, Droplets, Settings as Lungs, Heart, Brain, FileBarChart2, ArrowRight } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
@@ -34,6 +34,7 @@ interface ConsultationFormData {
 
 const ConsultationForm: React.FC = () => {
   const { hospital, user } = useAuthStore();
+  const { addNotification } = useNotificationStore();
   const { patientId } = useParams();
   const navigate = useNavigate();
   const [prescriptionCount, setPrescriptionCount] = useState(1);
@@ -110,6 +111,10 @@ const ConsultationForm: React.FC = () => {
       setPatient(data);
     } catch (error) {
       console.error('Error loading patient:', error);
+      addNotification({
+        message: 'Failed to load patient information',
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -145,10 +150,22 @@ const ConsultationForm: React.FC = () => {
       
       if (data.labTests.length > 0) {
         nextFlowStep = 'lab_tests';
+        addNotification({
+          message: `Lab tests ordered for ${patient.first_name} ${patient.last_name}`,
+          type: 'success'
+        });
       } else if (data.radiologyTests.length > 0) {
         nextFlowStep = 'radiology';
+        addNotification({
+          message: `Radiology tests ordered for ${patient.first_name} ${patient.last_name}`,
+          type: 'success'
+        });
       } else if (data.prescriptions.some(p => p.medication)) {
         nextFlowStep = 'pharmacy';
+        addNotification({
+          message: `Prescription sent to pharmacy for ${patient.first_name} ${patient.last_name}`,
+          type: 'success'
+        });
       }
 
       // Update patient's current flow step
@@ -215,9 +232,18 @@ const ConsultationForm: React.FC = () => {
         if (pharmacyError) throw pharmacyError;
       }
 
+      addNotification({
+        message: 'Consultation completed successfully',
+        type: 'success'
+      });
+
       navigate('/patients');
     } catch (error: any) {
       console.error('Error submitting consultation:', error.message);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
     } finally {
       setIsSaving(false);
     }
@@ -284,6 +310,11 @@ const ConsultationForm: React.FC = () => {
       }
     ]);
     setShowLabTestModal(false);
+    
+    addNotification({
+      message: `${test.name} added to lab tests`,
+      type: 'success'
+    });
   };
 
   const addRadiologyTest = (test: { name: string, price: number }) => {
@@ -298,16 +329,33 @@ const ConsultationForm: React.FC = () => {
       }
     ]);
     setShowRadiologyModal(false);
+    
+    addNotification({
+      message: `${test.name} added to radiology tests`,
+      type: 'success'
+    });
   };
 
   const removeLabTest = (index: number) => {
     const currentTests = watch('labTests');
+    const removedTest = currentTests[index];
     setValue('labTests', currentTests.filter((_, i) => i !== index));
+    
+    addNotification({
+      message: `${removedTest.testName} removed from lab tests`,
+      type: 'info'
+    });
   };
 
   const removeRadiologyTest = (index: number) => {
     const currentTests = watch('radiologyTests');
+    const removedTest = currentTests[index];
     setValue('radiologyTests', currentTests.filter((_, i) => i !== index));
+    
+    addNotification({
+      message: `${removedTest.testName} removed from radiology tests`,
+      type: 'info'
+    });
   };
 
   const updateLabTestPriority = (index: number, priority: string) => {
@@ -315,6 +363,12 @@ const ConsultationForm: React.FC = () => {
     const updatedTests = [...currentTests];
     updatedTests[index].priority = priority;
     setValue('labTests', updatedTests);
+    
+    addNotification({
+      message: `${currentTests[index].testName} priority set to ${priority}`,
+      type: 'info',
+      duration: 2000
+    });
   };
 
   const updateRadiologyTestPriority = (index: number, priority: string) => {
@@ -322,6 +376,12 @@ const ConsultationForm: React.FC = () => {
     const updatedTests = [...currentTests];
     updatedTests[index].priority = priority;
     setValue('radiologyTests', updatedTests);
+    
+    addNotification({
+      message: `${currentTests[index].testName} priority set to ${priority}`,
+      type: 'info',
+      duration: 2000
+    });
   };
 
   const formatCurrency = (amount: number) => {

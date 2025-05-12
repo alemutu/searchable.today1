@@ -47,6 +47,7 @@ import PatientSearch from './pages/PatientSearch';
 import PatientDetails from './pages/PatientDetails';
 import ReceptionDashboard from './pages/ReceptionDashboard';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
+import NotificationToast from './components/common/NotificationToast';
 
 // Import department pages
 import GeneralMedicine from './pages/departments/GeneralMedicine';
@@ -172,6 +173,9 @@ const App: React.FC = () => {
       
       {/* Offline indicator */}
       <OfflineIndicator />
+      
+      {/* Notification toast */}
+      <NotificationToast />
     </>
   );
 };

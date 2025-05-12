@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { useAuthStore } from '../../lib/store';
+import { useAuthStore, useNotificationStore } from '../../lib/store';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
 
 interface PharmacyOrder {
@@ -29,6 +29,7 @@ const PharmacyDispense: React.FC = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const { hospital, user } = useAuthStore();
+  const { addNotification } = useNotificationStore();
   const [order, setOrder] = useState<PharmacyOrder | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [dispensedMeds, setDispensedMeds] = useState<{ [key: number]: boolean }>({});
@@ -58,13 +59,17 @@ const PharmacyDispense: React.FC = () => {
         setDispensedMeds(initialDispensed);
       } catch (error) {
         console.error('Error fetching pharmacy order:', error);
+        addNotification({
+          message: 'Failed to load pharmacy order',
+          type: 'error'
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchOrder();
-  }, [hospital, orderId]);
+  }, [hospital, orderId, addNotification]);
 
   const handleDispense = async () => {
     if (!order || !user) return;
@@ -96,9 +101,18 @@ const PharmacyDispense: React.FC = () => {
 
       if (patientError) throw patientError;
 
+      addNotification({
+        message: `Medications dispensed successfully for ${order.patient.first_name} ${order.patient.last_name}`,
+        type: 'success'
+      });
+
       navigate('/pharmacy');
     } catch (error) {
       console.error('Error dispensing medications:', error);
+      addNotification({
+        message: 'Error dispensing medications',
+        type: 'error'
+      });
     }
   };
 
@@ -107,6 +121,16 @@ const PharmacyDispense: React.FC = () => {
       ...prev,
       [index]: !prev[index]
     }));
+    
+    // Show notification
+    const medication = order?.medications[index].medication;
+    if (medication) {
+      addNotification({
+        message: `${medication} marked as ${!dispensedMeds[index] ? 'dispensed' : 'not dispensed'}`,
+        type: 'info',
+        duration: 2000
+      });
+    }
   };
 
   const allDispensed = order?.medications.every((_, index) => dispensedMeds[index]);

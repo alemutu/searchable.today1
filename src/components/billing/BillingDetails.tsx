@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { useAuthStore } from '../../lib/store';
+import { useAuthStore, useNotificationStore } from '../../lib/store';
 import { DollarSign, CreditCard, Building2, Receipt, AlertTriangle } from 'lucide-react';
 
 interface Bill {
@@ -31,6 +31,7 @@ const BillingDetails: React.FC = () => {
   const { billId } = useParams();
   const navigate = useNavigate();
   const { hospital } = useAuthStore();
+  const { addNotification } = useNotificationStore();
   const [bill, setBill] = useState<Bill | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [paymentAmount, setPaymentAmount] = useState<number>(0);
@@ -55,13 +56,17 @@ const BillingDetails: React.FC = () => {
         setPaymentAmount(data.total_amount - data.paid_amount);
       } catch (error) {
         console.error('Error fetching bill:', error);
+        addNotification({
+          message: 'Failed to load billing information',
+          type: 'error'
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchBill();
-  }, [hospital, billId]);
+  }, [hospital, billId, addNotification]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -88,9 +93,60 @@ const BillingDetails: React.FC = () => {
         .eq('id', bill.id);
 
       if (error) throw error;
+      
+      // Update patient status if needed
+      if (newStatus === 'paid') {
+        // Check if patient has any pending lab tests or radiology
+        const { data: labTests } = await supabase
+          .from('lab_results')
+          .select('id')
+          .eq('patient_id', bill.patient.id)
+          .eq('status', 'pending')
+          .limit(1);
+          
+        const { data: radiologyTests } = await supabase
+          .from('radiology_results')
+          .select('id')
+          .eq('patient_id', bill.patient.id)
+          .eq('status', 'pending')
+          .limit(1);
+          
+        const { data: pharmacyOrders } = await supabase
+          .from('pharmacy')
+          .select('id')
+          .eq('patient_id', bill.patient.id)
+          .eq('status', 'pending')
+          .limit(1);
+        
+        let nextStep = 'post_consultation';
+        
+        if (labTests && labTests.length > 0) {
+          nextStep = 'lab_tests';
+        } else if (radiologyTests && radiologyTests.length > 0) {
+          nextStep = 'radiology';
+        } else if (pharmacyOrders && pharmacyOrders.length > 0) {
+          nextStep = 'pharmacy';
+        }
+        
+        // Update patient flow step
+        await supabase
+          .from('patients')
+          .update({ current_flow_step: nextStep })
+          .eq('id', bill.patient.id);
+      }
+      
+      addNotification({
+        message: `Payment of ${formatCurrency(paymentAmount)} processed successfully`,
+        type: 'success'
+      });
+      
       navigate('/billing');
     } catch (error) {
       console.error('Error processing payment:', error);
+      addNotification({
+        message: 'Error processing payment',
+        type: 'error'
+      });
     } finally {
       setIsProcessing(false);
     }

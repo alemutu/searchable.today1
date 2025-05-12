@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuthStore } from '../lib/store';
-import { Search, Filter, FlaskRound as Flask, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, Stethoscope, ChevronDown } from 'lucide-react';
+import { useAuthStore, useNotificationStore } from '../lib/store';
+import { Search, Filter, FlaskRound as Flask, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, FileImage, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-interface LabResult {
+interface RadiologyResult {
   id: string;
   patient: {
     id: string;
     first_name: string;
     last_name: string;
   };
-  test_type: string;
-  test_date: string;
+  scan_type: string;
+  scan_date: string;
   status: string;
   results: any;
   reviewed_by: {
@@ -25,16 +25,17 @@ interface LabResult {
 const Laboratory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [labResults, setLabResults] = useState<LabResult[]>([]);
+  const [radiologyResults, setRadiologyResults] = useState<RadiologyResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { hospital } = useAuthStore();
+  const { addNotification } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'pending' | 'in_progress'>('pending');
 
   useEffect(() => {
-    fetchLabResults();
+    fetchRadiologyResults();
   }, [hospital]);
 
-  const fetchLabResults = async () => {
+  const fetchRadiologyResults = async () => {
     try {
       // In a real app, we would fetch from Supabase
       // For now, we'll use mock data
@@ -46,8 +47,8 @@ const Laboratory: React.FC = () => {
             first_name: 'John',
             last_name: 'Doe'
           },
-          test_type: 'Complete Blood Count',
-          test_date: '2025-05-15',
+          scan_type: 'x_ray',
+          scan_date: '2025-05-15',
           status: 'pending',
           results: null,
           reviewed_by: null,
@@ -60,8 +61,8 @@ const Laboratory: React.FC = () => {
             first_name: 'Jane',
             last_name: 'Smith'
           },
-          test_type: 'Liver Function Test',
-          test_date: '2025-05-15',
+          scan_type: 'ct_scan',
+          scan_date: '2025-05-15',
           status: 'in_progress',
           results: null,
           reviewed_by: null,
@@ -74,8 +75,8 @@ const Laboratory: React.FC = () => {
             first_name: 'Robert',
             last_name: 'Johnson'
           },
-          test_type: 'Urinalysis',
-          test_date: '2025-05-14',
+          scan_type: 'mri',
+          scan_date: '2025-05-14',
           status: 'pending',
           results: null,
           reviewed_by: null,
@@ -88,8 +89,8 @@ const Laboratory: React.FC = () => {
             first_name: 'Emily',
             last_name: 'Williams'
           },
-          test_type: 'Lipid Profile',
-          test_date: '2025-05-14',
+          scan_type: 'ultrasound',
+          scan_date: '2025-05-14',
           status: 'in_progress',
           results: null,
           reviewed_by: null,
@@ -102,10 +103,10 @@ const Laboratory: React.FC = () => {
             first_name: 'Michael',
             last_name: 'Brown'
           },
-          test_type: 'Blood Glucose',
-          test_date: '2025-05-15',
+          scan_type: 'mammogram',
+          scan_date: '2025-05-15',
           status: 'completed',
-          results: { glucose: '120 mg/dL' },
+          results: { findings: 'Normal study' },
           reviewed_by: {
             first_name: 'Doctor',
             last_name: 'Smith'
@@ -114,9 +115,25 @@ const Laboratory: React.FC = () => {
         }
       ];
       
-      setLabResults(mockResults);
+      setRadiologyResults(mockResults);
+      
+      // Show notification for emergency cases
+      const emergencyCases = mockResults.filter(result => result.is_emergency && (result.status === 'pending' || result.status === 'in_progress'));
+      if (emergencyCases.length > 0) {
+        emergencyCases.forEach(emergency => {
+          addNotification({
+            message: `EMERGENCY: ${emergency.scan_type.toUpperCase()} needed for ${emergency.patient.first_name} ${emergency.patient.last_name}`,
+            type: 'warning',
+            duration: 5000
+          });
+        });
+      }
     } catch (error) {
-      console.error('Error fetching lab results:', error);
+      console.error('Error fetching radiology results:', error);
+      addNotification({
+        message: 'Failed to load laboratory data',
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -137,10 +154,24 @@ const Laboratory: React.FC = () => {
     }
   };
 
-  const filteredResults = labResults.filter(result => {
+  const getScanTypeLabel = (type: string) => {
+    const types: Record<string, string> = {
+      'x_ray': 'X-Ray',
+      'ct_scan': 'CT Scan',
+      'mri': 'MRI',
+      'ultrasound': 'Ultrasound',
+      'mammogram': 'Mammogram',
+      'pet_scan': 'PET Scan',
+      'dexa_scan': 'DEXA Scan',
+      'fluoroscopy': 'Fluoroscopy'
+    };
+    return types[type] || type;
+  };
+
+  const filteredResults = radiologyResults.filter(result => {
     const patientName = `${result.patient.first_name} ${result.patient.last_name}`.toLowerCase();
     const matchesSearch = patientName.includes(searchTerm.toLowerCase()) ||
-                         result.test_type.toLowerCase().includes(searchTerm.toLowerCase());
+                         result.scan_type.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || result.status === filterStatus;
     
     if (activeTab === 'pending') {
@@ -150,11 +181,29 @@ const Laboratory: React.FC = () => {
     }
   });
 
-  // Count tests in each category
-  const pendingCount = labResults.filter(r => r.status === 'pending').length;
-  const inProgressCount = labResults.filter(r => r.status === 'in_progress').length;
-  const completedCount = labResults.filter(r => r.status === 'completed').length;
-  const urgentCount = labResults.filter(r => r.is_emergency).length;
+  // Count scans in each category
+  const pendingCount = radiologyResults.filter(r => r.status === 'pending').length;
+  const inProgressCount = radiologyResults.filter(r => r.status === 'in_progress').length;
+  const completedCount = radiologyResults.filter(r => r.status === 'completed').length;
+  const urgentCount = radiologyResults.filter(r => r.is_emergency).length;
+
+  const handleProcessTest = (testId: string, patientName: string) => {
+    // In a real app, this would navigate to a test processing page
+    // For now, we'll just show a notification
+    addNotification({
+      message: `Started processing test for ${patientName}`,
+      type: 'success'
+    });
+    
+    // Update the test status in our local state
+    setRadiologyResults(prev => 
+      prev.map(result => 
+        result.id === testId 
+          ? { ...result, status: 'in_progress' } 
+          : result
+      )
+    );
+  };
 
   if (isLoading) {
     return (
@@ -267,7 +316,7 @@ const Laboratory: React.FC = () => {
                             </h3>
                             <div className="flex items-center text-xs text-gray-500">
                               <Clock className="h-3 w-3 mr-1" />
-                              <span>{new Date(result.test_date).toLocaleDateString()}</span>
+                              <span>{new Date(result.scan_date).toLocaleDateString()}</span>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -276,17 +325,17 @@ const Laboratory: React.FC = () => {
                                 Emergency
                               </span>
                             )}
-                            <Link 
-                              to={`/laboratory/${result.id}`}
+                            <button 
+                              onClick={() => handleProcessTest(result.id, `${result.patient.first_name} ${result.patient.last_name}`)}
                               className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
                             >
                               Process Test <Flask className="h-3 w-3 ml-1" />
-                            </Link>
+                            </button>
                           </div>
                         </div>
                         <div className="mt-0.5">
                           <span className="text-xs font-medium">Test: </span>
-                          <span className="text-xs">{result.test_type}</span>
+                          <span className="text-xs">{getScanTypeLabel(result.scan_type)}</span>
                         </div>
                       </div>
                     </div>

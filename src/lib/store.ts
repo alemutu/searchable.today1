@@ -34,6 +34,22 @@ interface Hospital {
   patient_id_digits?: number;
   patient_id_auto_increment?: boolean;
   patient_id_last_number?: number;
+  domain_enabled?: boolean;
+}
+
+interface NotificationState {
+  notifications: Notification[];
+  addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
+  removeNotification: (id: string) => void;
+  clearNotifications: () => void;
+}
+
+export interface Notification {
+  id: string;
+  message: string;
+  type: 'success' | 'error' | 'warning' | 'info';
+  timestamp: number;
+  duration?: number; // in milliseconds, default will be 3000
 }
 
 // Mock data for development
@@ -349,5 +365,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ hospital: mockHospital });
       }
     }
+  }
+}));
+
+// Notification store
+export const useNotificationStore = create<NotificationState>((set) => ({
+  notifications: [],
+  
+  addNotification: (notification) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    set((state) => ({
+      notifications: [
+        ...state.notifications,
+        {
+          id,
+          timestamp: Date.now(),
+          ...notification
+        }
+      ]
+    }));
+    
+    // Auto-remove notification after duration
+    const duration = notification.duration || 3000;
+    setTimeout(() => {
+      set((state) => ({
+        notifications: state.notifications.filter((n) => n.id !== id)
+      }));
+    }, duration);
+  },
+  
+  removeNotification: (id) => {
+    set((state) => ({
+      notifications: state.notifications.filter((notification) => notification.id !== id)
+    }));
+  },
+  
+  clearNotifications: () => {
+    set({ notifications: [] });
   }
 }));

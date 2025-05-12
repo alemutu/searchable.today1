@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { useAuthStore } from '../lib/store';
+import { useAuthStore, useNotificationStore } from '../lib/store';
 import { Search, Filter, Microscope, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, FileImage, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -28,6 +28,7 @@ const Radiology: React.FC = () => {
   const [radiologyResults, setRadiologyResults] = useState<RadiologyResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { hospital } = useAuthStore();
+  const { addNotification } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'pending' | 'in_progress'>('pending');
 
   useEffect(() => {
@@ -115,8 +116,24 @@ const Radiology: React.FC = () => {
       ];
       
       setRadiologyResults(mockResults);
+      
+      // Show notification for emergency cases
+      const emergencyCases = mockResults.filter(result => result.is_emergency && (result.status === 'pending' || result.status === 'in_progress'));
+      if (emergencyCases.length > 0) {
+        emergencyCases.forEach(emergency => {
+          addNotification({
+            message: `EMERGENCY: ${getScanTypeLabel(emergency.scan_type)} needed for ${emergency.patient.first_name} ${emergency.patient.last_name}`,
+            type: 'error',
+            duration: 5000
+          });
+        });
+      }
     } catch (error) {
       console.error('Error fetching radiology results:', error);
+      addNotification({
+        message: 'Failed to load radiology data',
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
     }
@@ -169,6 +186,24 @@ const Radiology: React.FC = () => {
   const inProgressCount = radiologyResults.filter(r => r.status === 'in_progress').length;
   const completedCount = radiologyResults.filter(r => r.status === 'completed').length;
   const urgentCount = radiologyResults.filter(r => r.is_emergency).length;
+
+  const handleProcessScan = (scanId: string, patientName: string) => {
+    // In a real app, this would navigate to a scan processing page
+    // For now, we'll just show a notification
+    addNotification({
+      message: `Started processing scan for ${patientName}`,
+      type: 'success'
+    });
+    
+    // Update the scan status in our local state
+    setRadiologyResults(prev => 
+      prev.map(result => 
+        result.id === scanId 
+          ? { ...result, status: 'in_progress' } 
+          : result
+      )
+    );
+  };
 
   if (isLoading) {
     return (
@@ -290,12 +325,12 @@ const Radiology: React.FC = () => {
                                 Emergency
                               </span>
                             )}
-                            <Link 
-                              to={`/radiology/${result.id}`}
+                            <button 
+                              onClick={() => handleProcessScan(result.id, `${result.patient.first_name} ${result.patient.last_name}`)}
                               className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
                             >
                               Process Scan <Microscope className="h-3 w-3 ml-1" />
-                            </Link>
+                            </button>
                           </div>
                         </div>
                         <div className="mt-0.5">
