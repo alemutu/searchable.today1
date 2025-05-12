@@ -48,6 +48,12 @@ import PatientDetails from './pages/PatientDetails';
 import ReceptionDashboard from './pages/ReceptionDashboard';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
 
+// Import department pages
+import GeneralMedicine from './pages/departments/GeneralMedicine';
+import Cardiology from './pages/departments/Cardiology';
+import Pediatrics from './pages/departments/Pediatrics';
+import Gynecology from './pages/departments/Gynecology';
+
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading } = useAuthStore();
   const navigate = useNavigate();
@@ -145,10 +151,10 @@ const App: React.FC = () => {
           <Route path="patients/:patientId/growth-charts" element={<GrowthCharts />} />
           
           {/* Department Routes */}
-          <Route path="departments/general" element={<div className="p-4">General Medicine Department</div>} />
-          <Route path="departments/cardiology" element={<div className="p-4">Cardiology Department</div>} />
-          <Route path="departments/pediatrics" element={<div className="p-4">Pediatrics Department</div>} />
-          <Route path="departments/gynecology" element={<div className="p-4">Gynecology & Obstetrics Department</div>} />
+          <Route path="departments/general" element={<GeneralMedicine />} />
+          <Route path="departments/cardiology" element={<Cardiology />} />
+          <Route path="departments/pediatrics" element={<Pediatrics />} />
+          <Route path="departments/gynecology" element={<Gynecology />} />
           <Route path="departments/surgical" element={<div className="p-4">Surgical Department</div>} />
           <Route path="departments/orthopedic" element={<div className="p-4">Orthopedic Department</div>} />
           <Route path="departments/dental" element={<div className="p-4">Dental Department</div>} />

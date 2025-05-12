@@ -14,7 +14,7 @@ import {
   ChevronDown,
   Activity,
   AlertTriangle,
-  Heart
+  UserRound
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -29,7 +29,7 @@ interface Patient {
   wait_time?: string;
 }
 
-const Cardiology: React.FC = () => {
+const Gynecology: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -48,9 +48,9 @@ const Cardiology: React.FC = () => {
       const mockPatients = [
         {
           id: '00000000-0000-0000-0000-000000000001',
-          first_name: 'John',
-          last_name: 'Doe',
-          date_of_birth: '1980-05-15',
+          first_name: 'Sarah',
+          last_name: 'Johnson',
+          date_of_birth: '1985-05-15',
           current_flow_step: 'waiting_consultation',
           priority_level: 'normal',
           arrival_time: '09:15 AM',
@@ -58,7 +58,7 @@ const Cardiology: React.FC = () => {
         },
         {
           id: '00000000-0000-0000-0000-000000000002',
-          first_name: 'Jane',
+          first_name: 'Jessica',
           last_name: 'Smith',
           date_of_birth: '1992-08-22',
           current_flow_step: 'consultation',
@@ -68,7 +68,7 @@ const Cardiology: React.FC = () => {
         },
         {
           id: '00000000-0000-0000-0000-000000000003',
-          first_name: 'Robert',
+          first_name: 'Rachel',
           last_name: 'Johnson',
           date_of_birth: '1975-12-10',
           current_flow_step: 'waiting_consultation',
@@ -88,7 +88,7 @@ const Cardiology: React.FC = () => {
         },
         {
           id: '00000000-0000-0000-0000-000000000005',
-          first_name: 'Michael',
+          first_name: 'Michelle',
           last_name: 'Brown',
           date_of_birth: '1965-07-18',
           current_flow_step: 'consultation',
@@ -166,7 +166,7 @@ const Cardiology: React.FC = () => {
           <ArrowLeft className="w-4 h-4" />
         </Link>
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Cardiology</h1>
+          <h1 className="text-xl font-bold text-gray-900">Gynecology & Obstetrics</h1>
           <p className="text-xs text-gray-500">Department Patient Management</p>
         </div>
       </div>
@@ -195,7 +195,7 @@ const Cardiology: React.FC = () => {
           }`}
           onClick={() => setActiveTab('in_progress')}
         >
-          <Heart className="h-4 w-4 text-error-500" />
+          <UserRound className="h-4 w-4 text-primary-500" />
           <span className="font-medium text-sm">In Consultation</span>
           <span className="ml-auto bg-primary-100 text-primary-800 rounded-full w-5 h-5 flex items-center justify-center text-xs">
             {inProgressCount}
@@ -271,7 +271,7 @@ const Cardiology: React.FC = () => {
                               to={`/patients/${patient.id}/consultation`}
                               className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
                             >
-                              {activeTab === 'waiting' ? 'Start Consultation' : 'Continue'} <Heart className="h-3 w-3 ml-1" />
+                              {activeTab === 'waiting' ? 'Start Consultation' : 'Continue'} <UserRound className="h-3 w-3 ml-1" />
                             </Link>
                           </div>
                         </div>
@@ -305,7 +305,7 @@ const Cardiology: React.FC = () => {
               </div>
               <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
                 <div className="flex items-center">
-                  <Heart className="h-4 w-4 text-error-500 mr-1.5" />
+                  <UserRound className="h-4 w-4 text-primary-500 mr-1.5" />
                   <span className="text-sm text-gray-700">In Consultation</span>
                 </div>
                 <span className="font-medium text-sm">{inProgressCount}</span>
@@ -356,23 +356,23 @@ const Cardiology: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm p-3">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-base font-medium text-gray-900 flex items-center">
-                <Heart className="h-4 w-4 text-error-500 mr-1.5" />
-                Cardiology Reference
+                <UserRound className="h-4 w-4 text-primary-500 mr-1.5" />
+                Gynecology Reference
               </h2>
               <ChevronDown className="h-4 w-4 text-gray-400" />
             </div>
             <div className="space-y-2">
               <div>
-                <h3 className="text-xs font-medium text-gray-700 mb-1">Common Conditions</h3>
+                <h3 className="text-xs font-medium text-gray-700 mb-1">Common Procedures</h3>
                 <div className="grid grid-cols-2 gap-1 text-xs">
-                  <div className="text-gray-600">Hypertension</div>
-                  <div className="text-right">140/90 mmHg+</div>
-                  <div className="text-gray-600">Tachycardia</div>
-                  <div className="text-right">100+ bpm</div>
-                  <div className="text-gray-600">Bradycardia</div>
-                  <div className="text-right">&lt;60 bpm</div>
-                  <div className="text-gray-600">Arrhythmia</div>
-                  <div className="text-right">Irregular rhythm</div>
+                  <div className="text-gray-600">Pap Smear</div>
+                  <div className="text-right">Cervical screening</div>
+                  <div className="text-gray-600">Colposcopy</div>
+                  <div className="text-right">Cervical examination</div>
+                  <div className="text-gray-600">Ultrasound</div>
+                  <div className="text-right">Pelvic/pregnancy</div>
+                  <div className="text-gray-600">Prenatal Check</div>
+                  <div className="text-right">Pregnancy monitoring</div>
                 </div>
               </div>
             </div>
@@ -383,4 +383,4 @@ const Cardiology: React.FC = () => {
   );
 };
 
-export default Cardiology;
+export default Gynecology;
