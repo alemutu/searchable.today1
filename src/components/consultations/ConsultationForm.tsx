@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { FileText, Plus, Trash2, User, Activity, Search, Pill, AlertTriangle, ArrowUpRight } from 'lucide-react';
+import { FileText, Plus, Trash2, User, Search, AlertTriangle, Clock } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
@@ -45,9 +45,8 @@ const ConsultationForm: React.FC = () => {
   const [showLabTestModal, setShowLabTestModal] = useState(false);
   const [showRadiologyModal, setShowRadiologyModal] = useState(false);
   const [searchMedication, setSearchMedication] = useState('');
-  const [medicationInventory, setMedicationInventory] = useState<any[]>([]);
-  const [filteredMedications, setFilteredMedications] = useState<any[]>([]);
-  const [showMedicationSearch, setShowMedicationSearch] = useState(false);
+  const [medicationSuggestions, setMedicationSuggestions] = useState<string[]>([]);
+  const [showMedicationSuggestions, setShowMedicationSuggestions] = useState(false);
   
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch } = useForm<ConsultationFormData>({
     defaultValues: {
@@ -62,27 +61,88 @@ const ConsultationForm: React.FC = () => {
   const radiologyTests = watch('radiologyTests');
   const prescriptions = watch('prescriptions');
 
+  // Common medication frequencies
+  const frequencyOptions = [
+    { value: 'once_daily', label: 'Once daily' },
+    { value: 'twice_daily', label: 'Twice daily (BID)' },
+    { value: 'three_times_daily', label: 'Three times daily (TID)' },
+    { value: 'four_times_daily', label: 'Four times daily (QID)' },
+    { value: 'every_morning', label: 'Every morning' },
+    { value: 'every_evening', label: 'Every evening' },
+    { value: 'every_night', label: 'Every night at bedtime' },
+    { value: 'every_other_day', label: 'Every other day' },
+    { value: 'weekly', label: 'Weekly' },
+    { value: 'as_needed', label: 'As needed (PRN)' },
+    { value: 'immediately', label: 'Immediately (STAT)' }
+  ];
+
+  // Common medication durations
+  const durationOptions = [
+    { value: '3_days', label: '3 days' },
+    { value: '5_days', label: '5 days' },
+    { value: '7_days', label: '7 days' },
+    { value: '10_days', label: '10 days' },
+    { value: '14_days', label: '14 days' },
+    { value: '1_month', label: '1 month' },
+    { value: '2_months', label: '2 months' },
+    { value: '3_months', label: '3 months' },
+    { value: '6_months', label: '6 months' },
+    { value: 'ongoing', label: 'Ongoing/Continuous' }
+  ];
+
+  // Common medications for suggestions
+  const commonMedications = [
+    'Acetaminophen (Paracetamol)', 'Ibuprofen', 'Aspirin', 'Amoxicillin', 
+    'Azithromycin', 'Ciprofloxacin', 'Metformin', 'Lisinopril', 
+    'Atorvastatin', 'Simvastatin', 'Omeprazole', 'Losartan', 
+    'Amlodipine', 'Metoprolol', 'Albuterol', 'Fluticasone', 
+    'Levothyroxine', 'Gabapentin', 'Sertraline', 'Fluoxetine'
+  ];
+
+  // Common dosages for quick selection
+  const commonDosages = {
+    'Acetaminophen (Paracetamol)': ['500mg', '650mg', '1000mg'],
+    'Ibuprofen': ['200mg', '400mg', '600mg', '800mg'],
+    'Aspirin': ['81mg', '325mg'],
+    'Amoxicillin': ['250mg', '500mg'],
+    'Azithromycin': ['250mg', '500mg'],
+    'Ciprofloxacin': ['250mg', '500mg', '750mg'],
+    'Metformin': ['500mg', '850mg', '1000mg'],
+    'Lisinopril': ['5mg', '10mg', '20mg'],
+    'Atorvastatin': ['10mg', '20mg', '40mg', '80mg'],
+    'Simvastatin': ['10mg', '20mg', '40mg'],
+    'Omeprazole': ['20mg', '40mg'],
+    'Losartan': ['25mg', '50mg', '100mg'],
+    'Amlodipine': ['2.5mg', '5mg', '10mg'],
+    'Metoprolol': ['25mg', '50mg', '100mg'],
+    'Albuterol': ['90mcg/puff', '108mcg/puff'],
+    'Fluticasone': ['50mcg/spray', '100mcg/spray'],
+    'Levothyroxine': ['25mcg', '50mcg', '75mcg', '88mcg', '100mcg', '112mcg', '125mcg', '150mcg'],
+    'Gabapentin': ['100mg', '300mg', '400mg', '600mg', '800mg'],
+    'Sertraline': ['25mg', '50mg', '100mg'],
+    'Fluoxetine': ['10mg', '20mg', '40mg']
+  };
+
   useEffect(() => {
     if (patientId) {
       fetchPatient();
     } else {
       setIsLoading(false);
     }
-    
-    // Fetch medication inventory
-    fetchMedicationInventory();
   }, [patientId]);
-  
+
   useEffect(() => {
+    // Filter medication suggestions based on search term
     if (searchMedication.trim() !== '') {
-      const filtered = medicationInventory.filter(med => 
-        med.name.toLowerCase().includes(searchMedication.toLowerCase())
+      const filteredSuggestions = commonMedications.filter(med => 
+        med.toLowerCase().includes(searchMedication.toLowerCase())
       );
-      setFilteredMedications(filtered);
+      setMedicationSuggestions(filteredSuggestions);
+      setShowMedicationSuggestions(true);
     } else {
-      setFilteredMedications([]);
+      setShowMedicationSuggestions(false);
     }
-  }, [searchMedication, medicationInventory]);
+  }, [searchMedication]);
 
   const fetchPatient = async () => {
     try {
@@ -131,108 +191,11 @@ const ConsultationForm: React.FC = () => {
     } catch (error) {
       console.error('Error loading patient:', error);
       addNotification({
-        message: 'Error loading patient data',
+        message: 'Failed to load patient information',
         type: 'error'
       });
     } finally {
       setIsLoading(false);
-    }
-  };
-  
-  const fetchMedicationInventory = async () => {
-    try {
-      // In a real app, we would fetch from Supabase
-      // For now, we'll use mock data
-      const mockMedications = [
-        {
-          id: '1',
-          name: 'Amoxicillin',
-          forms: ['Capsule', 'Tablet', 'Suspension'],
-          dosages: ['250mg', '500mg', '875mg'],
-          inStock: true,
-          quantity: 120
-        },
-        {
-          id: '2',
-          name: 'Lisinopril',
-          forms: ['Tablet'],
-          dosages: ['5mg', '10mg', '20mg'],
-          inStock: true,
-          quantity: 90
-        },
-        {
-          id: '3',
-          name: 'Atorvastatin',
-          forms: ['Tablet'],
-          dosages: ['10mg', '20mg', '40mg', '80mg'],
-          inStock: true,
-          quantity: 60
-        },
-        {
-          id: '4',
-          name: 'Metformin',
-          forms: ['Tablet', 'Extended-release tablet'],
-          dosages: ['500mg', '850mg', '1000mg'],
-          inStock: true,
-          quantity: 100
-        },
-        {
-          id: '5',
-          name: 'Ibuprofen',
-          forms: ['Tablet', 'Capsule', 'Suspension'],
-          dosages: ['200mg', '400mg', '600mg', '800mg'],
-          inStock: true,
-          quantity: 200
-        },
-        {
-          id: '6',
-          name: 'Paracetamol',
-          forms: ['Tablet', 'Capsule', 'Suspension'],
-          dosages: ['500mg', '650mg'],
-          inStock: true,
-          quantity: 150
-        },
-        {
-          id: '7',
-          name: 'Omeprazole',
-          forms: ['Capsule', 'Tablet'],
-          dosages: ['10mg', '20mg', '40mg'],
-          inStock: false,
-          quantity: 0
-        },
-        {
-          id: '8',
-          name: 'Amlodipine',
-          forms: ['Tablet'],
-          dosages: ['2.5mg', '5mg', '10mg'],
-          inStock: true,
-          quantity: 80
-        },
-        {
-          id: '9',
-          name: 'Metoprolol',
-          forms: ['Tablet', 'Extended-release tablet'],
-          dosages: ['25mg', '50mg', '100mg', '200mg'],
-          inStock: true,
-          quantity: 70
-        },
-        {
-          id: '10',
-          name: 'Sertraline',
-          forms: ['Tablet'],
-          dosages: ['25mg', '50mg', '100mg'],
-          inStock: true,
-          quantity: 45
-        }
-      ];
-      
-      setMedicationInventory(mockMedications);
-    } catch (error) {
-      console.error('Error fetching medication inventory:', error);
-      addNotification({
-        message: 'Failed to load medication inventory',
-        type: 'error'
-      });
     }
   };
 
@@ -328,12 +291,14 @@ const ConsultationForm: React.FC = () => {
 
       // If prescriptions were added, create pharmacy order
       if (data.prescriptions.some(p => p.medication)) {
+        const validPrescriptions = data.prescriptions.filter(p => p.medication);
+        
         const { error: pharmacyError } = await supabase
           .from('pharmacy')
           .insert({
             patient_id: patientId,
             hospital_id: hospital.id,
-            medications: data.prescriptions.filter(p => p.medication).map(p => ({
+            medications: validPrescriptions.map(p => ({
               ...p,
               quantity: 1,
               dispensed: false
@@ -346,48 +311,7 @@ const ConsultationForm: React.FC = () => {
         if (pharmacyError) throw pharmacyError;
         
         addNotification({
-          message: 'Prescription sent to pharmacy successfully',
-          type: 'success'
-        });
-      }
-      
-      // Create billing record for all services
-      const services = [
-        ...data.labTests.map(test => ({
-          name: test.testName,
-          amount: test.price,
-          quantity: 1
-        })),
-        ...data.radiologyTests.map(test => ({
-          name: test.testName,
-          amount: test.price,
-          quantity: 1
-        })),
-        ...data.prescriptions.filter(p => p.medication).map(p => ({
-          name: `Medication: ${p.medication}`,
-          amount: 500, // Default price, in a real app this would come from inventory
-          quantity: 1
-        }))
-      ];
-      
-      if (services.length > 0) {
-        const totalAmount = services.reduce((sum, service) => sum + (service.amount * service.quantity), 0);
-        
-        const { error: billingError } = await supabase
-          .from('billing')
-          .insert({
-            patient_id: patientId,
-            hospital_id: hospital.id,
-            services: services,
-            total_amount: totalAmount,
-            paid_amount: 0,
-            payment_status: 'pending'
-          });
-          
-        if (billingError) throw billingError;
-        
-        addNotification({
-          message: 'Billing record created successfully',
+          message: `${validPrescriptions.length} medications sent to pharmacy`,
           type: 'success'
         });
       }
@@ -396,96 +320,10 @@ const ConsultationForm: React.FC = () => {
         message: 'Consultation completed successfully',
         type: 'success'
       });
-      
+
       navigate('/patients');
     } catch (error: any) {
       console.error('Error submitting consultation:', error.message);
-      addNotification({
-        message: `Error: ${error.message}`,
-        type: 'error'
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-  
-  const handleSendToPharmacy = async () => {
-    const currentPrescriptions = watch('prescriptions');
-    
-    if (!currentPrescriptions.some(p => p.medication)) {
-      addNotification({
-        message: 'Please add at least one medication before sending to pharmacy',
-        type: 'warning'
-      });
-      return;
-    }
-    
-    try {
-      setIsSaving(true);
-      
-      if (!hospital || !user || !patient) throw new Error('Missing required data');
-      
-      // Create pharmacy order
-      const { data, error } = await supabase
-        .from('pharmacy')
-        .insert({
-          patient_id: patientId,
-          hospital_id: hospital.id,
-          medications: currentPrescriptions.filter(p => p.medication).map(p => ({
-            ...p,
-            quantity: 1,
-            dispensed: false
-          })),
-          status: 'pending',
-          payment_status: 'pending',
-          is_emergency: false
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      // Update patient's current flow step
-      const { error: patientError } = await supabase
-        .from('patients')
-        .update({
-          current_flow_step: 'pharmacy'
-        })
-        .eq('id', patientId);
-
-      if (patientError) throw patientError;
-      
-      // Create billing record
-      const services = currentPrescriptions.filter(p => p.medication).map(p => ({
-        name: `Medication: ${p.medication}`,
-        amount: 500, // Default price, in a real app this would come from inventory
-        quantity: 1
-      }));
-      
-      const totalAmount = services.reduce((sum, service) => sum + (service.amount * service.quantity), 0);
-      
-      const { error: billingError } = await supabase
-        .from('billing')
-        .insert({
-          patient_id: patientId,
-          hospital_id: hospital.id,
-          services: services,
-          total_amount: totalAmount,
-          paid_amount: 0,
-          payment_status: 'pending'
-        });
-        
-      if (billingError) throw billingError;
-      
-      addNotification({
-        message: 'Prescription sent to pharmacy successfully',
-        type: 'success'
-      });
-      
-      // Optionally navigate to pharmacy page or stay on current page
-      // navigate('/pharmacy');
-    } catch (error: any) {
-      console.error('Error sending to pharmacy:', error.message);
       addNotification({
         message: `Error: ${error.message}`,
         type: 'error'
@@ -629,109 +467,44 @@ const ConsultationForm: React.FC = () => {
       minimumFractionDigits: 2
     }).format(amount);
   };
-  
-  const addMedication = (medication: any) => {
-    if (!medication.inStock) {
-      addNotification({
-        message: `${medication.name} is out of stock`,
-        type: 'warning'
-      });
-      return;
-    }
-    
-    const currentPrescriptions = watch('prescriptions');
-    
-    // Check if we need to replace an empty prescription
-    const emptyIndex = currentPrescriptions.findIndex(p => !p.medication);
-    
-    if (emptyIndex !== -1) {
-      const updatedPrescriptions = [...currentPrescriptions];
-      updatedPrescriptions[emptyIndex] = {
-        ...updatedPrescriptions[emptyIndex],
-        medication: medication.name,
-        dosage: medication.dosages[0]
-      };
-      setValue('prescriptions', updatedPrescriptions);
-    } else {
-      // Add a new prescription
-      setValue('prescriptions', [
-        ...currentPrescriptions,
-        {
-          medication: medication.name,
-          dosage: medication.dosages[0],
-          frequency: '',
-          duration: '',
-          instructions: ''
-        }
-      ]);
-      setPrescriptionCount(prescriptionCount + 1);
-    }
-    
-    setSearchMedication('');
-    setShowMedicationSearch(false);
+
+  const handleAddMedication = () => {
+    setPrescriptionCount(prev => prev + 1);
     
     addNotification({
-      message: `${medication.name} added to prescription`,
-      type: 'success',
-      duration: 2000
-    });
-  };
-  
-  const addCustomMedication = () => {
-    const currentPrescriptions = watch('prescriptions');
-    
-    // Check if we need to replace an empty prescription
-    const emptyIndex = currentPrescriptions.findIndex(p => !p.medication);
-    
-    if (emptyIndex !== -1) {
-      const updatedPrescriptions = [...currentPrescriptions];
-      updatedPrescriptions[emptyIndex] = {
-        ...updatedPrescriptions[emptyIndex],
-        medication: searchMedication,
-      };
-      setValue('prescriptions', updatedPrescriptions);
-    } else {
-      // Add a new prescription
-      setValue('prescriptions', [
-        ...currentPrescriptions,
-        {
-          medication: searchMedication,
-          dosage: '',
-          frequency: '',
-          duration: '',
-          instructions: ''
-        }
-      ]);
-      setPrescriptionCount(prescriptionCount + 1);
-    }
-    
-    setSearchMedication('');
-    setShowMedicationSearch(false);
-    
-    addNotification({
-      message: `Custom medication added to prescription`,
-      type: 'success',
-      duration: 2000
-    });
-  };
-  
-  const removeMedication = (index: number) => {
-    const currentPrescriptions = watch('prescriptions');
-    const medicationName = currentPrescriptions[index].medication;
-    
-    if (currentPrescriptions.length === 1) {
-      // If it's the last prescription, just clear it instead of removing
-      setValue('prescriptions', [{ medication: '', dosage: '', frequency: '', duration: '', instructions: '' }]);
-    } else {
-      setValue('prescriptions', currentPrescriptions.filter((_, i) => i !== index));
-      setPrescriptionCount(prescriptionCount - 1);
-    }
-    
-    addNotification({
-      message: `${medicationName} removed from prescription`,
+      message: 'New medication added',
       type: 'info',
       duration: 2000
     });
+  };
+
+  const handleRemoveMedication = (index: number) => {
+    const currentPrescriptions = watch('prescriptions');
+    const medicationName = currentPrescriptions[index].medication;
+    
+    // Create a new array without the removed medication
+    const updatedPrescriptions = currentPrescriptions.filter((_, i) => i !== index);
+    setValue('prescriptions', updatedPrescriptions);
+    
+    // Update the prescription count
+    setPrescriptionCount(prev => prev - 1);
+    
+    addNotification({
+      message: `${medicationName || 'Medication'} removed`,
+      type: 'info',
+      duration: 2000
+    });
+  };
+
+  const selectMedication = (medication: string, index: number) => {
+    setValue(`prescriptions.${index}.medication`, medication);
+    setSearchMedication('');
+    setShowMedicationSuggestions(false);
+    
+    // If we have common dosages for this medication, suggest the first one
+    if (commonDosages[medication as keyof typeof commonDosages]) {
+      setValue(`prescriptions.${index}.dosage`, commonDosages[medication as keyof typeof commonDosages][0]);
+    }
   };
 
   if (isLoading) {
@@ -1118,183 +891,202 @@ const ConsultationForm: React.FC = () => {
         {activeTab === 'medications' && (
           <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
             <div className="flex items-center justify-between">
-              <h2 className="text-xl font-semibold text-gray-900">Medications</h2>
+              <h2 className="text-xl font-semibold text-gray-900">Prescriptions</h2>
               <button
                 type="button"
-                onClick={handleSendToPharmacy}
-                disabled={!prescriptions.some(p => p.medication) || isSaving}
+                onClick={handleAddMedication}
                 className="btn btn-primary inline-flex items-center"
               >
-                {isSaving ? (
-                  <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                    Sending...
-                  </>
-                ) : (
-                  <>
-                    <ArrowUpRight className="h-4 w-4 mr-2" />
-                    Send to Pharmacy
-                  </>
-                )}
+                <Plus className="h-4 w-4 mr-2" />
+                Add Medication
               </button>
             </div>
             
+            {/* Search medications */}
             <div className="relative">
-              <div className="flex items-center">
-                <div className="relative flex-grow">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Search className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    value={searchMedication}
-                    onChange={(e) => {
-                      setSearchMedication(e.target.value);
-                      setShowMedicationSearch(true);
-                    }}
-                    onFocus={() => setShowMedicationSearch(true)}
-                    className="form-input pl-10 w-full"
-                    placeholder="Search medications..."
-                  />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (searchMedication.trim()) {
-                      addCustomMedication();
-                    } else {
-                      addNotification({
-                        message: 'Please enter a medication name',
-                        type: 'warning'
-                      });
-                    }
-                  }}
-                  className="btn btn-primary ml-2"
-                >
-                  Add Custom
-                </button>
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <Search className="h-5 w-5 text-gray-400" />
               </div>
-              
-              {showMedicationSearch && filteredMedications.length > 0 && (
+              <input
+                type="text"
+                value={searchMedication}
+                onChange={(e) => setSearchMedication(e.target.value)}
+                className="form-input pl-10 w-full"
+                placeholder="Search medications..."
+              />
+              {showMedicationSuggestions && medicationSuggestions.length > 0 && (
                 <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-y-auto">
-                  {filteredMedications.map((medication) => (
+                  {medicationSuggestions.map((med, idx) => (
                     <div
-                      key={medication.id}
-                      className="p-2 hover:bg-gray-50 cursor-pointer flex items-center justify-between"
-                      onClick={() => addMedication(medication)}
+                      key={idx}
+                      className="px-4 py-2 hover:bg-gray-100 cursor-pointer"
+                      onClick={() => {
+                        // Find the first empty medication field or use the last one
+                        const emptyIndex = prescriptions.findIndex(p => !p.medication);
+                        const targetIndex = emptyIndex !== -1 ? emptyIndex : prescriptions.length - 1;
+                        selectMedication(med, targetIndex);
+                      }}
                     >
-                      <div>
-                        <div className="font-medium">{medication.name}</div>
-                        <div className="text-xs text-gray-500">
-                          {medication.forms.join(', ')} • {medication.dosages.join(', ')}
-                        </div>
-                      </div>
-                      <div className="flex items-center">
-                        {!medication.inStock ? (
-                          <span className="text-xs text-error-600 mr-2">Out of stock</span>
-                        ) : (
-                          <span className="text-xs text-success-600 mr-2">In stock ({medication.quantity})</span>
-                        )}
-                        <Plus className="h-4 w-4 text-primary-500" />
-                      </div>
+                      {med}
                     </div>
                   ))}
                 </div>
               )}
-              
-              {showMedicationSearch && searchMedication && filteredMedications.length === 0 && (
-                <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 p-4 text-center">
-                  <p className="text-gray-500">No medications found matching "{searchMedication}"</p>
-                  <button
-                    type="button"
-                    onClick={addCustomMedication}
-                    className="mt-2 text-primary-600 hover:text-primary-800 text-sm font-medium"
-                  >
-                    Add "{searchMedication}" as custom medication
-                  </button>
-                </div>
-              )}
             </div>
             
-            {/* Medications List */}
-            {prescriptions.some(p => p.medication) ? (
-              <div className="space-y-4">
-                {prescriptions.map((prescription, index) => (
-                  prescription.medication ? (
-                    <div key={index} className="border rounded-lg p-4 space-y-4">
-                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-medium text-gray-900">{prescription.medication}</h3>
-                        <button
-                          type="button"
-                          onClick={() => removeMedication(index)}
-                          className="text-error-600 hover:text-error-700"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                          <label className="form-label">Dosage</label>
-                          <input
-                            type="text"
-                            {...register(`prescriptions.${index}.dosage` as const, {
-                              required: 'Dosage is required'
-                            })}
-                            className="form-input"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="form-label">Frequency</label>
-                          <input
-                            type="text"
-                            {...register(`prescriptions.${index}.frequency` as const, {
-                              required: 'Frequency is required'
-                            })}
-                            className="form-input"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="form-label">Duration</label>
-                          <input
-                            type="text"
-                            {...register(`prescriptions.${index}.duration` as const, {
-                              required: 'Duration is required'
-                            })}
-                            className="form-input"
-                          />
-                        </div>
-
-                        <div className="sm:col-span-2">
-                          <label className="form-label">Special Instructions</label>
-                          <textarea
-                            {...register(`prescriptions.${index}.instructions` as const)}
-                            className="form-input"
-                            rows={2}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ) : null
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
+            {/* No medications message */}
+            {prescriptions.every(p => !p.medication) && (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
                 <div className="h-16 w-16 text-gray-300 mb-4">
-                  <Pill className="h-16 w-16" />
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="h-full w-full">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-1">No medications prescribed yet</h3>
-                <p className="text-gray-500 mb-6">
-                  Search above or click Add Custom to prescribe medications
+                <p className="text-gray-500 max-w-md mb-4">
+                  Search above or click "Add Medication" to prescribe medications
                 </p>
                 <button
                   type="button"
-                  className="text-primary-600 hover:text-primary-800 text-sm"
+                  className="text-primary-600 hover:text-primary-800 text-sm font-medium"
                   onClick={() => setActiveTab('notes')}
                 >
                   Skip prescribing medications
+                </button>
+              </div>
+            )}
+            
+            {/* Medication forms */}
+            <div className="space-y-4">
+              {Array.from({ length: prescriptionCount }).map((_, index) => (
+                <div key={index} className="border rounded-lg p-4 space-y-4 bg-white shadow-sm">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-medium text-gray-900">Medication #{index + 1}</h3>
+                    {index > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMedication(index)}
+                        className="text-error-600 hover:text-error-700"
+                      >
+                        <Trash2 className="h-5 w-5" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="form-label">Medication Name</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          {...register(`prescriptions.${index}.medication` as const, {
+                            required: 'Medication name is required'
+                          })}
+                          className="form-input"
+                          placeholder="Enter medication name"
+                          list={`medications-list-${index}`}
+                        />
+                        <datalist id={`medications-list-${index}`}>
+                          {commonMedications.map((med, idx) => (
+                            <option key={idx} value={med} />
+                          ))}
+                        </datalist>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="form-label">Dosage</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          {...register(`prescriptions.${index}.dosage` as const, {
+                            required: 'Dosage is required'
+                          })}
+                          className="form-input"
+                          placeholder="e.g., 500mg"
+                        />
+                        {prescriptions[index]?.medication && commonDosages[prescriptions[index].medication as keyof typeof commonDosages] && (
+                          <div className="mt-1 flex flex-wrap gap-1">
+                            {commonDosages[prescriptions[index].medication as keyof typeof commonDosages].map((dosage, dIdx) => (
+                              <button
+                                key={dIdx}
+                                type="button"
+                                className="px-2 py-1 text-xs bg-gray-100 hover:bg-gray-200 rounded-full"
+                                onClick={() => setValue(`prescriptions.${index}.dosage`, dosage)}
+                              >
+                                {dosage}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="form-label">Frequency</label>
+                      <select
+                        {...register(`prescriptions.${index}.frequency` as const, {
+                          required: 'Frequency is required'
+                        })}
+                        className="form-input"
+                      >
+                        <option value="">Select frequency</option>
+                        {frequencyOptions.map((option) => (
+                          <option key={option.value} value={option.label}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="form-label">Duration</label>
+                      <select
+                        {...register(`prescriptions.${index}.duration` as const, {
+                          required: 'Duration is required'
+                        })}
+                        className="form-input"
+                      >
+                        <option value="">Select duration</option>
+                        {durationOptions.map((option) => (
+                          <option key={option.value} value={option.label}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <label className="form-label">Special Instructions</label>
+                      <textarea
+                        {...register(`prescriptions.${index}.instructions` as const)}
+                        className="form-input"
+                        rows={2}
+                        placeholder="e.g., Take with food, avoid alcohol, etc."
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* Send to Pharmacy Button */}
+            {prescriptions.some(p => p.medication) && (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  className="btn btn-success inline-flex items-center"
+                  onClick={() => {
+                    addNotification({
+                      message: 'Prescriptions sent to pharmacy',
+                      type: 'success'
+                    });
+                  }}
+                >
+                  <svg className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                  </svg>
+                  Send to Pharmacy
                 </button>
               </div>
             )}
