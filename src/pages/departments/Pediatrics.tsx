@@ -1,106 +1,161 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuthStore } from '../lib/store';
-import { Search, Filter, Microscope, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, FileImage, ChevronDown } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import { useAuthStore } from '../../lib/store';
+import { 
+  Search, 
+  Filter, 
+  Stethoscope, 
+  CheckCircle, 
+  Clock, 
+  ArrowLeft, 
+  FileText, 
+  User, 
+  Calendar, 
+  ChevronDown,
+  Activity,
+  AlertTriangle,
+  Baby
+} from 'lucide-react';
 import { Link } from 'react-router-dom';
 
-interface RadiologyResult {
+interface Patient {
   id: string;
-  patient: {
-    id: string;
-    first_name: string;
-    last_name: string;
-  };
-  scan_type: string;
-  scan_date: string;
-  status: string;
-  results: any;
-  reviewed_by: {
-    first_name: string;
-    last_name: string;
-  } | null;
-  is_emergency: boolean;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  current_flow_step: string;
+  priority_level: string;
+  arrival_time?: string;
+  wait_time?: string;
 }
 
-const Radiology: React.FC = () => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState('all');
-  const [radiologyResults, setRadiologyResults] = useState<RadiologyResult[]>([]);
+const Pediatrics: React.FC = () => {
+  const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterPriority, setFilterPriority] = useState('all');
   const { hospital } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'pending' | 'in_progress'>('pending');
+  const [activeTab, setActiveTab] = useState<'waiting' | 'in_progress'>('waiting');
 
   useEffect(() => {
-    fetchRadiologyResults();
+    fetchPatients();
   }, [hospital]);
 
-  const fetchRadiologyResults = async () => {
+  const fetchPatients = async () => {
     try {
-      const { data, error } = await supabase
-        .from('radiology_results')
-        .select(`
-          *,
-          patient:patients(id, first_name, last_name),
-          reviewed_by:profiles(first_name, last_name)
-        `)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setRadiologyResults(data || []);
+      // In a real app, we would fetch from Supabase
+      // For now, we'll use mock data
+      const mockPatients = [
+        {
+          id: '00000000-0000-0000-0000-000000000001',
+          first_name: 'Tommy',
+          last_name: 'Jones',
+          date_of_birth: '2020-05-15',
+          current_flow_step: 'waiting_consultation',
+          priority_level: 'normal',
+          arrival_time: '09:15 AM',
+          wait_time: '15 min'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000002',
+          first_name: 'Lily',
+          last_name: 'Smith',
+          date_of_birth: '2018-08-22',
+          current_flow_step: 'consultation',
+          priority_level: 'urgent',
+          arrival_time: '09:30 AM',
+          wait_time: '0 min'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000003',
+          first_name: 'Bobby',
+          last_name: 'Johnson',
+          date_of_birth: '2019-12-10',
+          current_flow_step: 'waiting_consultation',
+          priority_level: 'normal',
+          arrival_time: '08:45 AM',
+          wait_time: '45 min'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000004',
+          first_name: 'Emma',
+          last_name: 'Williams',
+          date_of_birth: '2021-03-30',
+          current_flow_step: 'waiting_consultation',
+          priority_level: 'normal',
+          arrival_time: '10:00 AM',
+          wait_time: '5 min'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000005',
+          first_name: 'Michael',
+          last_name: 'Brown',
+          date_of_birth: '2022-07-18',
+          current_flow_step: 'consultation',
+          priority_level: 'critical',
+          arrival_time: '10:15 AM',
+          wait_time: '0 min'
+        }
+      ];
+      
+      setPatients(mockPatients);
     } catch (error) {
-      console.error('Error fetching radiology results:', error);
+      console.error('Error fetching patients:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-success-100 text-success-800';
-      case 'pending':
-        return 'bg-warning-100 text-warning-800';
-      case 'in_progress':
-        return 'bg-primary-100 text-primary-800';
-      case 'cancelled':
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'critical':
         return 'bg-error-100 text-error-800';
+      case 'urgent':
+        return 'bg-warning-100 text-warning-800';
+      case 'normal':
+        return 'bg-success-100 text-success-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const getScanTypeLabel = (type: string) => {
-    const types: Record<string, string> = {
-      'x_ray': 'X-Ray',
-      'ct_scan': 'CT Scan',
-      'mri': 'MRI',
-      'ultrasound': 'Ultrasound',
-      'mammogram': 'Mammogram',
-      'pet_scan': 'PET Scan',
-      'dexa_scan': 'DEXA Scan',
-      'fluoroscopy': 'Fluoroscopy'
-    };
-    return types[type] || type;
+  const calculateAge = (dateOfBirth: string) => {
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+    
+    let years = today.getFullYear() - birthDate.getFullYear();
+    let months = today.getMonth() - birthDate.getMonth();
+    
+    if (months < 0 || (months === 0 && today.getDate() < birthDate.getDate())) {
+      years--;
+      months += 12;
+    }
+    
+    if (years === 0) {
+      return `${months} month${months !== 1 ? 's' : ''}`;
+    } else {
+      return `${years} year${years !== 1 ? 's' : ''}`;
+    }
   };
 
-  const filteredResults = radiologyResults.filter(result => {
-    const patientName = `${result.patient.first_name} ${result.patient.last_name}`.toLowerCase();
-    const matchesSearch = patientName.includes(searchTerm.toLowerCase()) ||
-                         result.scan_type.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesFilter = filterStatus === 'all' || result.status === filterStatus;
+  // Filter patients based on their current flow step and the active tab
+  const filteredPatients = patients.filter(patient => {
+    const matchesSearch = patient.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                         patient.last_name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesPriority = filterPriority === 'all' || patient.priority_level === filterPriority;
     
-    if (activeTab === 'pending') {
-      return result.status === 'pending' && matchesSearch && matchesFilter;
+    if (activeTab === 'waiting') {
+      return patient.current_flow_step === 'waiting_consultation' && matchesSearch && matchesPriority;
     } else {
-      return result.status === 'in_progress' && matchesSearch && matchesFilter;
+      return patient.current_flow_step === 'consultation' && matchesSearch && matchesPriority;
     }
   });
 
-  // Count scans in each category
-  const pendingCount = radiologyResults.filter(r => r.status === 'pending').length;
-  const inProgressCount = radiologyResults.filter(r => r.status === 'in_progress').length;
-  const completedCount = radiologyResults.filter(r => r.status === 'completed').length;
-  const urgentCount = radiologyResults.filter(r => r.is_emergency).length;
+  // Count patients in each category
+  const waitingCount = patients.filter(p => p.current_flow_step === 'waiting_consultation').length;
+  const inProgressCount = patients.filter(p => p.current_flow_step === 'consultation').length;
+  const completedCount = patients.filter(p => p.current_flow_step === 'post_consultation').length;
+  const urgentCount = patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length;
 
   if (isLoading) {
     return (
@@ -117,24 +172,24 @@ const Radiology: React.FC = () => {
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Radiology</h1>
-          <p className="text-sm text-gray-500">Imaging & Scan Management</p>
+          <h1 className="text-2xl font-bold text-gray-900">Pediatrics</h1>
+          <p className="text-sm text-gray-500">Department Patient Management</p>
         </div>
       </div>
 
       <div className="flex space-x-2">
         <div 
           className={`flex-1 rounded-lg p-4 flex items-center space-x-2 cursor-pointer ${
-            activeTab === 'pending' 
+            activeTab === 'waiting' 
               ? 'bg-white shadow-sm border border-gray-200' 
               : 'bg-gray-100 hover:bg-gray-200'
           }`}
-          onClick={() => setActiveTab('pending')}
+          onClick={() => setActiveTab('waiting')}
         >
           <Clock className="h-5 w-5 text-gray-500" />
-          <span className="font-medium">Pending</span>
+          <span className="font-medium">Waiting</span>
           <span className="ml-auto bg-gray-200 text-gray-800 rounded-full w-6 h-6 flex items-center justify-center text-sm">
-            {pendingCount}
+            {waitingCount}
           </span>
         </div>
         
@@ -146,8 +201,8 @@ const Radiology: React.FC = () => {
           }`}
           onClick={() => setActiveTab('in_progress')}
         >
-          <Microscope className="h-5 w-5 text-primary-500" />
-          <span className="font-medium">In Progress</span>
+          <Baby className="h-5 w-5 text-primary-500" />
+          <span className="font-medium">In Consultation</span>
           <span className="ml-auto bg-primary-100 text-primary-800 rounded-full w-6 h-6 flex items-center justify-center text-sm">
             {inProgressCount}
           </span>
@@ -164,14 +219,14 @@ const Radiology: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="form-input pl-10 w-full"
-            placeholder="Search scans..."
+            placeholder="Search patients..."
           />
         </div>
         
         <div className="relative">
           <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            value={filterPriority}
+            onChange={(e) => setFilterPriority(e.target.value)}
             className="form-input appearance-none pr-8"
           >
             <option value="all">All Priority</option>
@@ -186,53 +241,48 @@ const Radiology: React.FC = () => {
       </div>
 
       <div className="flex space-x-4">
-        {/* Left Section - Scan Queue */}
+        {/* Left Section - Patient Queue */}
         <div className="w-2/3">
           <div className="bg-white rounded-lg shadow-sm">
-            {filteredResults.length === 0 ? (
+            {filteredPatients.length === 0 ? (
               <div className="p-8 text-center">
                 <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-                  <Microscope className="h-6 w-6 text-gray-400" />
+                  <Clock className="h-6 w-6 text-gray-400" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No scans {activeTab === 'pending' ? 'pending' : 'in progress'}</h3>
-                <p className="text-gray-500">There are currently no scans in this category</p>
+                <h3 className="text-lg font-medium text-gray-900 mb-1">No patients {activeTab === 'waiting' ? 'waiting' : 'in consultation'}</h3>
+                <p className="text-gray-500">There are currently no patients in this category</p>
               </div>
             ) : (
               <div className="divide-y divide-gray-200">
-                {filteredResults.map((result) => (
-                  <div key={result.id} className={`p-4 hover:bg-gray-50 ${result.is_emergency ? 'bg-error-50' : ''}`}>
+                {filteredPatients.map((patient) => (
+                  <div key={patient.id} className={`p-4 hover:bg-gray-50 ${patient.priority_level === 'critical' ? 'bg-error-50' : ''}`}>
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium">
-                        {result.patient.first_name.charAt(0)}
+                        {patient.first_name.charAt(0)}
                       </div>
                       <div className="ml-4 flex-1">
                         <div className="flex items-center justify-between">
                           <div>
-                            <h3 className="text-lg font-medium text-gray-900">
-                              {result.patient.first_name} {result.patient.last_name}
-                            </h3>
+                            <h3 className="text-lg font-medium text-gray-900">{patient.first_name} {patient.last_name}</h3>
                             <div className="flex items-center text-sm text-gray-500">
                               <Clock className="h-4 w-4 mr-1" />
-                              <span>{new Date(result.scan_date).toLocaleDateString()}</span>
+                              <span>Wait time: {patient.wait_time}</span>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
-                            {result.is_emergency && (
-                              <span className="px-3 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-error-100 text-error-800">
-                                Emergency
-                              </span>
-                            )}
+                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-medium rounded-full ${getPriorityColor(patient.priority_level)}`}>
+                              {patient.priority_level}
+                            </span>
                             <Link 
-                              to={`/radiology/${result.id}`}
+                              to={`/patients/${patient.id}/consultation`}
                               className="btn btn-primary inline-flex items-center text-sm"
                             >
-                              Process Scan <Microscope className="h-4 w-4 ml-1" />
+                              {activeTab === 'waiting' ? 'Start Consultation' : 'Continue'} <Baby className="h-4 w-4 ml-1" />
                             </Link>
                           </div>
                         </div>
                         <div className="mt-1">
-                          <span className="text-sm font-medium">Scan: </span>
-                          <span className="text-sm">{getScanTypeLabel(result.scan_type)}</span>
+                          <span className="text-sm">{calculateAge(patient.date_of_birth)} • {patient.date_of_birth}</span>
                         </div>
                       </div>
                     </div>
@@ -248,21 +298,21 @@ const Radiology: React.FC = () => {
           {/* Overview Card */}
           <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium text-gray-900">Radiology Overview</h2>
+              <h2 className="text-lg font-medium text-gray-900">Department Overview</h2>
               <span className="text-sm text-gray-500">Today</span>
             </div>
             <div className="space-y-3">
               <div className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
                 <div className="flex items-center">
                   <Clock className="h-5 w-5 text-gray-400 mr-2" />
-                  <span className="text-gray-700">Pending</span>
+                  <span className="text-gray-700">Waiting</span>
                 </div>
-                <span className="font-medium">{pendingCount}</span>
+                <span className="font-medium">{waitingCount}</span>
               </div>
               <div className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
                 <div className="flex items-center">
-                  <Microscope className="h-5 w-5 text-primary-500 mr-2" />
-                  <span className="text-gray-700">In Progress</span>
+                  <Baby className="h-5 w-5 text-primary-500 mr-2" />
+                  <span className="text-gray-700">In Consultation</span>
                 </div>
                 <span className="font-medium">{inProgressCount}</span>
               </div>
@@ -289,10 +339,6 @@ const Radiology: React.FC = () => {
               <h2 className="text-lg font-medium text-gray-900">Quick Actions</h2>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <Link to="/radiology/new-scan" className="flex items-center p-3 rounded-md hover:bg-gray-50 border border-gray-200">
-                <Plus className="h-5 w-5 text-primary-500 mr-2" />
-                <span className="text-gray-700">New Scan</span>
-              </Link>
               <Link to="/patients" className="flex items-center p-3 rounded-md hover:bg-gray-50 border border-gray-200">
                 <FileText className="h-5 w-5 text-primary-500 mr-2" />
                 <span className="text-gray-700">View Records</span>
@@ -300,6 +346,10 @@ const Radiology: React.FC = () => {
               <Link to="/reception" className="flex items-center p-3 rounded-md hover:bg-gray-50 border border-gray-200">
                 <User className="h-5 w-5 text-primary-500 mr-2" />
                 <span className="text-gray-700">Reception</span>
+              </Link>
+              <Link to="/consultations" className="flex items-center p-3 rounded-md hover:bg-gray-50 border border-gray-200">
+                <Stethoscope className="h-5 w-5 text-primary-500 mr-2" />
+                <span className="text-gray-700">Consultations</span>
               </Link>
               <Link to="/appointments" className="flex items-center p-3 rounded-md hover:bg-gray-50 border border-gray-200">
                 <Calendar className="h-5 w-5 text-primary-500 mr-2" />
@@ -312,23 +362,23 @@ const Radiology: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium text-gray-900 flex items-center">
-                <FileImage className="h-5 w-5 text-primary-500 mr-2" />
-                Scan Reference
+                <Baby className="h-5 w-5 text-primary-500 mr-2" />
+                Pediatric Reference
               </h2>
               <ChevronDown className="h-5 w-5 text-gray-400" />
             </div>
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Common Scans</h3>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Growth Milestones</h3>
                 <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="text-gray-600">X-Ray</div>
-                  <div className="text-right">Chest, Bone, Abdomen</div>
-                  <div className="text-gray-600">CT Scan</div>
-                  <div className="text-right">Head, Chest, Abdomen</div>
-                  <div className="text-gray-600">MRI</div>
-                  <div className="text-right">Brain, Spine, Joints</div>
-                  <div className="text-gray-600">Ultrasound</div>
-                  <div className="text-right">Abdomen, Pelvis, Cardiac</div>
+                  <div className="text-gray-600">2-4 months</div>
+                  <div className="text-right">Smiles, holds head up</div>
+                  <div className="text-gray-600">6-9 months</div>
+                  <div className="text-right">Sits, crawls</div>
+                  <div className="text-gray-600">12-18 months</div>
+                  <div className="text-right">Walks, first words</div>
+                  <div className="text-gray-600">2-3 years</div>
+                  <div className="text-right">Runs, sentences</div>
                 </div>
               </div>
             </div>
@@ -339,4 +389,4 @@ const Radiology: React.FC = () => {
   );
 };
 
-export default Radiology;
+export default Pediatrics;

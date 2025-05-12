@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuthStore } from '../lib/store';
+import { supabase } from '../../lib/supabase';
+import { useAuthStore } from '../../lib/store';
 import { 
-  Activity, 
-  AlertTriangle, 
-  Clock, 
-  Heart, 
   Search, 
   Filter, 
-  ArrowRight, 
+  Stethoscope, 
+  CheckCircle, 
+  Clock, 
+  ArrowLeft, 
   FileText, 
   User, 
   Calendar, 
-  Stethoscope, 
   ChevronDown,
-  CheckCircle
+  Activity,
+  AlertTriangle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -26,15 +25,16 @@ interface Patient {
   current_flow_step: string;
   priority_level: string;
   arrival_time?: string;
+  wait_time?: string;
 }
 
-const Triage: React.FC = () => {
+const GeneralMedicine: React.FC = () => {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPriority, setFilterPriority] = useState('all');
   const { hospital } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'waiting' | 'in_progress'>('in_progress');
+  const [activeTab, setActiveTab] = useState<'waiting' | 'in_progress'>('waiting');
 
   useEffect(() => {
     fetchPatients();
@@ -50,18 +50,20 @@ const Triage: React.FC = () => {
           first_name: 'John',
           last_name: 'Doe',
           date_of_birth: '1980-05-15',
-          current_flow_step: 'registration',
+          current_flow_step: 'waiting_consultation',
           priority_level: 'normal',
-          arrival_time: '09:15 AM'
+          arrival_time: '09:15 AM',
+          wait_time: '15 min'
         },
         {
           id: '00000000-0000-0000-0000-000000000002',
           first_name: 'Jane',
           last_name: 'Smith',
           date_of_birth: '1992-08-22',
-          current_flow_step: 'triage',
+          current_flow_step: 'consultation',
           priority_level: 'urgent',
-          arrival_time: '09:30 AM'
+          arrival_time: '09:30 AM',
+          wait_time: '0 min'
         },
         {
           id: '00000000-0000-0000-0000-000000000003',
@@ -70,43 +72,28 @@ const Triage: React.FC = () => {
           date_of_birth: '1975-12-10',
           current_flow_step: 'waiting_consultation',
           priority_level: 'normal',
-          arrival_time: '08:45 AM'
+          arrival_time: '08:45 AM',
+          wait_time: '45 min'
         },
         {
           id: '00000000-0000-0000-0000-000000000004',
           first_name: 'Emily',
           last_name: 'Williams',
           date_of_birth: '1988-03-30',
-          current_flow_step: 'consultation',
+          current_flow_step: 'waiting_consultation',
           priority_level: 'normal',
-          arrival_time: '10:00 AM'
+          arrival_time: '10:00 AM',
+          wait_time: '5 min'
         },
         {
           id: '00000000-0000-0000-0000-000000000005',
           first_name: 'Michael',
           last_name: 'Brown',
           date_of_birth: '1965-07-18',
-          current_flow_step: 'emergency',
+          current_flow_step: 'consultation',
           priority_level: 'critical',
-          arrival_time: '10:15 AM'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000006',
-          first_name: 'Sarah',
-          last_name: 'Davis',
-          date_of_birth: '1990-04-12',
-          current_flow_step: 'registration',
-          priority_level: 'urgent',
-          arrival_time: '10:30 AM'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000007',
-          first_name: 'David',
-          last_name: 'Miller',
-          date_of_birth: '1982-09-28',
-          current_flow_step: 'registration',
-          priority_level: 'normal',
-          arrival_time: '10:45 AM'
+          arrival_time: '10:15 AM',
+          wait_time: '0 min'
         }
       ];
       
@@ -151,17 +138,17 @@ const Triage: React.FC = () => {
     const matchesPriority = filterPriority === 'all' || patient.priority_level === filterPriority;
     
     if (activeTab === 'waiting') {
-      return patient.current_flow_step === 'registration' && matchesSearch && matchesPriority;
+      return patient.current_flow_step === 'waiting_consultation' && matchesSearch && matchesPriority;
     } else {
-      return patient.current_flow_step === 'triage' && matchesSearch && matchesPriority;
+      return patient.current_flow_step === 'consultation' && matchesSearch && matchesPriority;
     }
   });
 
   // Count patients in each category
-  const waitingCount = patients.filter(p => p.current_flow_step === 'registration').length;
-  const inProgressCount = patients.filter(p => p.current_flow_step === 'triage').length;
-  const completedCount = patients.filter(p => p.current_flow_step === 'waiting_consultation').length;
-  const urgentCount = patients.filter(p => p.priority_level === 'urgent').length;
+  const waitingCount = patients.filter(p => p.current_flow_step === 'waiting_consultation').length;
+  const inProgressCount = patients.filter(p => p.current_flow_step === 'consultation').length;
+  const completedCount = patients.filter(p => p.current_flow_step === 'post_consultation').length;
+  const urgentCount = patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length;
 
   if (isLoading) {
     return (
@@ -175,13 +162,11 @@ const Triage: React.FC = () => {
     <div className="space-y-4">
       <div className="flex items-center space-x-2">
         <Link to="/dashboard" className="text-gray-500 hover:text-gray-700">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
+          <ArrowLeft className="w-5 h-5" />
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Triage</h1>
-          <p className="text-sm text-gray-500">Patient Assessment & Prioritization</p>
+          <h1 className="text-2xl font-bold text-gray-900">General Medicine</h1>
+          <p className="text-sm text-gray-500">Department Patient Management</p>
         </div>
       </div>
 
@@ -209,8 +194,8 @@ const Triage: React.FC = () => {
           }`}
           onClick={() => setActiveTab('in_progress')}
         >
-          <Activity className="h-5 w-5 text-primary-500" />
-          <span className="font-medium">In Progress</span>
+          <Stethoscope className="h-5 w-5 text-primary-500" />
+          <span className="font-medium">In Consultation</span>
           <span className="ml-auto bg-primary-100 text-primary-800 rounded-full w-6 h-6 flex items-center justify-center text-sm">
             {inProgressCount}
           </span>
@@ -227,7 +212,7 @@ const Triage: React.FC = () => {
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="form-input pl-10 w-full"
-            placeholder="Search in progress patients..."
+            placeholder="Search patients..."
           />
         </div>
         
@@ -257,7 +242,7 @@ const Triage: React.FC = () => {
                 <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-4">
                   <Clock className="h-6 w-6 text-gray-400" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No patients {activeTab === 'waiting' ? 'waiting' : 'in triage'}</h3>
+                <h3 className="text-lg font-medium text-gray-900 mb-1">No patients {activeTab === 'waiting' ? 'waiting' : 'in consultation'}</h3>
                 <p className="text-gray-500">There are currently no patients in this category</p>
               </div>
             ) : (
@@ -274,7 +259,7 @@ const Triage: React.FC = () => {
                             <h3 className="text-lg font-medium text-gray-900">{patient.first_name} {patient.last_name}</h3>
                             <div className="flex items-center text-sm text-gray-500">
                               <Clock className="h-4 w-4 mr-1" />
-                              <span>{patient.arrival_time || 'Just arrived'}</span>
+                              <span>Wait time: {patient.wait_time}</span>
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -282,10 +267,10 @@ const Triage: React.FC = () => {
                               {patient.priority_level}
                             </span>
                             <Link 
-                              to={`/patients/${patient.id}/triage`}
+                              to={`/patients/${patient.id}/consultation`}
                               className="btn btn-primary inline-flex items-center text-sm"
                             >
-                              Continue Triage <ArrowRight className="h-4 w-4 ml-1" />
+                              {activeTab === 'waiting' ? 'Start Consultation' : 'Continue'} <Stethoscope className="h-4 w-4 ml-1" />
                             </Link>
                           </div>
                         </div>
@@ -306,7 +291,7 @@ const Triage: React.FC = () => {
           {/* Overview Card */}
           <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium text-gray-900">Triage Overview</h2>
+              <h2 className="text-lg font-medium text-gray-900">Department Overview</h2>
               <span className="text-sm text-gray-500">Today</span>
             </div>
             <div className="space-y-3">
@@ -319,8 +304,8 @@ const Triage: React.FC = () => {
               </div>
               <div className="flex items-center justify-between p-2 rounded-md hover:bg-gray-50">
                 <div className="flex items-center">
-                  <Activity className="h-5 w-5 text-primary-500 mr-2" />
-                  <span className="text-gray-700">In Progress</span>
+                  <Stethoscope className="h-5 w-5 text-primary-500 mr-2" />
+                  <span className="text-gray-700">In Consultation</span>
                 </div>
                 <span className="font-medium">{inProgressCount}</span>
               </div>
@@ -366,25 +351,37 @@ const Triage: React.FC = () => {
             </div>
           </div>
 
-          {/* Vital Signs Reference Card */}
+          {/* Reference Card */}
           <div className="bg-white rounded-lg shadow-sm p-4">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-medium text-gray-900 flex items-center">
-                <Heart className="h-5 w-5 text-error-500 mr-2" />
-                Vital Signs Reference
+                <Activity className="h-5 w-5 text-primary-500 mr-2" />
+                Department Info
               </h2>
               <ChevronDown className="h-5 w-5 text-gray-400" />
             </div>
             <div className="space-y-4">
               <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Blood Pressure</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div className="text-gray-600">Normal</div>
-                  <div className="text-right">90-120/60-80 mmHg</div>
-                  <div className="text-gray-600">Elevated</div>
-                  <div className="text-right">120-129/&lt;80 mmHg</div>
-                  <div className="text-gray-600">Hypertension</div>
-                  <div className="text-right">&gt;130/&gt;80 mmHg</div>
+                <h3 className="text-sm font-medium text-gray-700 mb-2">Doctors On Duty</h3>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center mr-2">
+                        <span className="text-xs font-medium">JD</span>
+                      </div>
+                      <span className="text-sm">Dr. John Davis</span>
+                    </div>
+                    <span className="text-xs bg-success-100 text-success-800 px-2 py-1 rounded-full">Available</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <div className="h-8 w-8 rounded-full bg-gray-200 flex items-center justify-center mr-2">
+                        <span className="text-xs font-medium">MW</span>
+                      </div>
+                      <span className="text-sm">Dr. Mary Wilson</span>
+                    </div>
+                    <span className="text-xs bg-primary-100 text-primary-800 px-2 py-1 rounded-full">With patient</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -395,4 +392,4 @@ const Triage: React.FC = () => {
   );
 };
 
-export default Triage;
+export default GeneralMedicine;
