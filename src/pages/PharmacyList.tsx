@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Search, Filter, Pill, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, ChevronDown } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuthStore } from '../lib/store';
+import { useAuthStore, useNotificationStore } from '../lib/store';
 
 interface PharmacyOrder {
   id: string;
@@ -27,7 +27,9 @@ const PharmacyList: React.FC = () => {
   const [orders, setOrders] = useState<PharmacyOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { hospital } = useAuthStore();
+  const { addNotification } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'pending' | 'processing'>('pending');
+  const [inventoryStatus, setInventoryStatus] = useState<{[key: string]: {inStock: boolean, quantity: number}}>({});
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -145,15 +147,82 @@ const PharmacyList: React.FC = () => {
         ];
         
         setOrders(mockOrders);
+        
+        // Check for emergency orders and show notifications
+        const emergencyOrders = mockOrders.filter(order => order.is_emergency && order.status === 'pending');
+        if (emergencyOrders.length > 0) {
+          emergencyOrders.forEach(order => {
+            addNotification({
+              message: `EMERGENCY: Prescription for ${order.patient.first_name} ${order.patient.last_name} needs immediate attention`,
+              type: 'error',
+              duration: 5000
+            });
+          });
+        }
+        
+        // Check inventory status for all medications
+        const mockInventory: {[key: string]: {inStock: boolean, quantity: number}} = {
+          'Amoxicillin': { inStock: true, quantity: 120 },
+          'Paracetamol': { inStock: true, quantity: 200 },
+          'Ibuprofen': { inStock: true, quantity: 150 },
+          'Metformin': { inStock: true, quantity: 80 },
+          'Atorvastatin': { inStock: true, quantity: 60 },
+          'Aspirin': { inStock: true, quantity: 100 },
+          'Salbutamol': { inStock: false, quantity: 0 },
+          'Prednisolone': { inStock: true, quantity: 45 },
+          'Omeprazole': { inStock: false, quantity: 0 }
+        };
+        
+        setInventoryStatus(mockInventory);
+        
+        // Check for out of stock medications
+        mockOrders.forEach(order => {
+          order.medications.forEach(med => {
+            if (mockInventory[med.medication] && !mockInventory[med.medication].inStock) {
+              addNotification({
+                message: `Warning: ${med.medication} is out of stock`,
+                type: 'warning',
+                duration: 4000
+              });
+            } else if (mockInventory[med.medication] && mockInventory[med.medication].quantity < med.quantity) {
+              addNotification({
+                message: `Low stock: Only ${mockInventory[med.medication].quantity} of ${med.medication} available`,
+                type: 'warning',
+                duration: 4000
+              });
+            }
+          });
+        });
       } catch (error) {
         console.error('Error fetching pharmacy orders:', error);
+        addNotification({
+          message: 'Failed to load pharmacy orders',
+          type: 'error'
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchOrders();
-  }, [hospital]);
+  }, [hospital, addNotification]);
+  
+  const handleProcessOrder = (orderId: string, patientName: string) => {
+    // Update order status in state
+    setOrders(prevOrders => 
+      prevOrders.map(order => 
+        order.id === orderId 
+          ? { ...order, status: 'processing' } 
+          : order
+      )
+    );
+    
+    // Show notification
+    addNotification({
+      message: `Started processing order for ${patientName}`,
+      type: 'success'
+    });
+  };
 
   const filteredOrders = orders.filter(order => {
     const patientName = `${order.patient.first_name} ${order.patient.last_name}`.toLowerCase();
@@ -329,20 +398,36 @@ const PharmacyList: React.FC = () => {
                                 Emergency
                               </span>
                             )}
-                            <Link 
-                              to={`/pharmacy/${order.id}/dispense`}
-                              className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
-                            >
-                              Process Order <Pill className="h-3 w-3 ml-1" />
-                            </Link>
+                            {activeTab === 'pending' ? (
+                              <button 
+                                onClick={() => handleProcessOrder(order.id, `${order.patient.first_name} ${order.patient.last_name}`)}
+                                className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
+                                disabled={order.payment_status === 'pending'}
+                                title={order.payment_status === 'pending' ? 'Payment required before processing' : ''}
+                              >
+                                Process Order <Pill className="h-3 w-3 ml-1" />
+                              </button>
+                            ) : (
+                              <Link 
+                                to={`/pharmacy/${order.id}/dispense`}
+                                className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
+                              >
+                                Dispense <Pill className="h-3 w-3 ml-1" />
+                              </Link>
+                            )}
                           </div>
                         </div>
                         <div className="mt-0.5">
                           <div className="flex flex-wrap gap-1">
                             {order.medications.slice(0, 2).map((med, index) => (
-                              <span key={index} className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                              <span key={index} className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                                inventoryStatus[med.medication]?.inStock 
+                                  ? 'bg-gray-100 text-gray-800' 
+                                  : 'bg-error-100 text-error-800'
+                              }`}>
                                 <Pill className="h-2.5 w-2.5 mr-0.5" />
                                 {med.medication} ({med.quantity})
+                                {!inventoryStatus[med.medication]?.inStock && ' - Out of stock'}
                               </span>
                             ))}
                             {order.medications.length > 2 && (
@@ -398,6 +483,29 @@ const PharmacyList: React.FC = () => {
                 </div>
                 <span className="font-medium text-sm">{urgentCount}</span>
               </div>
+            </div>
+          </div>
+
+          {/* Inventory Status Card */}
+          <div className="bg-white rounded-lg shadow-sm p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-base font-medium text-gray-900">Inventory Status</h2>
+              <button className="text-primary-600 text-xs font-medium">View All</button>
+            </div>
+            <div className="space-y-2">
+              {Object.entries(inventoryStatus).slice(0, 5).map(([medication, status]) => (
+                <div key={medication} className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
+                  <div className="flex items-center">
+                    <Pill className="h-4 w-4 text-gray-400 mr-1.5" />
+                    <span className="text-sm text-gray-700">{medication}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <span className={`text-xs font-medium ${status.inStock ? 'text-success-600' : 'text-error-600'}`}>
+                      {status.inStock ? `${status.quantity} in stock` : 'Out of stock'}
+                    </span>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
 

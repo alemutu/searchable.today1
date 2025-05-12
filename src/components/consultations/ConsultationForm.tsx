@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { FileText, Plus, Trash2, Activity, AlertTriangle, Stethoscope, Pill, Clock, Calculator, Ruler, Scale, Thermometer, Droplets, Settings as Lungs, Heart, Brain, FileBarChart2, ArrowRight, Search, ChevronDown } from 'lucide-react';
+import { FileText, Plus, Trash2, User, Activity, Search, Pill, AlertTriangle, ArrowUpRight } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
@@ -45,6 +45,9 @@ const ConsultationForm: React.FC = () => {
   const [showLabTestModal, setShowLabTestModal] = useState(false);
   const [showRadiologyModal, setShowRadiologyModal] = useState(false);
   const [searchMedication, setSearchMedication] = useState('');
+  const [medicationInventory, setMedicationInventory] = useState<any[]>([]);
+  const [filteredMedications, setFilteredMedications] = useState<any[]>([]);
+  const [showMedicationSearch, setShowMedicationSearch] = useState(false);
   
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch } = useForm<ConsultationFormData>({
     defaultValues: {
@@ -65,7 +68,21 @@ const ConsultationForm: React.FC = () => {
     } else {
       setIsLoading(false);
     }
+    
+    // Fetch medication inventory
+    fetchMedicationInventory();
   }, [patientId]);
+  
+  useEffect(() => {
+    if (searchMedication.trim() !== '') {
+      const filtered = medicationInventory.filter(med => 
+        med.name.toLowerCase().includes(searchMedication.toLowerCase())
+      );
+      setFilteredMedications(filtered);
+    } else {
+      setFilteredMedications([]);
+    }
+  }, [searchMedication, medicationInventory]);
 
   const fetchPatient = async () => {
     try {
@@ -114,11 +131,108 @@ const ConsultationForm: React.FC = () => {
     } catch (error) {
       console.error('Error loading patient:', error);
       addNotification({
-        message: 'Failed to load patient information',
+        message: 'Error loading patient data',
         type: 'error'
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+  
+  const fetchMedicationInventory = async () => {
+    try {
+      // In a real app, we would fetch from Supabase
+      // For now, we'll use mock data
+      const mockMedications = [
+        {
+          id: '1',
+          name: 'Amoxicillin',
+          forms: ['Capsule', 'Tablet', 'Suspension'],
+          dosages: ['250mg', '500mg', '875mg'],
+          inStock: true,
+          quantity: 120
+        },
+        {
+          id: '2',
+          name: 'Lisinopril',
+          forms: ['Tablet'],
+          dosages: ['5mg', '10mg', '20mg'],
+          inStock: true,
+          quantity: 90
+        },
+        {
+          id: '3',
+          name: 'Atorvastatin',
+          forms: ['Tablet'],
+          dosages: ['10mg', '20mg', '40mg', '80mg'],
+          inStock: true,
+          quantity: 60
+        },
+        {
+          id: '4',
+          name: 'Metformin',
+          forms: ['Tablet', 'Extended-release tablet'],
+          dosages: ['500mg', '850mg', '1000mg'],
+          inStock: true,
+          quantity: 100
+        },
+        {
+          id: '5',
+          name: 'Ibuprofen',
+          forms: ['Tablet', 'Capsule', 'Suspension'],
+          dosages: ['200mg', '400mg', '600mg', '800mg'],
+          inStock: true,
+          quantity: 200
+        },
+        {
+          id: '6',
+          name: 'Paracetamol',
+          forms: ['Tablet', 'Capsule', 'Suspension'],
+          dosages: ['500mg', '650mg'],
+          inStock: true,
+          quantity: 150
+        },
+        {
+          id: '7',
+          name: 'Omeprazole',
+          forms: ['Capsule', 'Tablet'],
+          dosages: ['10mg', '20mg', '40mg'],
+          inStock: false,
+          quantity: 0
+        },
+        {
+          id: '8',
+          name: 'Amlodipine',
+          forms: ['Tablet'],
+          dosages: ['2.5mg', '5mg', '10mg'],
+          inStock: true,
+          quantity: 80
+        },
+        {
+          id: '9',
+          name: 'Metoprolol',
+          forms: ['Tablet', 'Extended-release tablet'],
+          dosages: ['25mg', '50mg', '100mg', '200mg'],
+          inStock: true,
+          quantity: 70
+        },
+        {
+          id: '10',
+          name: 'Sertraline',
+          forms: ['Tablet'],
+          dosages: ['25mg', '50mg', '100mg'],
+          inStock: true,
+          quantity: 45
+        }
+      ];
+      
+      setMedicationInventory(mockMedications);
+    } catch (error) {
+      console.error('Error fetching medication inventory:', error);
+      addNotification({
+        message: 'Failed to load medication inventory',
+        type: 'error'
+      });
     }
   };
 
@@ -152,22 +266,10 @@ const ConsultationForm: React.FC = () => {
       
       if (data.labTests.length > 0) {
         nextFlowStep = 'lab_tests';
-        addNotification({
-          message: `Lab tests ordered for ${patient.first_name} ${patient.last_name}`,
-          type: 'success'
-        });
       } else if (data.radiologyTests.length > 0) {
         nextFlowStep = 'radiology';
-        addNotification({
-          message: `Radiology tests ordered for ${patient.first_name} ${patient.last_name}`,
-          type: 'success'
-        });
       } else if (data.prescriptions.some(p => p.medication)) {
         nextFlowStep = 'pharmacy';
-        addNotification({
-          message: `Prescription sent to pharmacy for ${patient.first_name} ${patient.last_name}`,
-          type: 'success'
-        });
       }
 
       // Update patient's current flow step
@@ -195,6 +297,11 @@ const ConsultationForm: React.FC = () => {
           })));
 
         if (labError) throw labError;
+        
+        addNotification({
+          message: `${data.labTests.length} lab tests ordered successfully`,
+          type: 'success'
+        });
       }
 
       // If radiology tests were ordered, create radiology orders
@@ -212,6 +319,11 @@ const ConsultationForm: React.FC = () => {
           })));
 
         if (radiologyError) throw radiologyError;
+        
+        addNotification({
+          message: `${data.radiologyTests.length} radiology tests ordered successfully`,
+          type: 'success'
+        });
       }
 
       // If prescriptions were added, create pharmacy order
@@ -232,16 +344,148 @@ const ConsultationForm: React.FC = () => {
           });
 
         if (pharmacyError) throw pharmacyError;
+        
+        addNotification({
+          message: 'Prescription sent to pharmacy successfully',
+          type: 'success'
+        });
+      }
+      
+      // Create billing record for all services
+      const services = [
+        ...data.labTests.map(test => ({
+          name: test.testName,
+          amount: test.price,
+          quantity: 1
+        })),
+        ...data.radiologyTests.map(test => ({
+          name: test.testName,
+          amount: test.price,
+          quantity: 1
+        })),
+        ...data.prescriptions.filter(p => p.medication).map(p => ({
+          name: `Medication: ${p.medication}`,
+          amount: 500, // Default price, in a real app this would come from inventory
+          quantity: 1
+        }))
+      ];
+      
+      if (services.length > 0) {
+        const totalAmount = services.reduce((sum, service) => sum + (service.amount * service.quantity), 0);
+        
+        const { error: billingError } = await supabase
+          .from('billing')
+          .insert({
+            patient_id: patientId,
+            hospital_id: hospital.id,
+            services: services,
+            total_amount: totalAmount,
+            paid_amount: 0,
+            payment_status: 'pending'
+          });
+          
+        if (billingError) throw billingError;
+        
+        addNotification({
+          message: 'Billing record created successfully',
+          type: 'success'
+        });
       }
 
       addNotification({
         message: 'Consultation completed successfully',
         type: 'success'
       });
-
+      
       navigate('/patients');
     } catch (error: any) {
       console.error('Error submitting consultation:', error.message);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleSendToPharmacy = async () => {
+    const currentPrescriptions = watch('prescriptions');
+    
+    if (!currentPrescriptions.some(p => p.medication)) {
+      addNotification({
+        message: 'Please add at least one medication before sending to pharmacy',
+        type: 'warning'
+      });
+      return;
+    }
+    
+    try {
+      setIsSaving(true);
+      
+      if (!hospital || !user || !patient) throw new Error('Missing required data');
+      
+      // Create pharmacy order
+      const { data, error } = await supabase
+        .from('pharmacy')
+        .insert({
+          patient_id: patientId,
+          hospital_id: hospital.id,
+          medications: currentPrescriptions.filter(p => p.medication).map(p => ({
+            ...p,
+            quantity: 1,
+            dispensed: false
+          })),
+          status: 'pending',
+          payment_status: 'pending',
+          is_emergency: false
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      // Update patient's current flow step
+      const { error: patientError } = await supabase
+        .from('patients')
+        .update({
+          current_flow_step: 'pharmacy'
+        })
+        .eq('id', patientId);
+
+      if (patientError) throw patientError;
+      
+      // Create billing record
+      const services = currentPrescriptions.filter(p => p.medication).map(p => ({
+        name: `Medication: ${p.medication}`,
+        amount: 500, // Default price, in a real app this would come from inventory
+        quantity: 1
+      }));
+      
+      const totalAmount = services.reduce((sum, service) => sum + (service.amount * service.quantity), 0);
+      
+      const { error: billingError } = await supabase
+        .from('billing')
+        .insert({
+          patient_id: patientId,
+          hospital_id: hospital.id,
+          services: services,
+          total_amount: totalAmount,
+          paid_amount: 0,
+          payment_status: 'pending'
+        });
+        
+      if (billingError) throw billingError;
+      
+      addNotification({
+        message: 'Prescription sent to pharmacy successfully',
+        type: 'success'
+      });
+      
+      // Optionally navigate to pharmacy page or stay on current page
+      // navigate('/pharmacy');
+    } catch (error: any) {
+      console.error('Error sending to pharmacy:', error.message);
       addNotification({
         message: `Error: ${error.message}`,
         type: 'error'
@@ -300,26 +544,6 @@ const ConsultationForm: React.FC = () => {
     ]}
   ];
 
-  // Available medications
-  const availableMedications = [
-    { name: 'Amoxicillin', dosages: ['250mg', '500mg'], forms: ['Capsule', 'Suspension'] },
-    { name: 'Paracetamol', dosages: ['500mg', '1g'], forms: ['Tablet', 'Syrup'] },
-    { name: 'Ibuprofen', dosages: ['200mg', '400mg', '600mg'], forms: ['Tablet', 'Suspension'] },
-    { name: 'Omeprazole', dosages: ['20mg', '40mg'], forms: ['Capsule'] },
-    { name: 'Metformin', dosages: ['500mg', '850mg', '1000mg'], forms: ['Tablet'] },
-    { name: 'Atorvastatin', dosages: ['10mg', '20mg', '40mg'], forms: ['Tablet'] },
-    { name: 'Lisinopril', dosages: ['5mg', '10mg', '20mg'], forms: ['Tablet'] },
-    { name: 'Amlodipine', dosages: ['5mg', '10mg'], forms: ['Tablet'] },
-    { name: 'Metoprolol', dosages: ['25mg', '50mg', '100mg'], forms: ['Tablet'] },
-    { name: 'Losartan', dosages: ['25mg', '50mg', '100mg'], forms: ['Tablet'] }
-  ];
-
-  const filteredMedications = searchMedication 
-    ? availableMedications.filter(med => 
-        med.name.toLowerCase().includes(searchMedication.toLowerCase())
-      )
-    : availableMedications;
-
   const addLabTest = (test: { name: string, price: number }) => {
     const currentTests = watch('labTests') || [];
     setValue('labTests', [
@@ -335,7 +559,8 @@ const ConsultationForm: React.FC = () => {
     
     addNotification({
       message: `${test.name} added to lab tests`,
-      type: 'success'
+      type: 'success',
+      duration: 2000
     });
   };
 
@@ -354,29 +579,32 @@ const ConsultationForm: React.FC = () => {
     
     addNotification({
       message: `${test.name} added to radiology tests`,
-      type: 'success'
+      type: 'success',
+      duration: 2000
     });
   };
 
   const removeLabTest = (index: number) => {
     const currentTests = watch('labTests');
-    const removedTest = currentTests[index];
+    const testName = currentTests[index].testName;
     setValue('labTests', currentTests.filter((_, i) => i !== index));
     
     addNotification({
-      message: `${removedTest.testName} removed from lab tests`,
-      type: 'info'
+      message: `${testName} removed from lab tests`,
+      type: 'info',
+      duration: 2000
     });
   };
 
   const removeRadiologyTest = (index: number) => {
     const currentTests = watch('radiologyTests');
-    const removedTest = currentTests[index];
+    const testName = currentTests[index].testName;
     setValue('radiologyTests', currentTests.filter((_, i) => i !== index));
     
     addNotification({
-      message: `${removedTest.testName} removed from radiology tests`,
-      type: 'info'
+      message: `${testName} removed from radiology tests`,
+      type: 'info',
+      duration: 2000
     });
   };
 
@@ -385,12 +613,6 @@ const ConsultationForm: React.FC = () => {
     const updatedTests = [...currentTests];
     updatedTests[index].priority = priority;
     setValue('labTests', updatedTests);
-    
-    addNotification({
-      message: `${currentTests[index].testName} priority set to ${priority}`,
-      type: 'info',
-      duration: 2000
-    });
   };
 
   const updateRadiologyTestPriority = (index: number, priority: string) => {
@@ -398,12 +620,6 @@ const ConsultationForm: React.FC = () => {
     const updatedTests = [...currentTests];
     updatedTests[index].priority = priority;
     setValue('radiologyTests', updatedTests);
-    
-    addNotification({
-      message: `${currentTests[index].testName} priority set to ${priority}`,
-      type: 'info',
-      duration: 2000
-    });
   };
 
   const formatCurrency = (amount: number) => {
@@ -413,12 +629,107 @@ const ConsultationForm: React.FC = () => {
       minimumFractionDigits: 2
     }).format(amount);
   };
-
-  const addCustomMedication = () => {
-    setPrescriptionCount(prev => prev + 1);
+  
+  const addMedication = (medication: any) => {
+    if (!medication.inStock) {
+      addNotification({
+        message: `${medication.name} is out of stock`,
+        type: 'warning'
+      });
+      return;
+    }
+    
+    const currentPrescriptions = watch('prescriptions');
+    
+    // Check if we need to replace an empty prescription
+    const emptyIndex = currentPrescriptions.findIndex(p => !p.medication);
+    
+    if (emptyIndex !== -1) {
+      const updatedPrescriptions = [...currentPrescriptions];
+      updatedPrescriptions[emptyIndex] = {
+        ...updatedPrescriptions[emptyIndex],
+        medication: medication.name,
+        dosage: medication.dosages[0]
+      };
+      setValue('prescriptions', updatedPrescriptions);
+    } else {
+      // Add a new prescription
+      setValue('prescriptions', [
+        ...currentPrescriptions,
+        {
+          medication: medication.name,
+          dosage: medication.dosages[0],
+          frequency: '',
+          duration: '',
+          instructions: ''
+        }
+      ]);
+      setPrescriptionCount(prescriptionCount + 1);
+    }
+    
+    setSearchMedication('');
+    setShowMedicationSearch(false);
+    
     addNotification({
-      message: 'Custom medication added',
+      message: `${medication.name} added to prescription`,
       type: 'success',
+      duration: 2000
+    });
+  };
+  
+  const addCustomMedication = () => {
+    const currentPrescriptions = watch('prescriptions');
+    
+    // Check if we need to replace an empty prescription
+    const emptyIndex = currentPrescriptions.findIndex(p => !p.medication);
+    
+    if (emptyIndex !== -1) {
+      const updatedPrescriptions = [...currentPrescriptions];
+      updatedPrescriptions[emptyIndex] = {
+        ...updatedPrescriptions[emptyIndex],
+        medication: searchMedication,
+      };
+      setValue('prescriptions', updatedPrescriptions);
+    } else {
+      // Add a new prescription
+      setValue('prescriptions', [
+        ...currentPrescriptions,
+        {
+          medication: searchMedication,
+          dosage: '',
+          frequency: '',
+          duration: '',
+          instructions: ''
+        }
+      ]);
+      setPrescriptionCount(prescriptionCount + 1);
+    }
+    
+    setSearchMedication('');
+    setShowMedicationSearch(false);
+    
+    addNotification({
+      message: `Custom medication added to prescription`,
+      type: 'success',
+      duration: 2000
+    });
+  };
+  
+  const removeMedication = (index: number) => {
+    const currentPrescriptions = watch('prescriptions');
+    const medicationName = currentPrescriptions[index].medication;
+    
+    if (currentPrescriptions.length === 1) {
+      // If it's the last prescription, just clear it instead of removing
+      setValue('prescriptions', [{ medication: '', dosage: '', frequency: '', duration: '', instructions: '' }]);
+    } else {
+      setValue('prescriptions', currentPrescriptions.filter((_, i) => i !== index));
+      setPrescriptionCount(prescriptionCount - 1);
+    }
+    
+    addNotification({
+      message: `${medicationName} removed from prescription`,
+      type: 'info',
       duration: 2000
     });
   };
@@ -453,7 +764,7 @@ const ConsultationForm: React.FC = () => {
                 {patient.first_name} {patient.last_name}
               </h2>
               <div className="flex items-center text-primary-100 text-xs">
-                <Activity className="h-3 w-3 mr-1" />
+                <User className="h-3 w-3 mr-1" />
                 <span>{new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} years • {patient.gender}</span>
               </div>
             </div>
@@ -810,27 +1121,102 @@ const ConsultationForm: React.FC = () => {
               <h2 className="text-xl font-semibold text-gray-900">Medications</h2>
               <button
                 type="button"
-                onClick={addCustomMedication}
+                onClick={handleSendToPharmacy}
+                disabled={!prescriptions.some(p => p.medication) || isSaving}
                 className="btn btn-primary inline-flex items-center"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Custom
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <ArrowUpRight className="h-4 w-4 mr-2" />
+                    Send to Pharmacy
+                  </>
+                )}
               </button>
             </div>
             
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Search className="h-5 w-5 text-gray-400" />
+              <div className="flex items-center">
+                <div className="relative flex-grow">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Search className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={searchMedication}
+                    onChange={(e) => {
+                      setSearchMedication(e.target.value);
+                      setShowMedicationSearch(true);
+                    }}
+                    onFocus={() => setShowMedicationSearch(true)}
+                    className="form-input pl-10 w-full"
+                    placeholder="Search medications..."
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (searchMedication.trim()) {
+                      addCustomMedication();
+                    } else {
+                      addNotification({
+                        message: 'Please enter a medication name',
+                        type: 'warning'
+                      });
+                    }
+                  }}
+                  className="btn btn-primary ml-2"
+                >
+                  Add Custom
+                </button>
               </div>
-              <input
-                type="text"
-                value={searchMedication}
-                onChange={(e) => setSearchMedication(e.target.value)}
-                className="form-input pl-10 w-full"
-                placeholder="Search medications..."
-              />
+              
+              {showMedicationSearch && filteredMedications.length > 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-y-auto">
+                  {filteredMedications.map((medication) => (
+                    <div
+                      key={medication.id}
+                      className="p-2 hover:bg-gray-50 cursor-pointer flex items-center justify-between"
+                      onClick={() => addMedication(medication)}
+                    >
+                      <div>
+                        <div className="font-medium">{medication.name}</div>
+                        <div className="text-xs text-gray-500">
+                          {medication.forms.join(', ')} • {medication.dosages.join(', ')}
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        {!medication.inStock ? (
+                          <span className="text-xs text-error-600 mr-2">Out of stock</span>
+                        ) : (
+                          <span className="text-xs text-success-600 mr-2">In stock ({medication.quantity})</span>
+                        )}
+                        <Plus className="h-4 w-4 text-primary-500" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              
+              {showMedicationSearch && searchMedication && filteredMedications.length === 0 && (
+                <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 p-4 text-center">
+                  <p className="text-gray-500">No medications found matching "{searchMedication}"</p>
+                  <button
+                    type="button"
+                    onClick={addCustomMedication}
+                    className="mt-2 text-primary-600 hover:text-primary-800 text-sm font-medium"
+                  >
+                    Add "{searchMedication}" as custom medication
+                  </button>
+                </div>
+              )}
             </div>
             
+            {/* Medications List */}
             {prescriptions.some(p => p.medication) ? (
               <div className="space-y-4">
                 {prescriptions.map((prescription, index) => (
@@ -840,14 +1226,7 @@ const ConsultationForm: React.FC = () => {
                         <h3 className="text-lg font-medium text-gray-900">{prescription.medication}</h3>
                         <button
                           type="button"
-                          onClick={() => {
-                            const updatedPrescriptions = [...prescriptions];
-                            updatedPrescriptions.splice(index, 1);
-                            setValue('prescriptions', updatedPrescriptions);
-                            if (updatedPrescriptions.length === 0) {
-                              setValue('prescriptions', [{ medication: '', dosage: '', frequency: '', duration: '', instructions: '' }]);
-                            }
-                          }}
+                          onClick={() => removeMedication(index)}
                           className="text-error-600 hover:text-error-700"
                         >
                           <Trash2 className="h-5 w-5" />
@@ -903,71 +1282,20 @@ const ConsultationForm: React.FC = () => {
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="h-16 w-16 text-gray-300 mb-4 flex items-center justify-center">
-                  <Pill className="h-12 w-12" />
+                <div className="h-16 w-16 text-gray-300 mb-4">
+                  <Pill className="h-16 w-16" />
                 </div>
                 <h3 className="text-lg font-medium text-gray-900 mb-1">No medications prescribed yet</h3>
-                <p className="text-gray-500 max-w-md mb-2">
+                <p className="text-gray-500 mb-6">
                   Search above or click Add Custom to prescribe medications
                 </p>
-                <button 
+                <button
                   type="button"
-                  className="text-primary-600 hover:text-primary-800 text-sm font-medium"
+                  className="text-primary-600 hover:text-primary-800 text-sm"
                   onClick={() => setActiveTab('notes')}
                 >
                   Skip prescribing medications
                 </button>
-              </div>
-            )}
-            
-            {filteredMedications.length > 0 && searchMedication && (
-              <div className="mt-4 border rounded-lg divide-y">
-                <div className="p-2 bg-gray-50 text-xs font-medium text-gray-700">
-                  Search Results
-                </div>
-                {filteredMedications.map((medication, idx) => (
-                  <div key={idx} className="p-3 hover:bg-gray-50 cursor-pointer" onClick={() => {
-                    // Find an empty prescription slot or add a new one
-                    const emptyIndex = prescriptions.findIndex(p => !p.medication);
-                    if (emptyIndex >= 0) {
-                      const updatedPrescriptions = [...prescriptions];
-                      updatedPrescriptions[emptyIndex] = {
-                        ...updatedPrescriptions[emptyIndex],
-                        medication: medication.name,
-                        dosage: medication.dosages[0],
-                      };
-                      setValue('prescriptions', updatedPrescriptions);
-                    } else {
-                      setValue('prescriptions', [
-                        ...prescriptions,
-                        {
-                          medication: medication.name,
-                          dosage: medication.dosages[0],
-                          frequency: '',
-                          duration: '',
-                          instructions: ''
-                        }
-                      ]);
-                    }
-                    setSearchMedication('');
-                    addNotification({
-                      message: `${medication.name} added to prescription`,
-                      type: 'success'
-                    });
-                  }}>
-                    <div className="flex justify-between">
-                      <div>
-                        <div className="font-medium text-gray-900">{medication.name}</div>
-                        <div className="text-xs text-gray-500">
-                          {medication.forms.join(', ')} • {medication.dosages.join(', ')}
-                        </div>
-                      </div>
-                      <div className="text-primary-600">
-                        <Plus className="h-5 w-5" />
-                      </div>
-                    </div>
-                  </div>
-                ))}
               </div>
             )}
           </div>
