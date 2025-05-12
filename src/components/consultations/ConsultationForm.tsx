@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
@@ -19,11 +19,13 @@ import {
   Syringe, 
   UserRound, 
   Baby,
-  AlertTriangle
+  AlertTriangle,
+  X
 } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
+  symptoms: string[];
   diagnosis: string;
   treatmentPlan: string;
   notes: string;
@@ -77,6 +79,8 @@ interface ConsultationFormData {
   // Pediatrics fields
   growthPercentile?: string;
   developmentalAssessment?: string;
+  // Family history
+  familyHistory?: string;
 }
 
 const ConsultationForm: React.FC = () => {
@@ -88,11 +92,15 @@ const ConsultationForm: React.FC = () => {
   const [department, setDepartment] = useState<string>('general');
   const [patientInfo, setPatientInfo] = useState<any>(null);
   const [isEmergency, setIsEmergency] = useState(false);
+  const [activeTab, setActiveTab] = useState<'assessment' | 'medications' | 'diagnosticTests' | 'notes' | 'summary'>('assessment');
+  const [symptoms, setSymptoms] = useState<string[]>([]);
+  const [symptomInput, setSymptomInput] = useState('');
   
-  const { register, handleSubmit, formState: { errors, isSubmitting }, setValue, watch } = useForm<ConsultationFormData>({
+  const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch } = useForm<ConsultationFormData>({
     defaultValues: {
       prescriptions: [{ medication: '', dosage: '', frequency: '', duration: '', instructions: '' }],
-      medicalCertificate: false
+      medicalCertificate: false,
+      symptoms: []
     }
   });
 
@@ -150,9 +158,23 @@ const ConsultationForm: React.FC = () => {
     fetchPatient();
   }, [patientId]);
 
+  const addSymptom = () => {
+    if (symptomInput.trim()) {
+      setSymptoms([...symptoms, symptomInput.trim()]);
+      setSymptomInput('');
+    }
+  };
+
+  const removeSymptom = (index: number) => {
+    setSymptoms(symptoms.filter((_, i) => i !== index));
+  };
+
   const onSubmit = async (data: ConsultationFormData) => {
     try {
       if (!hospital || !user || !patientId) throw new Error('Missing required data');
+
+      // Add symptoms to data
+      data.symptoms = symptoms;
 
       // Create consultation record
       const { error: consultationError } = await supabase
@@ -206,7 +228,8 @@ const ConsultationForm: React.FC = () => {
           ...(department === 'pediatrics' && {
             growth_percentile: data.growthPercentile,
             developmental_assessment: data.developmentalAssessment
-          })
+          }),
+          family_history: data.familyHistory
         });
 
       if (consultationError) throw consultationError;
@@ -275,607 +298,632 @@ const ConsultationForm: React.FC = () => {
     }
   };
 
+  const calculateAge = (dateOfBirth: string) => {
+    if (!dateOfBirth) return '';
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
+
   return (
-    <div className="max-w-4xl mx-auto">
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        {/* Header with Department Info */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <button
-              type="button"
-              onClick={() => navigate(-1)}
-              className="mr-3 p-1 rounded-full hover:bg-gray-100"
-            >
-              <ArrowLeft className="h-5 w-5 text-gray-500" />
-            </button>
-            <div>
-              <h1 className="text-xl font-bold text-gray-900 flex items-center">
-                {getDepartmentIcon()}
-                {getDepartmentTitle()}
-              </h1>
-              {patientInfo && (
-                <p className="text-sm text-gray-500">
-                  Patient: {patientInfo.first_name} {patientInfo.last_name}
-                </p>
+    <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-sm">
+      {/* Header with patient info and close button */}
+      <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+        <div className="flex items-center">
+          <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium">
+            {patientInfo?.first_name?.charAt(0) || 'P'}
+          </div>
+          <div className="ml-3">
+            <div className="flex items-center">
+              <h2 className="text-lg font-medium text-gray-900">
+                {patientInfo?.first_name || 'Patient'} {patientInfo?.last_name || ''}
+              </h2>
+              {isEmergency && (
+                <span className="ml-2 px-2 py-0.5 text-xs font-medium rounded-full bg-error-100 text-error-800">
+                  Emergency
+                </span>
               )}
             </div>
-          </div>
-          
-          {isEmergency && (
-            <div className="bg-error-50 text-error-700 px-3 py-1 rounded-md flex items-center">
-              <AlertTriangle className="h-4 w-4 mr-1" />
-              <span className="text-sm font-medium">Emergency Case</span>
+            <div className="flex items-center text-sm text-gray-500">
+              <span>{calculateAge(patientInfo?.date_of_birth)} years, {patientInfo?.gender?.toLowerCase()}</span>
+              <span className="mx-2">•</span>
+              <span>{getDepartmentTitle()}</span>
+              <span className="mx-2">•</span>
+              <span>{new Date().toLocaleDateString()}</span>
             </div>
-          )}
-        </div>
-
-        {/* Chief Complaint and Diagnosis */}
-        <div className="bg-white p-5 rounded-lg shadow-sm space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Consultation Details</h2>
-          
-          <div>
-            <label htmlFor="chiefComplaint" className="form-label">Chief Complaint</label>
-            <textarea
-              id="chiefComplaint"
-              rows={2}
-              {...register('chiefComplaint', { required: 'Chief complaint is required' })}
-              className="form-input"
-              placeholder="Patient's main complaint"
-            />
-            {errors.chiefComplaint && (
-              <p className="form-error">{errors.chiefComplaint.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="diagnosis" className="form-label">Diagnosis</label>
-            <textarea
-              id="diagnosis"
-              rows={2}
-              {...register('diagnosis', { required: 'Diagnosis is required' })}
-              className="form-input"
-              placeholder="Clinical diagnosis"
-            />
-            {errors.diagnosis && (
-              <p className="form-error">{errors.diagnosis.message}</p>
-            )}
           </div>
         </div>
+        <button 
+          onClick={() => navigate(-1)}
+          className="p-1 rounded-full hover:bg-gray-100"
+        >
+          <X className="h-5 w-5 text-gray-500" />
+        </button>
+      </div>
 
-        {/* Department-specific fields */}
-        {department === 'cardiology' && (
-          <div className="bg-white p-5 rounded-lg shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Heart className="h-5 w-5 mr-2 text-error-500" />
-              Cardiac Assessment
-            </h2>
-            
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="form-label">Blood Pressure (mmHg)</label>
-                <input
-                  type="text"
-                  {...register('vitalSigns.bloodPressure')}
-                  className="form-input"
-                  placeholder="e.g., 120/80"
-                />
-              </div>
-              
-              <div>
-                <label className="form-label">Heart Rate (bpm)</label>
-                <input
-                  type="number"
-                  {...register('vitalSigns.heartRate')}
-                  className="form-input"
-                  placeholder="e.g., 72"
-                />
-              </div>
+      {/* Vital Signs Panel */}
+      <div className="flex">
+        {/* Left sidebar with vital signs */}
+        <div className="w-1/4 border-r border-gray-200 p-4">
+          <h3 className="text-sm font-medium text-gray-700 mb-3">Vital Signs</h3>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">BP</span>
+              <span className="text-sm font-medium">120/80</span>
             </div>
-            
-            <div>
-              <label className="form-label">ECG Results</label>
-              <textarea
-                {...register('ecgResults')}
-                rows={2}
-                className="form-input"
-                placeholder="ECG findings"
-              />
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">Pulse</span>
+              <span className="text-sm font-medium">72 bpm</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">Temp</span>
+              <span className="text-sm font-medium">36.5°C</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">SpO2</span>
+              <span className="text-sm font-medium">98%</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">Resp</span>
+              <span className="text-sm font-medium">16/min</span>
             </div>
           </div>
-        )}
-
-        {department === 'pediatrics' && (
-          <div className="bg-white p-5 rounded-lg shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Baby className="h-5 w-5 mr-2 text-primary-500" />
-              Pediatric Assessment
-            </h2>
-            
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="form-label">Growth Percentile</label>
-                <input
-                  type="text"
-                  {...register('growthPercentile')}
-                  className="form-input"
-                  placeholder="e.g., 75th percentile"
-                />
-              </div>
-              
-              <div>
-                <label className="form-label">Temperature (°C)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  {...register('vitalSigns.temperature')}
-                  className="form-input"
-                  placeholder="e.g., 37.0"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="form-label">Developmental Assessment</label>
-              <textarea
-                {...register('developmentalAssessment')}
-                rows={2}
-                className="form-input"
-                placeholder="Developmental milestones and assessment"
-              />
-            </div>
-          </div>
-        )}
-
-        {department === 'gynecology' && (
-          <div className="bg-white p-5 rounded-lg shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-              <UserRound className="h-5 w-5 mr-2 text-primary-500" />
-              Gynecological Assessment
-            </h2>
-            
-            <div className="flex items-center mb-4">
-              <input
-                type="checkbox"
-                id="pregnancyStatus"
-                {...register('pregnancyStatus')}
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-              />
-              <label htmlFor="pregnancyStatus" className="ml-2 block text-sm text-gray-900">
-                Patient is pregnant
-              </label>
-            </div>
-            
-            {watch('pregnancyStatus') && (
-              <div>
-                <label className="form-label">Gestational Age (weeks)</label>
-                <input
-                  type="number"
-                  {...register('gestationalAge')}
-                  className="form-input"
-                  placeholder="e.g., 24"
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {department === 'surgical' && (
-          <div className="bg-white p-5 rounded-lg shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Syringe className="h-5 w-5 mr-2 text-primary-500" />
-              Surgical Assessment
-            </h2>
-            
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="form-label">Procedure Type</label>
-                <input
-                  type="text"
-                  {...register('procedureType')}
-                  className="form-input"
-                  placeholder="e.g., Appendectomy"
-                />
-              </div>
-              
-              <div>
-                <label className="form-label">Proposed Date</label>
-                <input
-                  type="date"
-                  {...register('procedureDate')}
-                  className="form-input"
-                />
-              </div>
-              
-              <div>
-                <label className="form-label">Anesthesia Type</label>
-                <select
-                  {...register('anesthesiaType')}
-                  className="form-input"
-                >
-                  <option value="">Select type</option>
-                  <option value="local">Local</option>
-                  <option value="regional">Regional</option>
-                  <option value="general">General</option>
-                  <option value="sedation">Sedation</option>
-                </select>
-              </div>
-            </div>
-            
-            <div>
-              <label className="form-label">Pre-operative Instructions</label>
-              <textarea
-                {...register('preOpInstructions')}
-                rows={2}
-                className="form-input"
-                placeholder="Instructions for patient before surgery"
-              />
-            </div>
-          </div>
-        )}
-
-        {department === 'orthopedic' && (
-          <div className="bg-white p-5 rounded-lg shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Bone className="h-5 w-5 mr-2 text-primary-500" />
-              Orthopedic Assessment
-            </h2>
-            
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="form-label">Mobility Assessment</label>
-                <select
-                  {...register('mobilityAssessment')}
-                  className="form-input"
-                >
-                  <option value="">Select assessment</option>
-                  <option value="normal">Normal</option>
-                  <option value="limited">Limited</option>
-                  <option value="severely_limited">Severely Limited</option>
-                  <option value="immobile">Immobile</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="form-label">Pain Level (0-10)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  {...register('painLevel')}
-                  className="form-input"
-                  placeholder="e.g., 5"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="form-label">Joint Range of Motion</label>
-              <textarea
-                {...register('jointRangeOfMotion')}
-                rows={2}
-                className="form-input"
-                placeholder="Describe range of motion in affected joints"
-              />
-            </div>
-          </div>
-        )}
-
-        {department === 'dental' && (
-          <div className="bg-white p-5 rounded-lg shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Tooth className="h-5 w-5 mr-2 text-primary-500" />
-              Dental Assessment
-            </h2>
-            
-            <div>
-              <label className="form-label">Dental Procedure</label>
-              <select
-                {...register('dentalProcedure')}
-                className="form-input"
-              >
-                <option value="">Select procedure</option>
-                <option value="cleaning">Dental Cleaning</option>
-                <option value="filling">Cavity Filling</option>
-                <option value="extraction">Tooth Extraction</option>
-                <option value="root_canal">Root Canal</option>
-                <option value="crown">Crown</option>
-                <option value="bridge">Bridge</option>
-                <option value="dentures">Dentures</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="form-label">Oral Hygiene Status</label>
-              <select
-                {...register('oralHygieneStatus')}
-                className="form-input"
-              >
-                <option value="">Select status</option>
-                <option value="excellent">Excellent</option>
-                <option value="good">Good</option>
-                <option value="fair">Fair</option>
-                <option value="poor">Poor</option>
-                <option value="very_poor">Very Poor</option>
-              </select>
-            </div>
-            
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="followUpRequired"
-                {...register('followUpRequired')}
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-              />
-              <label htmlFor="followUpRequired" className="ml-2 block text-sm text-gray-900">
-                Follow-up appointment required
-              </label>
-            </div>
-          </div>
-        )}
-
-        {department === 'eye' && (
-          <div className="bg-white p-5 rounded-lg shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Eye className="h-5 w-5 mr-2 text-primary-500" />
-              Vision Assessment
-            </h2>
-            
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="form-label">Visual Acuity - Right Eye</label>
-                <input
-                  type="text"
-                  {...register('visualAcuity.rightEye')}
-                  className="form-input"
-                  placeholder="e.g., 20/20"
-                />
-              </div>
-              
-              <div>
-                <label className="form-label">Visual Acuity - Left Eye</label>
-                <input
-                  type="text"
-                  {...register('visualAcuity.leftEye')}
-                  className="form-input"
-                  placeholder="e.g., 20/40"
-                />
-              </div>
-              
-              <div>
-                <label className="form-label">Intraocular Pressure - Right Eye (mmHg)</label>
-                <input
-                  type="number"
-                  {...register('intraocularPressure.rightEye')}
-                  className="form-input"
-                  placeholder="e.g., 15"
-                />
-              </div>
-              
-              <div>
-                <label className="form-label">Intraocular Pressure - Left Eye (mmHg)</label>
-                <input
-                  type="number"
-                  {...register('intraocularPressure.leftEye')}
-                  className="form-input"
-                  placeholder="e.g., 16"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {department === 'physiotherapy' && (
-          <div className="bg-white p-5 rounded-lg shadow-sm space-y-4">
-            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
-              <ActivitySquare className="h-5 w-5 mr-2 text-primary-500" />
-              Therapy Assessment
-            </h2>
-            
-            <div>
-              <label className="form-label">Exercise Plan</label>
-              <textarea
-                {...register('exercisePlan')}
-                rows={3}
-                className="form-input"
-                placeholder="Detailed exercise plan for patient"
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="form-label">Therapy Frequency</label>
-                <select
-                  {...register('therapyFrequency')}
-                  className="form-input"
-                >
-                  <option value="">Select frequency</option>
-                  <option value="daily">Daily</option>
-                  <option value="twice_weekly">Twice Weekly</option>
-                  <option value="weekly">Weekly</option>
-                  <option value="biweekly">Biweekly</option>
-                  <option value="monthly">Monthly</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="form-label">Estimated Sessions</label>
-                <input
-                  type="number"
-                  {...register('estimatedSessions')}
-                  className="form-input"
-                  placeholder="e.g., 10"
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Treatment Plan */}
-        <div className="bg-white p-5 rounded-lg shadow-sm space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Treatment Plan</h2>
           
-          <div>
-            <label htmlFor="treatmentPlan" className="form-label">Treatment Plan</label>
-            <textarea
-              id="treatmentPlan"
-              rows={3}
-              {...register('treatmentPlan', { required: 'Treatment plan is required' })}
-              className="form-input"
-              placeholder="Detailed treatment plan"
-            />
-            {errors.treatmentPlan && (
-              <p className="form-error">{errors.treatmentPlan.message}</p>
-            )}
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Medical History</h3>
+            <div className="space-y-2">
+              <div className="text-xs text-gray-600">
+                <span className="font-medium">Allergies:</span> Penicillin
+              </div>
+              <div className="text-xs text-gray-600">
+                <span className="font-medium">Chronic Conditions:</span> Hypertension
+              </div>
+              <div className="text-xs text-gray-600">
+                <span className="font-medium">Current Medications:</span> Lisinopril 10mg
+              </div>
+            </div>
           </div>
-        </div>
-
-        {/* Prescriptions */}
-        <div className="bg-white p-5 rounded-lg shadow-sm space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-gray-900">Prescriptions</h2>
-            <button
-              type="button"
-              onClick={() => setPrescriptionCount(prev => prev + 1)}
-              className="btn btn-outline inline-flex items-center text-sm"
-            >
-              <Plus className="h-4 w-4 mr-1" />
-              Add Medication
+          
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Patient History Summary</h3>
+            <button className="text-xs text-primary-600 hover:text-primary-700">
+              Show patient history summary
             </button>
           </div>
           
-          {Array.from({ length: prescriptionCount }).map((_, index) => (
-            <div key={index} className="border rounded-lg p-4 space-y-3">
-              <div className="flex justify-between items-center">
-                <h3 className="text-md font-medium text-gray-900">Medication #{index + 1}</h3>
-                {index > 0 && (
+          <div className="mt-6 pt-4 border-t border-gray-200">
+            <h3 className="text-sm font-medium text-gray-700 mb-3">Analyzing Patient Data</h3>
+            <div className="text-xs text-gray-600">
+              Evaluating vital signs and symptoms to suggest possible diagnoses...
+            </div>
+          </div>
+        </div>
+
+        {/* Main content area */}
+        <div className="w-3/4 p-4">
+          <form onSubmit={handleSubmit(onSubmit)}>
+            {/* Tabs */}
+            <div className="border-b border-gray-200 mb-4">
+              <nav className="-mb-px flex space-x-6">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('assessment')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'assessment'
+                      ? 'border-primary-500 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Activity className="h-4 w-4 inline mr-1" />
+                  Assessment
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('medications')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'medications'
+                      ? 'border-primary-500 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Pill className="h-4 w-4 inline mr-1" />
+                  Medications
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('diagnosticTests')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'diagnosticTests'
+                      ? 'border-primary-500 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Activity className="h-4 w-4 inline mr-1" />
+                  Diagnostic Tests
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('notes')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'notes'
+                      ? 'border-primary-500 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <FileText className="h-4 w-4 inline mr-1" />
+                  Notes
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('summary')}
+                  className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'summary'
+                      ? 'border-primary-500 text-primary-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <FileText className="h-4 w-4 inline mr-1" />
+                  Summary
+                </button>
+              </nav>
+            </div>
+
+            {/* Assessment Tab */}
+            {activeTab === 'assessment' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Chief Complaints</label>
+                  <textarea
+                    {...register('chiefComplaint', { required: 'Chief complaint is required' })}
+                    rows={3}
+                    className="form-input w-full text-sm"
+                    placeholder="Enter chief complaints, separated by commas..."
+                  />
+                  {errors.chiefComplaint && (
+                    <p className="mt-1 text-sm text-error-600">{errors.chiefComplaint.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Symptoms</label>
+                  <div className="flex items-center mb-2">
+                    <input
+                      type="text"
+                      value={symptomInput}
+                      onChange={(e) => setSymptomInput(e.target.value)}
+                      className="form-input text-sm flex-grow"
+                      placeholder="Enter symptom..."
+                    />
+                    <button
+                      type="button"
+                      onClick={addSymptom}
+                      className="ml-2 p-2 bg-primary-100 text-primary-600 rounded-md hover:bg-primary-200"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </button>
+                  </div>
+                  
+                  {symptoms.length === 0 ? (
+                    <p className="text-sm text-gray-500">No symptoms added yet</p>
+                  ) : (
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {symptoms.map((symptom, index) => (
+                        <div key={index} className="flex items-center bg-gray-100 rounded-full px-3 py-1">
+                          <span className="text-sm">{symptom}</span>
+                          <button
+                            type="button"
+                            onClick={() => removeSymptom(index)}
+                            className="ml-1 text-gray-500 hover:text-gray-700"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center">
                   <button
                     type="button"
-                    onClick={() => setPrescriptionCount(prev => prev - 1)}
-                    className="text-error-600 hover:text-error-700"
+                    className="text-sm text-primary-600 hover:text-primary-700 flex items-center"
+                    onClick={() => {}}
                   >
-                    <Trash2 className="h-4 w-4" />
+                    <ArrowLeft className="h-4 w-4 mr-1" />
+                    Patient History
                   </button>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Family and Socioeconomic History</label>
+                  <textarea
+                    {...register('familyHistory')}
+                    rows={3}
+                    className="form-input w-full text-sm"
+                    placeholder="Enter family history, social history, and socioeconomic factors..."
+                  />
+                </div>
+
+                {/* Department-specific fields */}
+                {department === 'cardiology' && (
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                      <Heart className="h-4 w-4 mr-1 text-error-500" />
+                      Cardiac Assessment
+                    </h3>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Blood Pressure (mmHg)</label>
+                        <input
+                          type="text"
+                          {...register('vitalSigns.bloodPressure')}
+                          className="form-input text-sm"
+                          placeholder="e.g., 120/80"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">ECG Results</label>
+                        <input
+                          type="text"
+                          {...register('ecgResults')}
+                          className="form-input text-sm"
+                          placeholder="e.g., Normal sinus rhythm"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {department === 'pediatrics' && (
+                  <div className="border-t border-gray-200 pt-4 mt-4">
+                    <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
+                      <Baby className="h-4 w-4 mr-1 text-primary-500" />
+                      Pediatric Assessment
+                    </h3>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Growth Percentile</label>
+                        <input
+                          type="text"
+                          {...register('growthPercentile')}
+                          className="form-input text-sm"
+                          placeholder="e.g., 75th percentile"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Developmental Assessment</label>
+                        <input
+                          type="text"
+                          {...register('developmentalAssessment')}
+                          className="form-input text-sm"
+                          placeholder="e.g., Age-appropriate"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
+            )}
 
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                <div>
-                  <label className="form-label text-sm">Medication Name</label>
-                  <input
-                    type="text"
-                    {...register(`prescriptions.${index}.medication` as const, {
-                      required: 'Medication name is required'
-                    })}
-                    className="form-input py-1.5 text-sm"
-                  />
+            {/* Medications Tab */}
+            {activeTab === 'medications' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-medium text-gray-700">Prescriptions</h3>
+                  <button
+                    type="button"
+                    onClick={() => setPrescriptionCount(prev => prev + 1)}
+                    className="text-xs bg-primary-50 text-primary-600 px-2 py-1 rounded flex items-center"
+                  >
+                    <Plus className="h-3 w-3 mr-1" />
+                    Add Medication
+                  </button>
                 </div>
+                
+                {Array.from({ length: prescriptionCount }).map((_, index) => (
+                  <div key={index} className="border rounded-lg p-3 space-y-3">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-sm font-medium text-gray-700">Medication #{index + 1}</h4>
+                      {index > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setPrescriptionCount(prev => prev - 1)}
+                          className="text-error-600 hover:text-error-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
 
-                <div>
-                  <label className="form-label text-sm">Dosage</label>
-                  <input
-                    type="text"
-                    {...register(`prescriptions.${index}.dosage` as const, {
-                      required: 'Dosage is required'
-                    })}
-                    className="form-input py-1.5 text-sm"
-                  />
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Medication Name</label>
+                        <input
+                          type="text"
+                          {...register(`prescriptions.${index}.medication` as const, {
+                            required: 'Medication name is required'
+                          })}
+                          className="form-input py-1 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Dosage</label>
+                        <input
+                          type="text"
+                          {...register(`prescriptions.${index}.dosage` as const, {
+                            required: 'Dosage is required'
+                          })}
+                          className="form-input py-1 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Frequency</label>
+                        <input
+                          type="text"
+                          {...register(`prescriptions.${index}.frequency` as const, {
+                            required: 'Frequency is required'
+                          })}
+                          className="form-input py-1 text-sm"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Duration</label>
+                        <input
+                          type="text"
+                          {...register(`prescriptions.${index}.duration` as const, {
+                            required: 'Duration is required'
+                          })}
+                          className="form-input py-1 text-sm"
+                        />
+                      </div>
+
+                      <div className="col-span-2">
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Special Instructions</label>
+                        <textarea
+                          {...register(`prescriptions.${index}.instructions` as const)}
+                          className="form-input py-1 text-sm"
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Diagnostic Tests Tab */}
+            {activeTab === 'diagnosticTests' && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-gray-700">Diagnostic Tests</h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="border rounded-lg p-3">
+                    <label className="flex items-center">
+                      <input type="checkbox" className="h-4 w-4 text-primary-600 rounded" />
+                      <span className="ml-2 text-sm">Complete Blood Count (CBC)</span>
+                    </label>
+                  </div>
+                  
+                  <div className="border rounded-lg p-3">
+                    <label className="flex items-center">
+                      <input type="checkbox" className="h-4 w-4 text-primary-600 rounded" />
+                      <span className="ml-2 text-sm">Comprehensive Metabolic Panel</span>
+                    </label>
+                  </div>
+                  
+                  <div className="border rounded-lg p-3">
+                    <label className="flex items-center">
+                      <input type="checkbox" className="h-4 w-4 text-primary-600 rounded" />
+                      <span className="ml-2 text-sm">Urinalysis</span>
+                    </label>
+                  </div>
+                  
+                  <div className="border rounded-lg p-3">
+                    <label className="flex items-center">
+                      <input type="checkbox" className="h-4 w-4 text-primary-600 rounded" />
+                      <span className="ml-2 text-sm">Chest X-Ray</span>
+                    </label>
+                  </div>
+                  
+                  <div className="border rounded-lg p-3">
+                    <label className="flex items-center">
+                      <input type="checkbox" className="h-4 w-4 text-primary-600 rounded" />
+                      <span className="ml-2 text-sm">ECG</span>
+                    </label>
+                  </div>
+                  
+                  <div className="border rounded-lg p-3">
+                    <label className="flex items-center">
+                      <input type="checkbox" className="h-4 w-4 text-primary-600 rounded" />
+                      <span className="ml-2 text-sm">Ultrasound</span>
+                    </label>
+                  </div>
                 </div>
-
+                
                 <div>
-                  <label className="form-label text-sm">Frequency</label>
-                  <input
-                    type="text"
-                    {...register(`prescriptions.${index}.frequency` as const, {
-                      required: 'Frequency is required'
-                    })}
-                    className="form-input py-1.5 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="form-label text-sm">Duration</label>
-                  <input
-                    type="text"
-                    {...register(`prescriptions.${index}.duration` as const, {
-                      required: 'Duration is required'
-                    })}
-                    className="form-input py-1.5 text-sm"
-                  />
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="form-label text-sm">Special Instructions</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Additional Tests</label>
                   <textarea
-                    {...register(`prescriptions.${index}.instructions` as const)}
-                    className="form-input py-1.5 text-sm"
-                    rows={2}
+                    className="form-input w-full text-sm"
+                    rows={3}
+                    placeholder="Specify any additional tests required..."
                   />
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Additional Notes */}
-        <div className="bg-white p-5 rounded-lg shadow-sm space-y-4">
-          <h2 className="text-lg font-semibold text-gray-900">Additional Information</h2>
-          
-          <div>
-            <label htmlFor="notes" className="form-label">Notes</label>
-            <textarea
-              id="notes"
-              rows={3}
-              {...register('notes')}
-              className="form-input"
-              placeholder="Any additional notes or observations"
-            />
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="medicalCertificate"
-              {...register('medicalCertificate')}
-              className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-            />
-            <label htmlFor="medicalCertificate" className="ml-2 flex items-center text-sm font-medium text-gray-700">
-              <FileText className="h-4 w-4 mr-1" />
-              Issue Medical Certificate
-            </label>
-          </div>
-        </div>
-
-        <div className="flex justify-end space-x-3">
-          <button
-            type="button"
-            onClick={() => navigate(-1)}
-            className="btn btn-outline"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="btn btn-primary"
-          >
-            {isSubmitting ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-2" />
-                Complete {department === 'dental' ? 'Treatment' : 
-                          department === 'eye' ? 'Examination' : 
-                          department === 'physiotherapy' ? 'Therapy' : 
-                          'Consultation'}
-              </>
             )}
-          </button>
+
+            {/* Notes Tab */}
+            {activeTab === 'notes' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Diagnosis</label>
+                  <textarea
+                    {...register('diagnosis', { required: 'Diagnosis is required' })}
+                    rows={3}
+                    className="form-input w-full text-sm"
+                    placeholder="Enter diagnosis..."
+                  />
+                  {errors.diagnosis && (
+                    <p className="mt-1 text-sm text-error-600">{errors.diagnosis.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Treatment Plan</label>
+                  <textarea
+                    {...register('treatmentPlan', { required: 'Treatment plan is required' })}
+                    rows={3}
+                    className="form-input w-full text-sm"
+                    placeholder="Enter treatment plan..."
+                  />
+                  {errors.treatmentPlan && (
+                    <p className="mt-1 text-sm text-error-600">{errors.treatmentPlan.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+                  <textarea
+                    {...register('notes')}
+                    rows={3}
+                    className="form-input w-full text-sm"
+                    placeholder="Enter any additional notes..."
+                  />
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="medicalCertificate"
+                    {...register('medicalCertificate')}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="medicalCertificate" className="ml-2 block text-sm text-gray-900">
+                    Issue Medical Certificate
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* Summary Tab */}
+            {activeTab === 'summary' && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-medium text-gray-700">Consultation Summary</h3>
+                
+                <div className="border rounded-lg p-4 space-y-3">
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500">Chief Complaints</h4>
+                    <p className="text-sm">{watch('chiefComplaint') || 'Not specified'}</p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500">Symptoms</h4>
+                    {symptoms.length > 0 ? (
+                      <div className="flex flex-wrap gap-1">
+                        {symptoms.map((symptom, index) => (
+                          <span key={index} className="text-xs bg-gray-100 px-2 py-0.5 rounded-full">
+                            {symptom}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm">None recorded</p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500">Diagnosis</h4>
+                    <p className="text-sm">{watch('diagnosis') || 'Not specified'}</p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500">Treatment Plan</h4>
+                    <p className="text-sm">{watch('treatmentPlan') || 'Not specified'}</p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500">Medications</h4>
+                    {watch('prescriptions')?.length > 0 ? (
+                      <ul className="text-sm list-disc pl-5">
+                        {watch('prescriptions').map((prescription, index) => (
+                          prescription.medication && (
+                            <li key={index}>
+                              {prescription.medication} {prescription.dosage} - {prescription.frequency} for {prescription.duration}
+                            </li>
+                          )
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm">No medications prescribed</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="mt-6 flex justify-between">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                className="btn btn-outline text-sm py-1.5"
+              >
+                Cancel
+              </button>
+              
+              {activeTab !== 'summary' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tabs = ['assessment', 'medications', 'diagnosticTests', 'notes', 'summary'];
+                    const currentIndex = tabs.indexOf(activeTab);
+                    if (currentIndex < tabs.length - 1) {
+                      setActiveTab(tabs[currentIndex + 1] as any);
+                    }
+                  }}
+                  className="btn btn-primary text-sm py-1.5"
+                >
+                  Next
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="btn btn-primary text-sm py-1.5"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                      Saving...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-4 w-4 mr-2" />
+                      Complete {department === 'dental' ? 'Treatment' : 
+                                department === 'eye' ? 'Examination' : 
+                                department === 'physiotherapy' ? 'Therapy' : 
+                                'Consultation'}
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
     </div>
   );
 };
