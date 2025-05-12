@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { FileText, Plus, Trash2, User, Activity, Thermometer, Heart, Lungs, Droplets, Clock, AlertTriangle, Stethoscope, ChevronDown, ChevronRight } from 'lucide-react';
+import { FileText, Plus, Trash2, User, Activity, Thermometer, Heart, Settings as Lungs, Droplets, Clock, AlertTriangle, Stethoscope, ChevronDown, ChevronRight } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
