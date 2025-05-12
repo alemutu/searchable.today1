@@ -277,16 +277,9 @@ const ConsultationForm: React.FC = () => {
 
       if (consultationError) throw consultationError;
 
-      // Update patient's current flow step
-      const { error: patientError } = await supabase
-        .from('patients')
-        .update({
-          current_flow_step: 'post_consultation'
-        })
-        .eq('id', patientId);
-
-      if (patientError) throw patientError;
-
+      // Determine next flow step based on lab/radiology tests and prescriptions
+      let nextFlowStep = 'post_consultation';
+      
       // Create lab orders if tests were selected
       if (labTests.length > 0) {
         const { error: labError } = await supabase
@@ -301,10 +294,11 @@ const ConsultationForm: React.FC = () => {
           });
 
         if (labError) throw labError;
+        nextFlowStep = 'lab_tests';
       }
 
       // Create radiology orders if tests were selected
-      if (radiologyTests.length > 0) {
+      if (radiologyTests.length > 0 && nextFlowStep === 'post_consultation') {
         const { error: radiologyError } = await supabase
           .from('radiology_results')
           .insert({
@@ -320,10 +314,11 @@ const ConsultationForm: React.FC = () => {
           });
 
         if (radiologyError) throw radiologyError;
+        nextFlowStep = 'radiology';
       }
 
       // Create pharmacy order if prescriptions were added
-      if (data.prescriptions && data.prescriptions.length > 0 && data.prescriptions[0].medication) {
+      if (data.prescriptions && data.prescriptions.length > 0 && data.prescriptions[0].medication && nextFlowStep === 'post_consultation') {
         const { error: pharmacyError } = await supabase
           .from('pharmacy')
           .insert({
@@ -344,7 +339,18 @@ const ConsultationForm: React.FC = () => {
           });
 
         if (pharmacyError) throw pharmacyError;
+        nextFlowStep = 'pharmacy';
       }
+
+      // Update patient's current flow step
+      const { error: patientError } = await supabase
+        .from('patients')
+        .update({
+          current_flow_step: nextFlowStep
+        })
+        .eq('id', patientId);
+
+      if (patientError) throw patientError;
 
       navigate('/patients');
     } catch (error: any) {

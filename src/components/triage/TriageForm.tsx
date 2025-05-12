@@ -337,9 +337,21 @@ const TriageForm: React.FC = () => {
 
       if (triageError) throw triageError;
       
-      // Update patient's current flow step
-      const nextStep = data.isEmergency ? 'emergency' : 'waiting_consultation';
+      // Determine the next flow step based on department and emergency status
+      let nextStep = 'waiting_consultation';
       
+      if (data.isEmergency) {
+        nextStep = 'emergency';
+      } else if (data.departmentId) {
+        // If a specific department is selected, update the flow step to include the department
+        const selectedDepartment = departments.find(dept => dept.id === data.departmentId);
+        if (selectedDepartment) {
+          const deptName = selectedDepartment.name.toLowerCase().replace(/\s+/g, '_');
+          nextStep = `waiting_${deptName}`;
+        }
+      }
+      
+      // Update patient's current flow step
       const { error: patientError } = await supabase
         .from('patients')
         .update({

@@ -86,6 +86,16 @@ const PharmacyDispense: React.FC = () => {
 
       if (error) throw error;
 
+      // Update patient's current flow step to post_consultation or completed
+      const { error: patientError } = await supabase
+        .from('patients')
+        .update({
+          current_flow_step: 'post_consultation'
+        })
+        .eq('id', order.patient.id);
+
+      if (patientError) throw patientError;
+
       navigate('/pharmacy');
     } catch (error) {
       console.error('Error dispensing medications:', error);
