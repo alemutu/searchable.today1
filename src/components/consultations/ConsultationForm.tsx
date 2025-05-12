@@ -20,7 +20,17 @@ import {
   UserRound, 
   Baby,
   AlertTriangle,
-  X
+  X,
+  ChevronRight,
+  ChevronDown,
+  Microscope,
+  FileImage,
+  Stethoscope,
+  Lungs,
+  Thermometer,
+  Scale,
+  Ruler,
+  Brain
 } from 'lucide-react';
 
 interface ConsultationFormData {
@@ -37,6 +47,24 @@ interface ConsultationFormData {
     duration: string;
     instructions: string;
   }[];
+  // Patient History
+  historyOfPresentingIllness?: string;
+  gynecologicalHistory?: string;
+  pastMedicalHistory?: string;
+  pastSurgicalHistory?: string;
+  // Family and Socioeconomic History
+  familyHistory?: string;
+  socioeconomicHistory?: string;
+  // General Examination
+  generalExamination?: string;
+  // Systemic Examination
+  cardiovascularSystem?: string;
+  centralNervousSystem?: string;
+  respiratorySystem?: string;
+  gastrointestinalSystem?: string;
+  genitourinarySystem?: string;
+  musculoskeletalSystem?: string;
+  breastExamination?: string;
   // Department-specific fields
   vitalSigns?: {
     bloodPressure?: string;
@@ -79,8 +107,9 @@ interface ConsultationFormData {
   // Pediatrics fields
   growthPercentile?: string;
   developmentalAssessment?: string;
-  // Family history
-  familyHistory?: string;
+  // Lab and Radiology
+  labTests?: string[];
+  radiologyTests?: string[];
 }
 
 const ConsultationForm: React.FC = () => {
@@ -95,6 +124,12 @@ const ConsultationForm: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'assessment' | 'medications' | 'diagnosticTests' | 'notes' | 'summary'>('assessment');
   const [symptoms, setSymptoms] = useState<string[]>([]);
   const [symptomInput, setSymptomInput] = useState('');
+  const [patientHistoryExpanded, setPatientHistoryExpanded] = useState(false);
+  const [familyHistoryExpanded, setFamilyHistoryExpanded] = useState(false);
+  const [generalExamExpanded, setGeneralExamExpanded] = useState(false);
+  const [systemicExamExpanded, setSystemicExamExpanded] = useState(false);
+  const [labTests, setLabTests] = useState<string[]>([]);
+  const [radiologyTests, setRadiologyTests] = useState<string[]>([]);
   
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch } = useForm<ConsultationFormData>({
     defaultValues: {
@@ -169,12 +204,30 @@ const ConsultationForm: React.FC = () => {
     setSymptoms(symptoms.filter((_, i) => i !== index));
   };
 
+  const toggleLabTest = (test: string) => {
+    if (labTests.includes(test)) {
+      setLabTests(labTests.filter(t => t !== test));
+    } else {
+      setLabTests([...labTests, test]);
+    }
+  };
+
+  const toggleRadiologyTest = (test: string) => {
+    if (radiologyTests.includes(test)) {
+      setRadiologyTests(radiologyTests.filter(t => t !== test));
+    } else {
+      setRadiologyTests([...radiologyTests, test]);
+    }
+  };
+
   const onSubmit = async (data: ConsultationFormData) => {
     try {
       if (!hospital || !user || !patientId) throw new Error('Missing required data');
 
       // Add symptoms to data
       data.symptoms = symptoms;
+      data.labTests = labTests;
+      data.radiologyTests = radiologyTests;
 
       // Create consultation record
       const { error: consultationError } = await supabase
@@ -191,6 +244,24 @@ const ConsultationForm: React.FC = () => {
           notes: data.notes,
           medical_certificate: data.medicalCertificate,
           department_id: user.department_id,
+          // Patient history
+          history_of_presenting_illness: data.historyOfPresentingIllness,
+          gynecological_history: data.gynecologicalHistory,
+          past_medical_history: data.pastMedicalHistory,
+          past_surgical_history: data.pastSurgicalHistory,
+          // Family and socioeconomic history
+          family_history: data.familyHistory,
+          socioeconomic_history: data.socioeconomicHistory,
+          // General examination
+          general_examination: data.generalExamination,
+          // Systemic examination
+          cardiovascular_system: data.cardiovascularSystem,
+          central_nervous_system: data.centralNervousSystem,
+          respiratory_system: data.respiratorySystem,
+          gastrointestinal_system: data.gastrointestinalSystem,
+          genitourinary_system: data.genitourinarySystem,
+          musculoskeletal_system: data.musculoskeletalSystem,
+          breast_examination: data.breastExamination,
           // Include department-specific data based on department
           ...(department === 'surgical' && {
             procedure_type: data.procedureType,
@@ -228,8 +299,7 @@ const ConsultationForm: React.FC = () => {
           ...(department === 'pediatrics' && {
             growth_percentile: data.growthPercentile,
             developmental_assessment: data.developmentalAssessment
-          }),
-          family_history: data.familyHistory
+          })
         });
 
       if (consultationError) throw consultationError;
@@ -243,6 +313,65 @@ const ConsultationForm: React.FC = () => {
         .eq('id', patientId);
 
       if (patientError) throw patientError;
+
+      // Create lab orders if tests were selected
+      if (labTests.length > 0) {
+        const { error: labError } = await supabase
+          .from('lab_results')
+          .insert({
+            patient_id: patientId,
+            hospital_id: hospital.id,
+            test_type: labTests.join(', '),
+            test_date: new Date().toISOString(),
+            status: 'pending',
+            is_emergency: isEmergency
+          });
+
+        if (labError) throw labError;
+      }
+
+      // Create radiology orders if tests were selected
+      if (radiologyTests.length > 0) {
+        const { error: radiologyError } = await supabase
+          .from('radiology_results')
+          .insert({
+            patient_id: patientId,
+            hospital_id: hospital.id,
+            scan_type: radiologyTests[0], // Primary scan type
+            scan_date: new Date().toISOString(),
+            status: 'pending',
+            is_emergency: isEmergency,
+            results: { 
+              ordered_scans: radiologyTests 
+            }
+          });
+
+        if (radiologyError) throw radiologyError;
+      }
+
+      // Create pharmacy order if prescriptions were added
+      if (data.prescriptions && data.prescriptions.length > 0 && data.prescriptions[0].medication) {
+        const { error: pharmacyError } = await supabase
+          .from('pharmacy')
+          .insert({
+            patient_id: patientId,
+            hospital_id: hospital.id,
+            medications: data.prescriptions.map(p => ({
+              medication: p.medication,
+              dosage: p.dosage,
+              frequency: p.frequency,
+              duration: p.duration,
+              instructions: p.instructions,
+              quantity: 1, // Default quantity
+              dispensed: false
+            })),
+            status: 'pending',
+            payment_status: 'pending',
+            is_emergency: isEmergency
+          });
+
+        if (pharmacyError) throw pharmacyError;
+      }
 
       navigate('/patients');
     } catch (error: any) {
@@ -445,7 +574,7 @@ const ConsultationForm: React.FC = () => {
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
-                  <Activity className="h-4 w-4 inline mr-1" />
+                  <Microscope className="h-4 w-4 inline mr-1" />
                   Diagnostic Tests
                 </button>
                 <button
@@ -482,7 +611,7 @@ const ConsultationForm: React.FC = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-1">Chief Complaints</label>
                   <textarea
                     {...register('chiefComplaint', { required: 'Chief complaint is required' })}
-                    rows={3}
+                    rows={2}
                     className="form-input w-full text-sm"
                     placeholder="Enter chief complaints, separated by commas..."
                   />
@@ -530,38 +659,242 @@ const ConsultationForm: React.FC = () => {
                   )}
                 </div>
 
-                <div className="flex items-center">
-                  <button
-                    type="button"
-                    className="text-sm text-primary-600 hover:text-primary-700 flex items-center"
-                    onClick={() => {}}
+                {/* 1. Patient History Section */}
+                <div className="border rounded-lg overflow-hidden">
+                  <div 
+                    className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                    onClick={() => setPatientHistoryExpanded(!patientHistoryExpanded)}
                   >
-                    <ArrowLeft className="h-4 w-4 mr-1" />
-                    Patient History
-                  </button>
+                    <h3 className="text-sm font-medium text-gray-700 flex items-center">
+                      <FileText className="h-4 w-4 mr-1.5 text-gray-500" />
+                      Patient History
+                    </h3>
+                    {patientHistoryExpanded ? 
+                      <ChevronDown className="h-4 w-4 text-gray-500" /> : 
+                      <ChevronRight className="h-4 w-4 text-gray-500" />
+                    }
+                  </div>
+                  
+                  {patientHistoryExpanded && (
+                    <div className="p-3 space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">History of Presenting Illness</label>
+                        <textarea
+                          {...register('historyOfPresentingIllness')}
+                          rows={2}
+                          className="form-input w-full text-sm"
+                          placeholder="Describe the history of the current illness..."
+                        />
+                      </div>
+                      
+                      {department === 'gynecology' && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Gynecological/Obstetric History</label>
+                          <textarea
+                            {...register('gynecologicalHistory')}
+                            rows={2}
+                            className="form-input w-full text-sm"
+                            placeholder="Menstrual history, pregnancies, etc..."
+                          />
+                        </div>
+                      )}
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Past Medical History</label>
+                        <textarea
+                          {...register('pastMedicalHistory')}
+                          rows={2}
+                          className="form-input w-full text-sm"
+                          placeholder="Previous medical conditions, chronic illnesses..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Past Surgical History</label>
+                        <textarea
+                          {...register('pastSurgicalHistory')}
+                          rows={2}
+                          className="form-input w-full text-sm"
+                          placeholder="Previous surgeries, procedures..."
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Family and Socioeconomic History</label>
-                  <textarea
-                    {...register('familyHistory')}
-                    rows={3}
-                    className="form-input w-full text-sm"
-                    placeholder="Enter family history, social history, and socioeconomic factors..."
-                  />
+                {/* 2. Family and Socioeconomic History */}
+                <div className="border rounded-lg overflow-hidden">
+                  <div 
+                    className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                    onClick={() => setFamilyHistoryExpanded(!familyHistoryExpanded)}
+                  >
+                    <h3 className="text-sm font-medium text-gray-700 flex items-center">
+                      <User className="h-4 w-4 mr-1.5 text-gray-500" />
+                      Family and Socioeconomic History
+                    </h3>
+                    {familyHistoryExpanded ? 
+                      <ChevronDown className="h-4 w-4 text-gray-500" /> : 
+                      <ChevronRight className="h-4 w-4 text-gray-500" />
+                    }
+                  </div>
+                  
+                  {familyHistoryExpanded && (
+                    <div className="p-3 space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Family History</label>
+                        <textarea
+                          {...register('familyHistory')}
+                          rows={2}
+                          className="form-input w-full text-sm"
+                          placeholder="Family history of diseases, genetic conditions..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Socioeconomic History</label>
+                        <textarea
+                          {...register('socioeconomicHistory')}
+                          rows={2}
+                          className="form-input w-full text-sm"
+                          placeholder="Occupation, living conditions, social support..."
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 3. General Examination */}
+                <div className="border rounded-lg overflow-hidden">
+                  <div 
+                    className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                    onClick={() => setGeneralExamExpanded(!generalExamExpanded)}
+                  >
+                    <h3 className="text-sm font-medium text-gray-700 flex items-center">
+                      <Stethoscope className="h-4 w-4 mr-1.5 text-gray-500" />
+                      General Examination
+                    </h3>
+                    {generalExamExpanded ? 
+                      <ChevronDown className="h-4 w-4 text-gray-500" /> : 
+                      <ChevronRight className="h-4 w-4 text-gray-500" />
+                    }
+                  </div>
+                  
+                  {generalExamExpanded && (
+                    <div className="p-3">
+                      <textarea
+                        {...register('generalExamination')}
+                        rows={3}
+                        className="form-input w-full text-sm"
+                        placeholder="General appearance, vital signs, etc..."
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* 4. Systemic Examination */}
+                <div className="border rounded-lg overflow-hidden">
+                  <div 
+                    className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                    onClick={() => setSystemicExamExpanded(!systemicExamExpanded)}
+                  >
+                    <h3 className="text-sm font-medium text-gray-700 flex items-center">
+                      <Activity className="h-4 w-4 mr-1.5 text-gray-500" />
+                      Systemic Examination
+                    </h3>
+                    {systemicExamExpanded ? 
+                      <ChevronDown className="h-4 w-4 text-gray-500" /> : 
+                      <ChevronRight className="h-4 w-4 text-gray-500" />
+                    }
+                  </div>
+                  
+                  {systemicExamExpanded && (
+                    <div className="p-3 space-y-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Cardiovascular System</label>
+                        <textarea
+                          {...register('cardiovascularSystem')}
+                          rows={2}
+                          className="form-input w-full text-sm"
+                          placeholder="Heart sounds, pulses, etc..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Central Nervous System</label>
+                        <textarea
+                          {...register('centralNervousSystem')}
+                          rows={2}
+                          className="form-input w-full text-sm"
+                          placeholder="Mental status, reflexes, etc..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Respiratory System</label>
+                        <textarea
+                          {...register('respiratorySystem')}
+                          rows={2}
+                          className="form-input w-full text-sm"
+                          placeholder="Breath sounds, respiratory effort, etc..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Gastrointestinal System</label>
+                        <textarea
+                          {...register('gastrointestinalSystem')}
+                          rows={2}
+                          className="form-input w-full text-sm"
+                          placeholder="Abdomen, bowel sounds, etc..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Genitourinary System</label>
+                        <textarea
+                          {...register('genitourinarySystem')}
+                          rows={2}
+                          className="form-input w-full text-sm"
+                          placeholder="Urinary symptoms, genital examination if relevant..."
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Musculoskeletal System</label>
+                        <textarea
+                          {...register('musculoskeletalSystem')}
+                          rows={2}
+                          className="form-input w-full text-sm"
+                          placeholder="Joints, muscles, range of motion..."
+                        />
+                      </div>
+                      
+                      {(department === 'gynecology' || patientInfo?.gender === 'Female') && (
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Breast Examination</label>
+                          <textarea
+                            {...register('breastExamination')}
+                            rows={2}
+                            className="form-input w-full text-sm"
+                            placeholder="Breast examination findings..."
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Department-specific fields */}
                 {department === 'cardiology' && (
-                  <div className="border-t border-gray-200 pt-4 mt-4">
-                    <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-                      <Heart className="h-4 w-4 mr-1 text-error-500" />
+                  <div className="border rounded-lg p-3 space-y-3">
+                    <h3 className="text-sm font-medium text-gray-700 flex items-center">
+                      <Heart className="h-4 w-4 mr-1.5 text-error-500" />
                       Cardiac Assessment
                     </h3>
                     
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Blood Pressure (mmHg)</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Blood Pressure (mmHg)</label>
                         <input
                           type="text"
                           {...register('vitalSigns.bloodPressure')}
@@ -571,7 +904,7 @@ const ConsultationForm: React.FC = () => {
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">ECG Results</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">ECG Results</label>
                         <input
                           type="text"
                           {...register('ecgResults')}
@@ -584,15 +917,15 @@ const ConsultationForm: React.FC = () => {
                 )}
 
                 {department === 'pediatrics' && (
-                  <div className="border-t border-gray-200 pt-4 mt-4">
-                    <h3 className="text-sm font-medium text-gray-700 mb-3 flex items-center">
-                      <Baby className="h-4 w-4 mr-1 text-primary-500" />
+                  <div className="border rounded-lg p-3 space-y-3">
+                    <h3 className="text-sm font-medium text-gray-700 flex items-center">
+                      <Baby className="h-4 w-4 mr-1.5 text-primary-500" />
                       Pediatric Assessment
                     </h3>
                     
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Growth Percentile</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Growth Percentile</label>
                         <input
                           type="text"
                           {...register('growthPercentile')}
@@ -602,7 +935,7 @@ const ConsultationForm: React.FC = () => {
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Developmental Assessment</label>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Developmental Assessment</label>
                         <input
                           type="text"
                           {...register('developmentalAssessment')}
@@ -708,58 +1041,202 @@ const ConsultationForm: React.FC = () => {
             {/* Diagnostic Tests Tab */}
             {activeTab === 'diagnosticTests' && (
               <div className="space-y-4">
-                <h3 className="text-sm font-medium text-gray-700">Diagnostic Tests</h3>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="border rounded-lg p-3">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="h-4 w-4 text-primary-600 rounded" />
-                      <span className="ml-2 text-sm">Complete Blood Count (CBC)</span>
-                    </label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Laboratory Tests */}
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 p-3">
+                      <h3 className="text-sm font-medium text-gray-700 flex items-center">
+                        <Microscope className="h-4 w-4 mr-1.5 text-primary-500" />
+                        Laboratory Tests
+                      </h3>
+                    </div>
+                    <div className="p-3 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="border rounded-lg p-2">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="h-4 w-4 text-primary-600 rounded"
+                              checked={labTests.includes('Complete Blood Count')}
+                              onChange={() => toggleLabTest('Complete Blood Count')}
+                            />
+                            <span className="ml-2 text-sm">Complete Blood Count</span>
+                          </label>
+                        </div>
+                        
+                        <div className="border rounded-lg p-2">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="h-4 w-4 text-primary-600 rounded"
+                              checked={labTests.includes('Comprehensive Metabolic Panel')}
+                              onChange={() => toggleLabTest('Comprehensive Metabolic Panel')}
+                            />
+                            <span className="ml-2 text-sm">Metabolic Panel</span>
+                          </label>
+                        </div>
+                        
+                        <div className="border rounded-lg p-2">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="h-4 w-4 text-primary-600 rounded"
+                              checked={labTests.includes('Urinalysis')}
+                              onChange={() => toggleLabTest('Urinalysis')}
+                            />
+                            <span className="ml-2 text-sm">Urinalysis</span>
+                          </label>
+                        </div>
+                        
+                        <div className="border rounded-lg p-2">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="h-4 w-4 text-primary-600 rounded"
+                              checked={labTests.includes('Lipid Profile')}
+                              onChange={() => toggleLabTest('Lipid Profile')}
+                            />
+                            <span className="ml-2 text-sm">Lipid Profile</span>
+                          </label>
+                        </div>
+                        
+                        <div className="border rounded-lg p-2">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="h-4 w-4 text-primary-600 rounded"
+                              checked={labTests.includes('Liver Function Test')}
+                              onChange={() => toggleLabTest('Liver Function Test')}
+                            />
+                            <span className="ml-2 text-sm">Liver Function</span>
+                          </label>
+                        </div>
+                        
+                        <div className="border rounded-lg p-2">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="h-4 w-4 text-primary-600 rounded"
+                              checked={labTests.includes('Renal Function Test')}
+                              onChange={() => toggleLabTest('Renal Function Test')}
+                            />
+                            <span className="ml-2 text-sm">Renal Function</span>
+                          </label>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Additional Tests</label>
+                        <textarea
+                          className="form-input w-full text-sm"
+                          rows={2}
+                          placeholder="Specify any additional tests..."
+                        />
+                      </div>
+                    </div>
                   </div>
                   
-                  <div className="border rounded-lg p-3">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="h-4 w-4 text-primary-600 rounded" />
-                      <span className="ml-2 text-sm">Comprehensive Metabolic Panel</span>
-                    </label>
-                  </div>
-                  
-                  <div className="border rounded-lg p-3">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="h-4 w-4 text-primary-600 rounded" />
-                      <span className="ml-2 text-sm">Urinalysis</span>
-                    </label>
-                  </div>
-                  
-                  <div className="border rounded-lg p-3">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="h-4 w-4 text-primary-600 rounded" />
-                      <span className="ml-2 text-sm">Chest X-Ray</span>
-                    </label>
-                  </div>
-                  
-                  <div className="border rounded-lg p-3">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="h-4 w-4 text-primary-600 rounded" />
-                      <span className="ml-2 text-sm">ECG</span>
-                    </label>
-                  </div>
-                  
-                  <div className="border rounded-lg p-3">
-                    <label className="flex items-center">
-                      <input type="checkbox" className="h-4 w-4 text-primary-600 rounded" />
-                      <span className="ml-2 text-sm">Ultrasound</span>
-                    </label>
+                  {/* Radiology Tests */}
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="bg-gray-50 p-3">
+                      <h3 className="text-sm font-medium text-gray-700 flex items-center">
+                        <FileImage className="h-4 w-4 mr-1.5 text-primary-500" />
+                        Radiology Tests
+                      </h3>
+                    </div>
+                    <div className="p-3 space-y-2">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="border rounded-lg p-2">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="h-4 w-4 text-primary-600 rounded"
+                              checked={radiologyTests.includes('x_ray')}
+                              onChange={() => toggleRadiologyTest('x_ray')}
+                            />
+                            <span className="ml-2 text-sm">X-Ray</span>
+                          </label>
+                        </div>
+                        
+                        <div className="border rounded-lg p-2">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="h-4 w-4 text-primary-600 rounded"
+                              checked={radiologyTests.includes('ct_scan')}
+                              onChange={() => toggleRadiologyTest('ct_scan')}
+                            />
+                            <span className="ml-2 text-sm">CT Scan</span>
+                          </label>
+                        </div>
+                        
+                        <div className="border rounded-lg p-2">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="h-4 w-4 text-primary-600 rounded"
+                              checked={radiologyTests.includes('mri')}
+                              onChange={() => toggleRadiologyTest('mri')}
+                            />
+                            <span className="ml-2 text-sm">MRI</span>
+                          </label>
+                        </div>
+                        
+                        <div className="border rounded-lg p-2">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="h-4 w-4 text-primary-600 rounded"
+                              checked={radiologyTests.includes('ultrasound')}
+                              onChange={() => toggleRadiologyTest('ultrasound')}
+                            />
+                            <span className="ml-2 text-sm">Ultrasound</span>
+                          </label>
+                        </div>
+                        
+                        <div className="border rounded-lg p-2">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="h-4 w-4 text-primary-600 rounded"
+                              checked={radiologyTests.includes('mammogram')}
+                              onChange={() => toggleRadiologyTest('mammogram')}
+                            />
+                            <span className="ml-2 text-sm">Mammogram</span>
+                          </label>
+                        </div>
+                        
+                        <div className="border rounded-lg p-2">
+                          <label className="flex items-center">
+                            <input 
+                              type="checkbox" 
+                              className="h-4 w-4 text-primary-600 rounded"
+                              checked={radiologyTests.includes('dexa_scan')}
+                              onChange={() => toggleRadiologyTest('dexa_scan')}
+                            />
+                            <span className="ml-2 text-sm">DEXA Scan</span>
+                          </label>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Additional Imaging</label>
+                        <textarea
+                          className="form-input w-full text-sm"
+                          rows={2}
+                          placeholder="Specify any additional imaging..."
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Additional Tests</label>
+                <div className="border rounded-lg p-3">
+                  <h3 className="text-sm font-medium text-gray-700 mb-2">Special Instructions for Tests</h3>
                   <textarea
                     className="form-input w-full text-sm"
                     rows={3}
-                    placeholder="Specify any additional tests required..."
+                    placeholder="Enter any special instructions for the ordered tests..."
                   />
                 </div>
               </div>
@@ -869,6 +1346,36 @@ const ConsultationForm: React.FC = () => {
                     ) : (
                       <p className="text-sm">No medications prescribed</p>
                     )}
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-xs font-medium text-gray-500">Diagnostic Tests</h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <h5 className="text-xs font-medium">Laboratory</h5>
+                        {labTests.length > 0 ? (
+                          <ul className="text-sm list-disc pl-5">
+                            {labTests.map((test, index) => (
+                              <li key={index}>{test}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm">No lab tests ordered</p>
+                        )}
+                      </div>
+                      <div>
+                        <h5 className="text-xs font-medium">Radiology</h5>
+                        {radiologyTests.length > 0 ? (
+                          <ul className="text-sm list-disc pl-5">
+                            {radiologyTests.map((test, index) => (
+                              <li key={index}>{test.replace('_', ' ').toUpperCase()}</li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-sm">No imaging ordered</p>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
