@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
 import { User, Activity, Heart, Thermometer, Settings as Lungs, Droplets, Scale, Ruler, Calculator, Clock, AlertTriangle, Stethoscope, Building2, Save, ArrowLeft, Brain, FileText, Pill, AlertCircle } from 'lucide-react';
+import { useNotification } from '../common/NotificationProvider';
 
 interface TriageFormData {
   vitalSigns: {
@@ -64,6 +65,7 @@ const TriageForm: React.FC = () => {
   const { hospital, user } = useAuthStore();
   const { patientId } = useParams();
   const navigate = useNavigate();
+  const { showNotification } = useNotification();
   const [patient, setPatient] = useState<Patient | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -176,6 +178,7 @@ const TriageForm: React.FC = () => {
       setPatient(data);
     } catch (error) {
       console.error('Error loading patient:', error);
+      showNotification('warning', 'Failed to load patient data', 3000);
     } finally {
       setIsLoading(false);
     }
@@ -206,6 +209,7 @@ const TriageForm: React.FC = () => {
       setDepartments(data || []);
     } catch (error) {
       console.error('Error loading departments:', error);
+      showNotification('warning', 'Failed to load departments', 3000);
     }
   };
 
@@ -224,6 +228,7 @@ const TriageForm: React.FC = () => {
 
   const analyzeVitals = async () => {
     setIsAnalyzing(true);
+    showNotification('info', 'Analyzing vital signs...', 2000);
     
     try {
       // In a real app, this would call an AI service
@@ -238,15 +243,20 @@ const TriageForm: React.FC = () => {
       // Suggest acuity level based on analysis
       if (analysis.includes('Critical') || analysis.includes('severe')) {
         setValue('acuityLevel', 1);
+        showNotification('warning', 'Critical vital signs detected', 3000);
       } else if (analysis.includes('Concerning') || analysis.includes('moderate')) {
         setValue('acuityLevel', 2);
+        showNotification('warning', 'Concerning vital signs detected', 3000);
       } else if (analysis.includes('Abnormal') || analysis.includes('mild')) {
         setValue('acuityLevel', 3);
+        showNotification('info', 'Abnormal vital signs detected', 3000);
       } else {
         setValue('acuityLevel', 4);
+        showNotification('success', 'Vital signs within normal range', 3000);
       }
     } catch (error) {
       console.error('Error analyzing vitals:', error);
+      showNotification('warning', 'Failed to analyze vital signs', 3000);
     } finally {
       setIsAnalyzing(false);
     }
@@ -311,11 +321,13 @@ const TriageForm: React.FC = () => {
     
     try {
       setIsSaving(true);
+      showNotification('info', 'Saving triage information...', 2000);
       
       if (import.meta.env.DEV) {
         // Simulate successful submission in development
         console.log('Triage form submitted:', data);
         await new Promise(resolve => setTimeout(resolve, 1000));
+        showNotification('success', 'Triage completed successfully', 3000);
         navigate('/patients');
         return;
       }
@@ -370,10 +382,11 @@ const TriageForm: React.FC = () => {
 
       if (patientError) throw patientError;
       
+      showNotification('success', 'Triage completed successfully', 3000);
       navigate('/patients');
     } catch (error: any) {
       console.error('Error submitting triage form:', error.message);
-      alert(`Error: ${error.message}`);
+      showNotification('warning', `Error: ${error.message}`, 5000);
     } finally {
       setIsSaving(false);
     }
@@ -401,7 +414,7 @@ const TriageForm: React.FC = () => {
         {/* Patient Header */}
         <div className="bg-gradient-to-r from-primary-700 to-primary-600 rounded-lg shadow-sm p-3 mb-3">
           <div className="flex items-center">
-            <div className="h-10 w-10 rounded-full bg-white text-primary-600 flex items-center justify-center text-lg font-bold shadow-sm">
+            <div className="h-10 w-10 rounded-full bg-white text-primary-600 flex items-center justify-center text-lg font-bold">
               {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
             </div>
             <div className="ml-3">
@@ -881,7 +894,10 @@ const TriageForm: React.FC = () => {
         <div className="flex justify-between">
           <button
             type="button"
-            onClick={() => navigate('/patients')}
+            onClick={() => {
+              showNotification('info', 'Returning to patient list', 2000);
+              navigate('/patients');
+            }}
             className="btn btn-sm btn-outline flex items-center"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />

@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
 import { CheckCircle, AlertTriangle } from 'lucide-react';
+import { useNotification } from '../common/NotificationProvider';
 
 interface PharmacyOrder {
   id: string;
@@ -29,47 +30,51 @@ const PharmacyDispense: React.FC = () => {
   const { orderId } = useParams();
   const navigate = useNavigate();
   const { hospital, user } = useAuthStore();
+  const { showNotification } = useNotification();
   const [order, setOrder] = useState<PharmacyOrder | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [dispensedMeds, setDispensedMeds] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
-    const fetchOrder = async () => {
-      if (!hospital || !orderId) return;
-
-      try {
-        const { data, error } = await supabase
-          .from('pharmacy')
-          .select(`
-            *,
-            patient:patients(id, first_name, last_name)
-          `)
-          .eq('id', orderId)
-          .single();
-
-        if (error) throw error;
-        setOrder(data);
-        
-        // Initialize dispensed state
-        const initialDispensed = {};
-        data.medications.forEach((_, index) => {
-          initialDispensed[index] = false;
-        });
-        setDispensedMeds(initialDispensed);
-      } catch (error) {
-        console.error('Error fetching pharmacy order:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchOrder();
   }, [hospital, orderId]);
+
+  const fetchOrder = async () => {
+    if (!hospital || !orderId) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('pharmacy')
+        .select(`
+          *,
+          patient:patients(id, first_name, last_name)
+        `)
+        .eq('id', orderId)
+        .single();
+
+      if (error) throw error;
+      setOrder(data);
+      
+      // Initialize dispensed state
+      const initialDispensed = {};
+      data.medications.forEach((_, index) => {
+        initialDispensed[index] = false;
+      });
+      setDispensedMeds(initialDispensed);
+    } catch (error) {
+      console.error('Error fetching pharmacy order:', error);
+      showNotification('warning', 'Failed to load pharmacy order', 3000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleDispense = async () => {
     if (!order || !user) return;
 
     try {
+      showNotification('info', 'Processing medication dispensing...', 2000);
+      
       // Update pharmacy order
       const { error } = await supabase
         .from('pharmacy')
@@ -96,17 +101,31 @@ const PharmacyDispense: React.FC = () => {
 
       if (patientError) throw patientError;
 
+      showNotification('success', 'Medications dispensed successfully', 3000);
       navigate('/pharmacy');
     } catch (error) {
       console.error('Error dispensing medications:', error);
+      showNotification('warning', 'Failed to dispense medications', 3000);
     }
   };
 
   const toggleDispensed = (index: number) => {
-    setDispensedMeds(prev => ({
-      ...prev,
-      [index]: !prev[index]
-    }));
+    setDispensedMeds(prev => {
+      const newState = {
+        ...prev,
+        [index]: !prev[index]
+      };
+      
+      // Show notification
+      const medication = order?.medications[index].medication;
+      if (newState[index]) {
+        showNotification('success', `${medication} marked as dispensed`, 2000);
+      } else {
+        showNotification('info', `${medication} marked as not dispensed`, 2000);
+      }
+      
+      return newState;
+    });
   };
 
   const allDispensed = order?.medications.every((_, index) => dispensedMeds[index]);
@@ -214,7 +233,10 @@ const PharmacyDispense: React.FC = () => {
             </div>
             <div className="flex space-x-4">
               <button
-                onClick={() => navigate('/pharmacy')}
+                onClick={() => {
+                  showNotification('info', 'Dispensing cancelled', 2000);
+                  navigate('/pharmacy');
+                }}
                 className="btn btn-outline"
               >
                 Cancel
