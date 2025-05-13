@@ -143,19 +143,9 @@ const ConsultationForm: React.FC = () => {
         .from('patients')
         .select('*')
         .eq('id', patientId)
-        .maybeSingle(); // Use maybeSingle() instead of single() to handle null case gracefully
+        .single();
         
       if (error) throw error;
-      
-      if (!data) {
-        setPatient(null);
-        addNotification({
-          message: 'Patient not found',
-          type: 'error'
-        });
-        return;
-      }
-      
       setPatient(data);
       
       // Pre-fill allergies if available in medical history
@@ -306,12 +296,6 @@ const ConsultationForm: React.FC = () => {
     return (
       <div className="text-center p-4">
         <p className="text-gray-500">Patient not found</p>
-        <button
-          onClick={() => navigate('/patients')}
-          className="mt-2 text-primary-600 hover:text-primary-700 text-sm"
-        >
-          Return to Patient List
-        </button>
       </div>
     );
   }
@@ -789,8 +773,7 @@ const ConsultationForm: React.FC = () => {
                     className="btn btn-sm btn-outline py-1 px-2 text-xs flex items-center"
                   >
                     <Plus className="h-3 w-3 mr-1" />
-                    Ad
-d Test
+                    Add Test
                   </button>
                 </div>
                 
