@@ -85,44 +85,24 @@ const ConsultationForm: React.FC = () => {
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   useEffect(() => {
-    if (patientId && hospital?.id) {
+    if (patientId) {
       fetchPatient();
       fetchVitalSigns();
     }
-  }, [patientId, hospital?.id]);
+  }, [patientId, hospital]);
 
   const fetchPatient = async () => {
     try {
-      if (!patientId || !hospital?.id) {
-        throw new Error('Missing patient ID or hospital ID');
-      }
-
       const { data, error } = await supabase
         .from('patients')
         .select('*')
         .eq('id', patientId)
-        .eq('hospital_id', hospital.id)
-        .maybeSingle();
+        .single();
 
       if (error) throw error;
-      
-      if (!data) {
-        addNotification({
-          message: 'Patient not found',
-          type: 'error'
-        });
-        navigate('/patients');
-        return;
-      }
-
       setPatient(data);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching patient:', error);
-      addNotification({
-        message: `Error fetching patient: ${error.message}`,
-        type: 'error'
-      });
-      navigate('/patients');
     } finally {
       setIsLoading(false);
     }
@@ -130,24 +110,17 @@ const ConsultationForm: React.FC = () => {
 
   const fetchVitalSigns = async () => {
     try {
-      if (!patientId || !hospital?.id) return;
-
       const { data, error } = await supabase
         .from('vital_signs')
         .select('*')
         .eq('patient_id', patientId)
-        .eq('hospital_id', hospital.id)
         .order('recorded_at', { ascending: false })
         .limit(5);
 
       if (error) throw error;
       setVitalSigns(data || []);
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching vital signs:', error);
-      addNotification({
-        message: `Error fetching vital signs: ${error.message}`,
-        type: 'error'
-      });
     }
   };
 
@@ -328,8 +301,7 @@ const ConsultationForm: React.FC = () => {
       const { error: patientError } = await supabase
         .from('patients')
         .update({ current_flow_step: nextStep })
-        .eq('id', patient.id)
-        .eq('hospital_id', hospital.id);
+        .eq('id', patient.id);
 
       if (patientError) throw patientError;
       
@@ -769,7 +741,7 @@ const ConsultationForm: React.FC = () => {
                   <input
                     type="checkbox"
                     id="medicalCertificate"
-                    checked={formData.medical_certificate}
+                    checked={formData.medicalCertificate}
                     onChange={(e) => handleChange('medicalCertificate', e.target.checked)}
                     className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                   />
