@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { User, Calendar, FileText, Save, ArrowLeft, ChevronDown, ChevronRight, CheckCircle, AlertTriangle, Stethoscope, Heart, Settings as Lungs, Pill, Activity, Brain, Microscope, FileImage, Search, Plus, Trash2, Clock, CalendarClock, FileCheck, Send, Printer, Loader2, X, Check, ArrowRight, Clipboard, ClipboardCheck, Bone, Thermometer, Droplets, Scale, Ruler, Calculator, Bell, FlaskConical as Flask, Info } from 'lucide-react';
+import { User, Calendar, FileText, Save, ArrowLeft, ChevronDown, ChevronRight, CheckCircle, AlertTriangle, Stethoscope, Heart, Settings as Lungs, Pill, Activity, Brain, Microscope, FileImage, Search, Plus, Trash2, Clock, CalendarClock, FileCheck, Send, Printer, Loader2, X, Check, ArrowRight, Clipboard, ClipboardCheck, Bone, Thermometer, Droplets, Scale, Ruler, Calculator, Bell, FlaskConical as Flask, Info, UserRound, Home, Briefcase, Users, Scroll, Layers, Dna, Lungs as LungsIcon, Skull, Stethoscope as StethoscopeIcon, Utensils, Kidney, Baby } from 'lucide-react';
 
 interface Patient {
   id: string;
@@ -76,6 +76,82 @@ interface Appointment {
   doctor: string;
 }
 
+// Patient History interfaces
+interface PatientHistory {
+  chiefComplaint: string;
+  historyOfPresentingIllness: string;
+  gynecologicalHistory: string;
+  pastMedicalHistory: string;
+  pastSurgicalHistory: string;
+  isExpanded: boolean;
+}
+
+interface FamilySocioeconomicHistory {
+  familyHistory: string;
+  socialHistory: string;
+  occupationalHistory: string;
+  economicStatus: string;
+  isExpanded: boolean;
+}
+
+interface GeneralExamination {
+  generalAppearance: string;
+  consciousness: string;
+  hydration: string;
+  pallor: string;
+  cyanosis: string;
+  jaundice: string;
+  clubbing: string;
+  lymphadenopathy: string;
+  edema: string;
+  isExpanded: boolean;
+}
+
+interface SystemicExamination {
+  cardiovascular: {
+    inspection: string;
+    palpation: string;
+    percussion: string;
+    auscultation: string;
+    isExpanded: boolean;
+  };
+  respiratory: {
+    inspection: string;
+    palpation: string;
+    percussion: string;
+    auscultation: string;
+    isExpanded: boolean;
+  };
+  gastrointestinal: {
+    inspection: string;
+    palpation: string;
+    percussion: string;
+    auscultation: string;
+    isExpanded: boolean;
+  };
+  genitourinary: {
+    examination: string;
+    isExpanded: boolean;
+  };
+  neurological: {
+    mentalStatus: string;
+    cranialNerves: string;
+    motorSystem: string;
+    sensorySystem: string;
+    reflexes: string;
+    isExpanded: boolean;
+  };
+  musculoskeletal: {
+    examination: string;
+    isExpanded: boolean;
+  };
+  breast: {
+    examination: string;
+    isExpanded: boolean;
+  };
+  isExpanded: boolean;
+}
+
 const ConsultationForm: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
@@ -87,7 +163,6 @@ const ConsultationForm: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'assessment' | 'prescriptions' | 'orders' | 'notes'>('assessment');
   
   // Assessment state
-  const [chiefComplaint, setChiefComplaint] = useState('');
   const [diagnosis, setDiagnosis] = useState('');
   const [treatmentPlan, setTreatmentPlan] = useState('');
   const [notes, setNotes] = useState('');
@@ -138,6 +213,85 @@ const ConsultationForm: React.FC = () => {
     pain_level: null
   });
   
+  // Patient History
+  const [patientHistory, setPatientHistory] = useState<PatientHistory>({
+    chiefComplaint: '',
+    historyOfPresentingIllness: '',
+    gynecologicalHistory: '',
+    pastMedicalHistory: '',
+    pastSurgicalHistory: '',
+    isExpanded: true
+  });
+
+  // Family and Socioeconomic History
+  const [familySocioeconomicHistory, setFamilySocioeconomicHistory] = useState<FamilySocioeconomicHistory>({
+    familyHistory: '',
+    socialHistory: '',
+    occupationalHistory: '',
+    economicStatus: '',
+    isExpanded: true
+  });
+
+  // General Examination
+  const [generalExamination, setGeneralExamination] = useState<GeneralExamination>({
+    generalAppearance: '',
+    consciousness: 'Alert and oriented',
+    hydration: 'Well hydrated',
+    pallor: 'Absent',
+    cyanosis: 'Absent',
+    jaundice: 'Absent',
+    clubbing: 'Absent',
+    lymphadenopathy: 'Absent',
+    edema: 'Absent',
+    isExpanded: true
+  });
+
+  // Systemic Examination
+  const [systemicExamination, setSystemicExamination] = useState<SystemicExamination>({
+    cardiovascular: {
+      inspection: '',
+      palpation: '',
+      percussion: '',
+      auscultation: '',
+      isExpanded: true
+    },
+    respiratory: {
+      inspection: '',
+      palpation: '',
+      percussion: '',
+      auscultation: '',
+      isExpanded: true
+    },
+    gastrointestinal: {
+      inspection: '',
+      palpation: '',
+      percussion: '',
+      auscultation: '',
+      isExpanded: true
+    },
+    genitourinary: {
+      examination: '',
+      isExpanded: true
+    },
+    neurological: {
+      mentalStatus: '',
+      cranialNerves: '',
+      motorSystem: '',
+      sensorySystem: '',
+      reflexes: '',
+      isExpanded: true
+    },
+    musculoskeletal: {
+      examination: '',
+      isExpanded: true
+    },
+    breast: {
+      examination: '',
+      isExpanded: true
+    },
+    isExpanded: true
+  });
+  
   // Confirmation state
   const [showConfirmation, setShowConfirmation] = useState(false);
 
@@ -180,6 +334,12 @@ const ConsultationForm: React.FC = () => {
           current_flow_step: 'consultation'
         };
         setPatient(mockPatient);
+        
+        // Set chief complaint
+        setPatientHistory(prev => ({
+          ...prev,
+          chiefComplaint: 'Chest pain and shortness of breath for 3 days'
+        }));
         
         // Mock medications
         setMedications([
@@ -402,7 +562,7 @@ const ConsultationForm: React.FC = () => {
   };
 
   const validateForm = () => {
-    if (!chiefComplaint) {
+    if (!patientHistory.chiefComplaint) {
       addNotification({
         message: 'Chief complaint is required',
         type: 'warning'
@@ -445,7 +605,10 @@ const ConsultationForm: React.FC = () => {
       if (import.meta.env.DEV) {
         // Simulate successful submission in development
         console.log('Consultation form submitted:', {
-          chiefComplaint,
+          patientHistory,
+          familySocioeconomicHistory,
+          generalExamination,
+          systemicExamination,
           diagnosis,
           treatmentPlan,
           notes,
@@ -475,7 +638,7 @@ const ConsultationForm: React.FC = () => {
           doctor_id: user.id,
           hospital_id: hospital.id,
           consultation_date: new Date().toISOString(),
-          chief_complaint: chiefComplaint,
+          chief_complaint: patientHistory.chiefComplaint,
           diagnosis: diagnosis,
           treatment_plan: treatmentPlan,
           notes: notes,
@@ -488,7 +651,13 @@ const ConsultationForm: React.FC = () => {
             instructions: med.instructions,
             quantity: med.quantity
           })),
-          department_id: user.department_id || null
+          department_id: user.department_id || null,
+          clinical_data: {
+            patient_history: patientHistory,
+            family_socioeconomic_history: familySocioeconomicHistory,
+            general_examination: generalExamination,
+            systemic_examination: systemicExamination
+          }
         })
         .select()
         .single();
@@ -843,18 +1012,874 @@ const ConsultationForm: React.FC = () => {
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         {/* Assessment Tab */}
         {activeTab === 'assessment' && (
-          <div className="p-5 space-y-5">
-            <div>
-              <label className="form-label required text-sm">Chief Complaint</label>
-              <textarea
-                value={chiefComplaint}
-                onChange={(e) => setChiefComplaint(e.target.value)}
-                className="form-input py-2 text-sm rounded-lg"
-                rows={2}
-                placeholder="Enter the patient's main complaint"
-              />
+          <div className="p-5 space-y-5 max-h-[calc(100vh-300px)] overflow-y-auto">
+            {/* Patient History Section */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div 
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                onClick={() => setPatientHistory({...patientHistory, isExpanded: !patientHistory.isExpanded})}
+              >
+                <div className="flex items-center">
+                  <Scroll className="h-4 w-4 text-primary-500 mr-2" />
+                  <h3 className="text-sm font-medium text-gray-900">1. Patient History</h3>
+                </div>
+                {patientHistory.isExpanded ? (
+                  <ChevronDown className="h-5 w-5 text-gray-500" />
+                ) : (
+                  <ChevronRight className="h-5 w-5 text-gray-500" />
+                )}
+              </div>
+              
+              {patientHistory.isExpanded && (
+                <div className="p-4 space-y-4">
+                  <div>
+                    <label className="form-label required text-sm">Chief Complaint</label>
+                    <textarea
+                      value={patientHistory.chiefComplaint}
+                      onChange={(e) => setPatientHistory({...patientHistory, chiefComplaint: e.target.value})}
+                      className="form-input py-2 text-sm rounded-lg"
+                      rows={2}
+                      placeholder="Enter the patient's main complaint"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-sm">History of Presenting Illness</label>
+                    <textarea
+                      value={patientHistory.historyOfPresentingIllness}
+                      onChange={(e) => setPatientHistory({...patientHistory, historyOfPresentingIllness: e.target.value})}
+                      className="form-input py-2 text-sm rounded-lg"
+                      rows={3}
+                      placeholder="Describe the onset, duration, and progression of symptoms"
+                    />
+                  </div>
+                  
+                  {patient.gender === 'Female' && (
+                    <div>
+                      <label className="form-label text-sm">Gynecological/Obstetric History</label>
+                      <textarea
+                        value={patientHistory.gynecologicalHistory}
+                        onChange={(e) => setPatientHistory({...patientHistory, gynecologicalHistory: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                        rows={2}
+                        placeholder="LMP, pregnancies, deliveries, gynecological conditions"
+                      />
+                    </div>
+                  )}
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label text-sm">Past Medical History</label>
+                      <textarea
+                        value={patientHistory.pastMedicalHistory}
+                        onChange={(e) => setPatientHistory({...patientHistory, pastMedicalHistory: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                        rows={2}
+                        placeholder="Previous medical conditions, hospitalizations"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="form-label text-sm">Past Surgical History</label>
+                      <textarea
+                        value={patientHistory.pastSurgicalHistory}
+                        onChange={(e) => setPatientHistory({...patientHistory, pastSurgicalHistory: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                        rows={2}
+                        placeholder="Previous surgeries, procedures, dates"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
             
+            {/* Family and Socioeconomic History */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div 
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                onClick={() => setFamilySocioeconomicHistory({...familySocioeconomicHistory, isExpanded: !familySocioeconomicHistory.isExpanded})}
+              >
+                <div className="flex items-center">
+                  <Users className="h-4 w-4 text-primary-500 mr-2" />
+                  <h3 className="text-sm font-medium text-gray-900">2. Family and Socioeconomic History</h3>
+                </div>
+                {familySocioeconomicHistory.isExpanded ? (
+                  <ChevronDown className="h-5 w-5 text-gray-500" />
+                ) : (
+                  <ChevronRight className="h-5 w-5 text-gray-500" />
+                )}
+              </div>
+              
+              {familySocioeconomicHistory.isExpanded && (
+                <div className="p-4 space-y-4">
+                  <div>
+                    <label className="form-label text-sm">Family History</label>
+                    <textarea
+                      value={familySocioeconomicHistory.familyHistory}
+                      onChange={(e) => setFamilySocioeconomicHistory({...familySocioeconomicHistory, familyHistory: e.target.value})}
+                      className="form-input py-2 text-sm rounded-lg"
+                      rows={2}
+                      placeholder="Family history of diseases, genetic conditions"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label text-sm">Social History</label>
+                      <textarea
+                        value={familySocioeconomicHistory.socialHistory}
+                        onChange={(e) => setFamilySocioeconomicHistory({...familySocioeconomicHistory, socialHistory: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                        rows={2}
+                        placeholder="Smoking, alcohol, substance use, living situation"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="form-label text-sm">Occupational History</label>
+                      <textarea
+                        value={familySocioeconomicHistory.occupationalHistory}
+                        onChange={(e) => setFamilySocioeconomicHistory({...familySocioeconomicHistory, occupationalHistory: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                        rows={2}
+                        placeholder="Current and past occupations, exposures"
+                      />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-sm">Economic Status</label>
+                    <select
+                      value={familySocioeconomicHistory.economicStatus}
+                      onChange={(e) => setFamilySocioeconomicHistory({...familySocioeconomicHistory, economicStatus: e.target.value})}
+                      className="form-input py-2 text-sm rounded-lg"
+                    >
+                      <option value="">Select economic status</option>
+                      <option value="Low income">Low income</option>
+                      <option value="Middle income">Middle income</option>
+                      <option value="High income">High income</option>
+                      <option value="Unemployed">Unemployed</option>
+                      <option value="Retired">Retired</option>
+                      <option value="Student">Student</option>
+                    </select>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* General Examination */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div 
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                onClick={() => setGeneralExamination({...generalExamination, isExpanded: !generalExamination.isExpanded})}
+              >
+                <div className="flex items-center">
+                  <UserRound className="h-4 w-4 text-primary-500 mr-2" />
+                  <h3 className="text-sm font-medium text-gray-900">3. General Examination</h3>
+                </div>
+                {generalExamination.isExpanded ? (
+                  <ChevronDown className="h-5 w-5 text-gray-500" />
+                ) : (
+                  <ChevronRight className="h-5 w-5 text-gray-500" />
+                )}
+              </div>
+              
+              {generalExamination.isExpanded && (
+                <div className="p-4 space-y-4">
+                  <div>
+                    <label className="form-label text-sm">General Appearance</label>
+                    <textarea
+                      value={generalExamination.generalAppearance}
+                      onChange={(e) => setGeneralExamination({...generalExamination, generalAppearance: e.target.value})}
+                      className="form-input py-2 text-sm rounded-lg"
+                      rows={2}
+                      placeholder="Overall appearance, distress level, posture, gait"
+                    />
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="form-label text-sm">Consciousness</label>
+                      <select
+                        value={generalExamination.consciousness}
+                        onChange={(e) => setGeneralExamination({...generalExamination, consciousness: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                      >
+                        <option value="Alert and oriented">Alert and oriented</option>
+                        <option value="Drowsy">Drowsy</option>
+                        <option value="Lethargic">Lethargic</option>
+                        <option value="Obtunded">Obtunded</option>
+                        <option value="Stuporous">Stuporous</option>
+                        <option value="Comatose">Comatose</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="form-label text-sm">Hydration</label>
+                      <select
+                        value={generalExamination.hydration}
+                        onChange={(e) => setGeneralExamination({...generalExamination, hydration: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                      >
+                        <option value="Well hydrated">Well hydrated</option>
+                        <option value="Mildly dehydrated">Mildly dehydrated</option>
+                        <option value="Moderately dehydrated">Moderately dehydrated</option>
+                        <option value="Severely dehydrated">Severely dehydrated</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="form-label text-sm">Pallor</label>
+                      <select
+                        value={generalExamination.pallor}
+                        onChange={(e) => setGeneralExamination({...generalExamination, pallor: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                      >
+                        <option value="Absent">Absent</option>
+                        <option value="Mild">Mild</option>
+                        <option value="Moderate">Moderate</option>
+                        <option value="Severe">Severe</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="form-label text-sm">Cyanosis</label>
+                      <select
+                        value={generalExamination.cyanosis}
+                        onChange={(e) => setGeneralExamination({...generalExamination, cyanosis: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                      >
+                        <option value="Absent">Absent</option>
+                        <option value="Central">Central</option>
+                        <option value="Peripheral">Peripheral</option>
+                        <option value="Both">Both</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="form-label text-sm">Jaundice</label>
+                      <select
+                        value={generalExamination.jaundice}
+                        onChange={(e) => setGeneralExamination({...generalExamination, jaundice: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                      >
+                        <option value="Absent">Absent</option>
+                        <option value="Mild">Mild</option>
+                        <option value="Moderate">Moderate</option>
+                        <option value="Severe">Severe</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="form-label text-sm">Clubbing</label>
+                      <select
+                        value={generalExamination.clubbing}
+                        onChange={(e) => setGeneralExamination({...generalExamination, clubbing: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                      >
+                        <option value="Absent">Absent</option>
+                        <option value="Grade 1">Grade 1</option>
+                        <option value="Grade 2">Grade 2</option>
+                        <option value="Grade 3">Grade 3</option>
+                        <option value="Grade 4">Grade 4</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="form-label text-sm">Lymphadenopathy</label>
+                      <select
+                        value={generalExamination.lymphadenopathy}
+                        onChange={(e) => setGeneralExamination({...generalExamination, lymphadenopathy: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                      >
+                        <option value="Absent">Absent</option>
+                        <option value="Cervical">Cervical</option>
+                        <option value="Axillary">Axillary</option>
+                        <option value="Inguinal">Inguinal</option>
+                        <option value="Generalized">Generalized</option>
+                      </select>
+                    </div>
+                    
+                    <div>
+                      <label className="form-label text-sm">Edema</label>
+                      <select
+                        value={generalExamination.edema}
+                        onChange={(e) => setGeneralExamination({...generalExamination, edema: e.target.value})}
+                        className="form-input py-2 text-sm rounded-lg"
+                      >
+                        <option value="Absent">Absent</option>
+                        <option value="Pedal">Pedal</option>
+                        <option value="Pretibial">Pretibial</option>
+                        <option value="Anasarca">Anasarca</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Systemic Examination */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div 
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                onClick={() => setSystemicExamination({...systemicExamination, isExpanded: !systemicExamination.isExpanded})}
+              >
+                <div className="flex items-center">
+                  <Layers className="h-4 w-4 text-primary-500 mr-2" />
+                  <h3 className="text-sm font-medium text-gray-900">4. Systemic Examination</h3>
+                </div>
+                {systemicExamination.isExpanded ? (
+                  <ChevronDown className="h-5 w-5 text-gray-500" />
+                ) : (
+                  <ChevronRight className="h-5 w-5 text-gray-500" />
+                )}
+              </div>
+              
+              {systemicExamination.isExpanded && (
+                <div className="p-4 space-y-4">
+                  {/* Cardiovascular System */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div 
+                      className="bg-gray-50 p-2 flex justify-between items-center cursor-pointer"
+                      onClick={() => setSystemicExamination({
+                        ...systemicExamination, 
+                        cardiovascular: {
+                          ...systemicExamination.cardiovascular,
+                          isExpanded: !systemicExamination.cardiovascular.isExpanded
+                        }
+                      })}
+                    >
+                      <div className="flex items-center">
+                        <Heart className="h-4 w-4 text-error-500 mr-2" />
+                        <h4 className="text-sm font-medium text-gray-900">Cardiovascular System</h4>
+                      </div>
+                      {systemicExamination.cardiovascular.isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                      )}
+                    </div>
+                    
+                    {systemicExamination.cardiovascular.isExpanded && (
+                      <div className="p-3 space-y-3">
+                        <div>
+                          <label className="form-label text-xs">Inspection</label>
+                          <textarea
+                            value={systemicExamination.cardiovascular.inspection}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              cardiovascular: {
+                                ...systemicExamination.cardiovascular,
+                                inspection: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Visible pulsations, scars, deformities"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="form-label text-xs">Palpation</label>
+                          <textarea
+                            value={systemicExamination.cardiovascular.palpation}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              cardiovascular: {
+                                ...systemicExamination.cardiovascular,
+                                palpation: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Apex beat, thrills, heaves"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="form-label text-xs">Percussion</label>
+                          <textarea
+                            value={systemicExamination.cardiovascular.percussion}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              cardiovascular: {
+                                ...systemicExamination.cardiovascular,
+                                percussion: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Cardiac borders"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="form-label text-xs">Auscultation</label>
+                          <textarea
+                            value={systemicExamination.cardiovascular.auscultation}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              cardiovascular: {
+                                ...systemicExamination.cardiovascular,
+                                auscultation: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Heart sounds, murmurs, rubs"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Respiratory System */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div 
+                      className="bg-gray-50 p-2 flex justify-between items-center cursor-pointer"
+                      onClick={() => setSystemicExamination({
+                        ...systemicExamination, 
+                        respiratory: {
+                          ...systemicExamination.respiratory,
+                          isExpanded: !systemicExamination.respiratory.isExpanded
+                        }
+                      })}
+                    >
+                      <div className="flex items-center">
+                        <LungsIcon className="h-4 w-4 text-primary-500 mr-2" />
+                        <h4 className="text-sm font-medium text-gray-900">Respiratory System</h4>
+                      </div>
+                      {systemicExamination.respiratory.isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                      )}
+                    </div>
+                    
+                    {systemicExamination.respiratory.isExpanded && (
+                      <div className="p-3 space-y-3">
+                        <div>
+                          <label className="form-label text-xs">Inspection</label>
+                          <textarea
+                            value={systemicExamination.respiratory.inspection}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              respiratory: {
+                                ...systemicExamination.respiratory,
+                                inspection: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Respiratory rate, pattern, use of accessory muscles"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="form-label text-xs">Palpation</label>
+                          <textarea
+                            value={systemicExamination.respiratory.palpation}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              respiratory: {
+                                ...systemicExamination.respiratory,
+                                palpation: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Chest expansion, tactile fremitus"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="form-label text-xs">Percussion</label>
+                          <textarea
+                            value={systemicExamination.respiratory.percussion}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              respiratory: {
+                                ...systemicExamination.respiratory,
+                                percussion: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Resonance, dullness"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="form-label text-xs">Auscultation</label>
+                          <textarea
+                            value={systemicExamination.respiratory.auscultation}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              respiratory: {
+                                ...systemicExamination.respiratory,
+                                auscultation: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Breath sounds, added sounds"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Gastrointestinal System */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div 
+                      className="bg-gray-50 p-2 flex justify-between items-center cursor-pointer"
+                      onClick={() => setSystemicExamination({
+                        ...systemicExamination, 
+                        gastrointestinal: {
+                          ...systemicExamination.gastrointestinal,
+                          isExpanded: !systemicExamination.gastrointestinal.isExpanded
+                        }
+                      })}
+                    >
+                      <div className="flex items-center">
+                        <Utensils className="h-4 w-4 text-warning-500 mr-2" />
+                        <h4 className="text-sm font-medium text-gray-900">Gastrointestinal System</h4>
+                      </div>
+                      {systemicExamination.gastrointestinal.isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                      )}
+                    </div>
+                    
+                    {systemicExamination.gastrointestinal.isExpanded && (
+                      <div className="p-3 space-y-3">
+                        <div>
+                          <label className="form-label text-xs">Inspection</label>
+                          <textarea
+                            value={systemicExamination.gastrointestinal.inspection}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              gastrointestinal: {
+                                ...systemicExamination.gastrointestinal,
+                                inspection: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Abdominal contour, visible peristalsis, scars"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="form-label text-xs">Palpation</label>
+                          <textarea
+                            value={systemicExamination.gastrointestinal.palpation}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              gastrointestinal: {
+                                ...systemicExamination.gastrointestinal,
+                                palpation: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Tenderness, organomegaly, masses"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="form-label text-xs">Percussion</label>
+                          <textarea
+                            value={systemicExamination.gastrointestinal.percussion}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              gastrointestinal: {
+                                ...systemicExamination.gastrointestinal,
+                                percussion: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Liver span, shifting dullness"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="form-label text-xs">Auscultation</label>
+                          <textarea
+                            value={systemicExamination.gastrointestinal.auscultation}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              gastrointestinal: {
+                                ...systemicExamination.gastrointestinal,
+                                auscultation: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Bowel sounds, bruits"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Genitourinary System */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div 
+                      className="bg-gray-50 p-2 flex justify-between items-center cursor-pointer"
+                      onClick={() => setSystemicExamination({
+                        ...systemicExamination, 
+                        genitourinary: {
+                          ...systemicExamination.genitourinary,
+                          isExpanded: !systemicExamination.genitourinary.isExpanded
+                        }
+                      })}
+                    >
+                      <div className="flex items-center">
+                        <Kidney className="h-4 w-4 text-secondary-500 mr-2" />
+                        <h4 className="text-sm font-medium text-gray-900">Genitourinary System</h4>
+                      </div>
+                      {systemicExamination.genitourinary.isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                      )}
+                    </div>
+                    
+                    {systemicExamination.genitourinary.isExpanded && (
+                      <div className="p-3 space-y-3">
+                        <div>
+                          <label className="form-label text-xs">Examination</label>
+                          <textarea
+                            value={systemicExamination.genitourinary.examination}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              genitourinary: {
+                                ...systemicExamination.genitourinary,
+                                examination: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={2}
+                            placeholder="External genitalia, renal angle tenderness, suprapubic tenderness"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Neurological System */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div 
+                      className="bg-gray-50 p-2 flex justify-between items-center cursor-pointer"
+                      onClick={() => setSystemicExamination({
+                        ...systemicExamination, 
+                        neurological: {
+                          ...systemicExamination.neurological,
+                          isExpanded: !systemicExamination.neurological.isExpanded
+                        }
+                      })}
+                    >
+                      <div className="flex items-center">
+                        <Brain className="h-4 w-4 text-accent-500 mr-2" />
+                        <h4 className="text-sm font-medium text-gray-900">Neurological System</h4>
+                      </div>
+                      {systemicExamination.neurological.isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                      )}
+                    </div>
+                    
+                    {systemicExamination.neurological.isExpanded && (
+                      <div className="p-3 space-y-3">
+                        <div>
+                          <label className="form-label text-xs">Mental Status</label>
+                          <textarea
+                            value={systemicExamination.neurological.mentalStatus}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              neurological: {
+                                ...systemicExamination.neurological,
+                                mentalStatus: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Level of consciousness, orientation, memory, speech"
+                          />
+                        </div>
+                        
+                        <div>
+                          <label className="form-label text-xs">Cranial Nerves</label>
+                          <textarea
+                            value={systemicExamination.neurological.cranialNerves}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              neurological: {
+                                ...systemicExamination.neurological,
+                                cranialNerves: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={1}
+                            placeholder="Examination of cranial nerves I-XII"
+                          />
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                          <div>
+                            <label className="form-label text-xs">Motor System</label>
+                            <textarea
+                              value={systemicExamination.neurological.motorSystem}
+                              onChange={(e) => setSystemicExamination({
+                                ...systemicExamination,
+                                neurological: {
+                                  ...systemicExamination.neurological,
+                                  motorSystem: e.target.value
+                                }
+                              })}
+                              className="form-input py-1.5 text-sm rounded-lg"
+                              rows={1}
+                              placeholder="Tone, power, coordination"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="form-label text-xs">Sensory System</label>
+                            <textarea
+                              value={systemicExamination.neurological.sensorySystem}
+                              onChange={(e) => setSystemicExamination({
+                                ...systemicExamination,
+                                neurological: {
+                                  ...systemicExamination.neurological,
+                                  sensorySystem: e.target.value
+                                }
+                              })}
+                              className="form-input py-1.5 text-sm rounded-lg"
+                              rows={1}
+                              placeholder="Touch, pain, temperature, position"
+                            />
+                          </div>
+                          
+                          <div>
+                            <label className="form-label text-xs">Reflexes</label>
+                            <textarea
+                              value={systemicExamination.neurological.reflexes}
+                              onChange={(e) => setSystemicExamination({
+                                ...systemicExamination,
+                                neurological: {
+                                  ...systemicExamination.neurological,
+                                  reflexes: e.target.value
+                                }
+                              })}
+                              className="form-input py-1.5 text-sm rounded-lg"
+                              rows={1}
+                              placeholder="Deep tendon reflexes, plantar response"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Musculoskeletal System */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div 
+                      className="bg-gray-50 p-2 flex justify-between items-center cursor-pointer"
+                      onClick={() => setSystemicExamination({
+                        ...systemicExamination, 
+                        musculoskeletal: {
+                          ...systemicExamination.musculoskeletal,
+                          isExpanded: !systemicExamination.musculoskeletal.isExpanded
+                        }
+                      })}
+                    >
+                      <div className="flex items-center">
+                        <Bone className="h-4 w-4 text-warning-500 mr-2" />
+                        <h4 className="text-sm font-medium text-gray-900">Musculoskeletal System</h4>
+                      </div>
+                      {systemicExamination.musculoskeletal.isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                      )}
+                    </div>
+                    
+                    {systemicExamination.musculoskeletal.isExpanded && (
+                      <div className="p-3 space-y-3">
+                        <div>
+                          <label className="form-label text-xs">Examination</label>
+                          <textarea
+                            value={systemicExamination.musculoskeletal.examination}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              musculoskeletal: {
+                                ...systemicExamination.musculoskeletal,
+                                examination: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={2}
+                            placeholder="Joints, muscles, range of motion, deformities, tenderness"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {/* Breast Examination */}
+                  <div className="border border-gray-200 rounded-lg overflow-hidden">
+                    <div 
+                      className="bg-gray-50 p-2 flex justify-between items-center cursor-pointer"
+                      onClick={() => setSystemicExamination({
+                        ...systemicExamination, 
+                        breast: {
+                          ...systemicExamination.breast,
+                          isExpanded: !systemicExamination.breast.isExpanded
+                        }
+                      })}
+                    >
+                      <div className="flex items-center">
+                        <UserRound className="h-4 w-4 text-primary-500 mr-2" />
+                        <h4 className="text-sm font-medium text-gray-900">Breast Examination</h4>
+                      </div>
+                      {systemicExamination.breast.isExpanded ? (
+                        <ChevronDown className="h-4 w-4 text-gray-500" />
+                      ) : (
+                        <ChevronRight className="h-4 w-4 text-gray-500" />
+                      )}
+                    </div>
+                    
+                    {systemicExamination.breast.isExpanded && (
+                      <div className="p-3 space-y-3">
+                        <div>
+                          <label className="form-label text-xs">Examination</label>
+                          <textarea
+                            value={systemicExamination.breast.examination}
+                            onChange={(e) => setSystemicExamination({
+                              ...systemicExamination,
+                              breast: {
+                                ...systemicExamination.breast,
+                                examination: e.target.value
+                              }
+                            })}
+                            className="form-input py-1.5 text-sm rounded-lg"
+                            rows={2}
+                            placeholder="Inspection, palpation, masses, discharge, lymph nodes"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Diagnosis and Treatment Plan */}
             <div>
               <label className="form-label required text-sm">Diagnosis</label>
               <textarea
