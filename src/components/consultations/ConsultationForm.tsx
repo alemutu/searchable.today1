@@ -2,29 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { 
-  Stethoscope, 
-  Save, 
-  ArrowLeft, 
-  User, 
-  Calendar, 
-  FileText, 
-  Pill, 
-  CheckSquare, 
-  Brain,
-  Activity,
-  Thermometer,
-  Heart,
-  Lungs,
-  Droplets,
-  AlertTriangle,
-  Search,
-  Plus,
-  Trash2,
-  XCircle,
-  CheckCircle,
-  Loader2
-} from 'lucide-react';
+import { Stethoscope, Save, ArrowLeft, User, Calendar, FileText, Pill, CheckSquare, Brain, Activity, Thermometer, Heart, Settings as Lungs, Droplets, AlertTriangle, Search, Plus, Trash2, XCircle, CheckCircle, Loader2 } from 'lucide-react';
 
 interface ConsultationFormData {
   patientId: string;
