@@ -33,7 +33,7 @@ const LoginForm: React.FC = () => {
           <div className="flex justify-center">
             <Activity className="h-12 w-12 text-primary-500" />
           </div>
-          <h2 className="mt-6 text-2xl font-bold text-gray-900">Sign in to HMS</h2>
+          <h2 className="mt-6 text-2xl font-bold text-gray-900">Welcome back to Searchable</h2>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
