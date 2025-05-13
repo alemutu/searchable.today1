@@ -22,3 +22,6 @@ export const supabase = createClient<Database>(
     }
   }
 );
+
+// Add getClient function to return the Supabase client instance
+export const getClient = () => supabase;
