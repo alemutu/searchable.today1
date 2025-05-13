@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { FileText, Plus, Trash2, User, Search, Pill, X, AlertTriangle } from 'lucide-react';
+import { FileText, Plus, Trash2, User, Search, X, Pill, AlertTriangle, Activity, Heart, Thermometer, Lungs, Droplets, Clock, Scale, Ruler, Calculator, Brain, FileBarChart2, AlertCircle } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
@@ -44,11 +44,17 @@ const ConsultationForm: React.FC = () => {
   const [showLabTestModal, setShowLabTestModal] = useState(false);
   const [showRadiologyModal, setShowRadiologyModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<string[]>([]);
-  const [showSearchResults, setShowSearchResults] = useState(false);
-  const [showAddCustom, setShowAddCustom] = useState(false);
-  const [customMedication, setCustomMedication] = useState('');
-  const [selectedMedications, setSelectedMedications] = useState<string[]>([]);
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [selectedMedications, setSelectedMedications] = useState<any[]>([]);
+  const [showCustomForm, setShowCustomForm] = useState(false);
+  const [customMedication, setCustomMedication] = useState({
+    medication: '',
+    dosage: '',
+    frequency: '',
+    duration: '',
+    instructions: ''
+  });
+  const [vitals, setVitals] = useState<any>(null);
   
   const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch } = useForm<ConsultationFormData>({
     defaultValues: {
@@ -61,36 +67,11 @@ const ConsultationForm: React.FC = () => {
 
   const labTests = watch('labTests');
   const radiologyTests = watch('radiologyTests');
-  const prescriptions = watch('prescriptions');
-
-  // Common medications database
-  const commonMedications = [
-    'Acetaminophen', 'Amoxicillin', 'Atorvastatin', 'Azithromycin', 'Cephalexin',
-    'Ciprofloxacin', 'Citalopram', 'Clonazepam', 'Doxycycline', 'Escitalopram',
-    'Fluoxetine', 'Gabapentin', 'Hydrochlorothiazide', 'Ibuprofen', 'Levothyroxine',
-    'Lisinopril', 'Lorazepam', 'Losartan', 'Metformin', 'Metoprolol',
-    'Montelukast', 'Naproxen', 'Omeprazole', 'Pantoprazole', 'Prednisone',
-    'Sertraline', 'Simvastatin', 'Tramadol', 'Trazodone', 'Warfarin'
-  ];
-
-  // Common frequencies
-  const commonFrequencies = [
-    'Once daily', 'Twice daily', 'Three times daily', 'Four times daily',
-    'Every morning', 'Every evening', 'Every 4 hours', 'Every 6 hours',
-    'Every 8 hours', 'Every 12 hours', 'As needed', 'Before meals',
-    'After meals', 'At bedtime', 'Weekly', 'Monthly'
-  ];
-
-  // Common durations
-  const commonDurations = [
-    '3 days', '5 days', '7 days', '10 days', '14 days', '21 days',
-    '1 month', '2 months', '3 months', '6 months', 'Indefinitely',
-    'Until finished', 'As directed'
-  ];
 
   useEffect(() => {
     if (patientId) {
       fetchPatient();
+      fetchVitals();
     } else {
       setIsLoading(false);
     }
@@ -142,8 +123,36 @@ const ConsultationForm: React.FC = () => {
       setPatient(data);
     } catch (error) {
       console.error('Error loading patient:', error);
+      addNotification({
+        message: 'Failed to load patient information',
+        type: 'error'
+      });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchVitals = async () => {
+    try {
+      // In a real app, we would fetch from Supabase
+      // For now, we'll use mock data
+      const mockVitals = {
+        temperature: 37.2,
+        heart_rate: 72,
+        respiratory_rate: 16,
+        blood_pressure_systolic: 120,
+        blood_pressure_diastolic: 80,
+        oxygen_saturation: 98,
+        weight: 70,
+        height: 175,
+        bmi: 22.9,
+        pain_level: 0,
+        recorded_at: new Date().toISOString()
+      };
+      
+      setVitals(mockVitals);
+    } catch (error) {
+      console.error('Error loading vitals:', error);
     }
   };
 
@@ -152,6 +161,9 @@ const ConsultationForm: React.FC = () => {
       if (!hospital || !user || !patient) throw new Error('Missing required data');
 
       setIsSaving(true);
+
+      // Use selected medications for prescriptions
+      data.prescriptions = selectedMedications;
 
       // Create consultation record
       const { error: consultationError } = await supabase
@@ -179,7 +191,7 @@ const ConsultationForm: React.FC = () => {
         nextFlowStep = 'lab_tests';
       } else if (data.radiologyTests.length > 0) {
         nextFlowStep = 'radiology';
-      } else if (data.prescriptions.some(p => p.medication)) {
+      } else if (data.prescriptions.length > 0) {
         nextFlowStep = 'pharmacy';
       }
 
@@ -228,7 +240,7 @@ const ConsultationForm: React.FC = () => {
       }
 
       // If prescriptions were added, create pharmacy order
-      if (data.prescriptions.some(p => p.medication)) {
+      if (data.prescriptions.length > 0) {
         const { error: pharmacyError } = await supabase
           .from('pharmacy')
           .insert({
@@ -373,95 +385,77 @@ const ConsultationForm: React.FC = () => {
     }).format(amount);
   };
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const term = e.target.value;
+  // Handle medication search
+  const handleMedicationSearch = (term: string) => {
     setSearchTerm(term);
-    
-    if (term.length > 0) {
-      const results = commonMedications.filter(med => 
-        med.toLowerCase().includes(term.toLowerCase())
-      );
-      setSearchResults(results);
-      setShowSearchResults(true);
-    } else {
+    if (term.length < 2) {
       setSearchResults([]);
-      setShowSearchResults(false);
+      return;
     }
+
+    // Mock medication database
+    const medications = [
+      { id: 1, name: 'Amoxicillin', dosages: ['250mg', '500mg'] },
+      { id: 2, name: 'Paracetamol', dosages: ['500mg', '1g'] },
+      { id: 3, name: 'Ibuprofen', dosages: ['200mg', '400mg'] },
+      { id: 4, name: 'Omeprazole', dosages: ['20mg', '40mg'] },
+      { id: 5, name: 'Atorvastatin', dosages: ['10mg', '20mg', '40mg'] },
+      { id: 6, name: 'Metformin', dosages: ['500mg', '850mg', '1000mg'] },
+      { id: 7, name: 'Amlodipine', dosages: ['5mg', '10mg'] },
+      { id: 8, name: 'Lisinopril', dosages: ['5mg', '10mg', '20mg'] },
+      { id: 9, name: 'Simvastatin', dosages: ['10mg', '20mg', '40mg'] },
+      { id: 10, name: 'Aspirin', dosages: ['75mg', '81mg', '325mg'] }
+    ];
+
+    const results = medications.filter(med => 
+      med.name.toLowerCase().includes(term.toLowerCase())
+    );
+    setSearchResults(results);
   };
 
-  const handleSelectMedication = (medication: string) => {
-    // Add the medication to the prescriptions array
-    const currentPrescriptions = watch('prescriptions') || [];
-    setValue('prescriptions', [
-      ...currentPrescriptions,
-      {
-        medication,
+  // Add medication to prescription
+  const addMedication = (medication: any, dosage: string) => {
+    const newMedication = {
+      medication: medication.name,
+      dosage: dosage,
+      frequency: '',
+      duration: '',
+      instructions: ''
+    };
+    
+    setSelectedMedications([...selectedMedications, newMedication]);
+    setSearchTerm('');
+    setSearchResults([]);
+  };
+
+  // Add custom medication
+  const addCustomMedication = () => {
+    if (customMedication.medication && customMedication.dosage) {
+      setSelectedMedications([...selectedMedications, {...customMedication}]);
+      setCustomMedication({
+        medication: '',
         dosage: '',
         frequency: '',
         duration: '',
         instructions: ''
-      }
-    ]);
-    
-    // Add to selected medications
-    setSelectedMedications([...selectedMedications, medication]);
-    
-    // Clear search
-    setSearchTerm('');
-    setSearchResults([]);
-    setShowSearchResults(false);
-    
-    // Show notification
-    addNotification({
-      message: `Added ${medication} to prescriptions`,
-      type: 'success',
-      duration: 2000
-    });
-  };
-
-  const handleAddCustomMedication = () => {
-    if (searchTerm.trim()) {
-      // Use the search term as the custom medication
-      handleSelectMedication(searchTerm.trim());
-      setSearchTerm('');
-      setShowAddCustom(false);
-    } else {
-      setShowAddCustom(true);
-      setCustomMedication('');
-    }
-  };
-
-  const confirmAddCustomMedication = () => {
-    if (customMedication.trim()) {
-      handleSelectMedication(customMedication.trim());
-      setCustomMedication('');
-      setShowAddCustom(false);
-      
-      // Show notification
-      addNotification({
-        message: `Added custom medication: ${customMedication}`,
-        type: 'info',
-        duration: 2000
       });
+      setShowCustomForm(false);
     }
   };
 
-  const removePrescription = (index: number) => {
-    const currentPrescriptions = watch('prescriptions');
-    const medicationToRemove = currentPrescriptions[index].medication;
-    
-    // Remove from form data
-    setValue('prescriptions', currentPrescriptions.filter((_, i) => i !== index));
-    
-    // Remove from selected medications
-    setSelectedMedications(selectedMedications.filter(med => med !== medicationToRemove));
-    
-    // Show notification
-    addNotification({
-      message: `Removed ${medicationToRemove} from prescriptions`,
-      type: 'info',
-      duration: 2000
-    });
+  // Remove medication from prescription
+  const removeMedication = (index: number) => {
+    setSelectedMedications(selectedMedications.filter((_, i) => i !== index));
+  };
+
+  // Update medication details
+  const updateMedication = (index: number, field: string, value: string) => {
+    const updatedMedications = [...selectedMedications];
+    updatedMedications[index] = {
+      ...updatedMedications[index],
+      [field]: value
+    };
+    setSelectedMedications(updatedMedications);
   };
 
   if (isLoading) {
@@ -481,7 +475,7 @@ const ConsultationForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-7xl mx-auto">
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Patient Header */}
         <div className="bg-gradient-to-r from-primary-700 to-primary-600 rounded-lg shadow-sm p-3 mb-3">
@@ -501,690 +495,762 @@ const ConsultationForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-3">
-          <div className="flex border-b border-gray-200">
-            <button
-              type="button"
-              className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
-                activeTab === 'assessment'
-                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-              onClick={() => setActiveTab('assessment')}
-            >
-              Assessment
-            </button>
-            <button
-              type="button"
-              className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
-                activeTab === 'diagnostics'
-                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-              onClick={() => setActiveTab('diagnostics')}
-            >
-              Diagnostic Tests
-            </button>
-            <button
-              type="button"
-              className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
-                activeTab === 'medications'
-                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-              onClick={() => setActiveTab('medications')}
-            >
-              Medications
-            </button>
-            <button
-              type="button"
-              className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
-                activeTab === 'notes'
-                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-              }`}
-              onClick={() => setActiveTab('notes')}
-            >
-              Notes
-            </button>
-          </div>
-        </div>
+        {/* Vitals and Medical History Section */}
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Left Side - Vitals and Medical History */}
+          <div className="w-full md:w-1/3 space-y-4">
+            {/* Vital Signs Card */}
+            {vitals && (
+              <div className="bg-white rounded-lg shadow-sm p-4">
+                <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
+                  <Activity className="h-4 w-4 text-primary-500 mr-1.5" />
+                  Vital Signs
+                </h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="flex items-center">
+                    <Thermometer className="h-3 w-3 text-gray-400 mr-1" />
+                    <span className="text-gray-500 mr-1">Temp:</span>
+                    <span className="font-medium">{vitals.temperature}°C</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Heart className="h-3 w-3 text-gray-400 mr-1" />
+                    <span className="text-gray-500 mr-1">HR:</span>
+                    <span className="font-medium">{vitals.heart_rate} bpm</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Lungs className="h-3 w-3 text-gray-400 mr-1" />
+                    <span className="text-gray-500 mr-1">RR:</span>
+                    <span className="font-medium">{vitals.respiratory_rate} br/min</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Activity className="h-3 w-3 text-gray-400 mr-1" />
+                    <span className="text-gray-500 mr-1">BP:</span>
+                    <span className="font-medium">{vitals.blood_pressure_systolic}/{vitals.blood_pressure_diastolic}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Droplets className="h-3 w-3 text-gray-400 mr-1" />
+                    <span className="text-gray-500 mr-1">O₂:</span>
+                    <span className="font-medium">{vitals.oxygen_saturation}%</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Calculator className="h-3 w-3 text-gray-400 mr-1" />
+                    <span className="text-gray-500 mr-1">BMI:</span>
+                    <span className="font-medium">{vitals.bmi}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Scale className="h-3 w-3 text-gray-400 mr-1" />
+                    <span className="text-gray-500 mr-1">Weight:</span>
+                    <span className="font-medium">{vitals.weight} kg</span>
+                  </div>
+                  <div className="flex items-center">
+                    <Ruler className="h-3 w-3 text-gray-400 mr-1" />
+                    <span className="text-gray-500 mr-1">Height:</span>
+                    <span className="font-medium">{vitals.height} cm</span>
+                  </div>
+                </div>
+                <div className="mt-2 text-xs text-gray-500 flex items-center">
+                  <Clock className="h-3 w-3 mr-1" />
+                  <span>Recorded: {new Date(vitals.recorded_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                </div>
+              </div>
+            )}
 
-        {/* Assessment Tab */}
-        {activeTab === 'assessment' && (
-          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
-            <h2 className="text-xl font-semibold text-gray-900">Patient Assessment</h2>
-            
-            <div>
-              <label htmlFor="chiefComplaint" className="form-label">Chief Complaint</label>
-              <textarea
-                id="chiefComplaint"
-                rows={3}
-                {...register('chiefComplaint', { required: 'Chief complaint is required' })}
-                className="form-input"
-                placeholder="Patient's main complaint"
-              />
-              {errors.chiefComplaint && (
-                <p className="form-error">{errors.chiefComplaint.message}</p>
+            {/* Medical History Card */}
+            <div className="bg-white rounded-lg shadow-sm p-4">
+              <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
+                <FileBarChart2 className="h-4 w-4 text-primary-500 mr-1.5" />
+                Medical History
+              </h3>
+              
+              {/* Allergies */}
+              {patient.medical_history?.allergies && patient.medical_history.allergies.length > 0 && (
+                <div className="mb-3">
+                  <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center">
+                    <AlertCircle className="h-3 w-3 text-error-500 mr-1" />
+                    Allergies
+                  </h4>
+                  <ul className="text-sm space-y-1">
+                    {patient.medical_history.allergies.map((allergy: any, index: number) => (
+                      <li key={index} className="flex items-start">
+                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                          allergy.severity === 'severe' ? 'bg-error-100 text-error-800' : 'bg-warning-100 text-warning-800'
+                        } mr-1`}>
+                          {allergy.severity}
+                        </span>
+                        <span>{allergy.allergen} - {allergy.reaction}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* Chronic Conditions */}
+              {patient.medical_history?.chronicConditions && patient.medical_history.chronicConditions.length > 0 && (
+                <div className="mb-3">
+                  <h4 className="text-sm font-medium text-gray-700 mb-1">Chronic Conditions</h4>
+                  <ul className="text-sm">
+                    {patient.medical_history.chronicConditions.map((condition: string, index: number) => (
+                      <li key={index} className="flex items-center">
+                        <div className="w-1.5 h-1.5 rounded-full bg-warning-500 mr-1.5"></div>
+                        {condition}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {/* Current Medications */}
+              {patient.medical_history?.currentMedications && patient.medical_history.currentMedications.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-1 flex items-center">
+                    <Pill className="h-3 w-3 text-primary-500 mr-1" />
+                    Current Medications
+                  </h4>
+                  <ul className="text-sm">
+                    {patient.medical_history.currentMedications.map((med: any, index: number) => (
+                      <li key={index} className="flex items-center">
+                        <div className="w-1.5 h-1.5 rounded-full bg-primary-500 mr-1.5"></div>
+                        {med.name} {med.dosage && `- ${med.dosage}`} {med.frequency && `(${med.frequency})`}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              
+              {(!patient.medical_history?.allergies || patient.medical_history.allergies.length === 0) && 
+               (!patient.medical_history?.chronicConditions || patient.medical_history.chronicConditions.length === 0) && 
+               (!patient.medical_history?.currentMedications || patient.medical_history.currentMedications.length === 0) && (
+                <p className="text-sm text-gray-500 italic">No medical history recorded</p>
               )}
             </div>
+          </div>
 
-            <div>
-              <h3 className="text-md font-medium text-gray-900 mb-2">Patient History</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="text-sm font-medium text-gray-700 mb-1">History of Presenting Illness</h4>
-                <textarea
-                  rows={3}
-                  className="form-input text-sm"
-                  placeholder="Enter details about the history of presenting illness..."
-                />
+          {/* Right Side - Main Content */}
+          <div className="w-full md:w-2/3">
+            {/* Tabs */}
+            <div className="bg-white rounded-lg shadow-sm mb-3">
+              <div className="flex border-b border-gray-200">
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'assessment'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('assessment')}
+                >
+                  Assessment
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'diagnostics'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('diagnostics')}
+                >
+                  Diagnostic Tests
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'medications'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('medications')}
+                >
+                  Medications
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'notes'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('notes')}
+                >
+                  Notes
+                </button>
+              </div>
+            </div>
+
+            {/* Assessment Tab */}
+            {activeTab === 'assessment' && (
+              <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
+                <h2 className="text-xl font-semibold text-gray-900">Patient Assessment</h2>
                 
-                {patient.gender === 'Female' && (
-                  <div className="mt-3">
-                    <h4 className="text-sm font-medium text-gray-700 mb-1">Gynecological/Obstetric History</h4>
+                <div>
+                  <label htmlFor="chiefComplaint" className="form-label">Chief Complaint</label>
+                  <textarea
+                    id="chiefComplaint"
+                    rows={3}
+                    {...register('chiefComplaint', { required: 'Chief complaint is required' })}
+                    className="form-input"
+                    placeholder="Patient's main complaint"
+                  />
+                  {errors.chiefComplaint && (
+                    <p className="form-error">{errors.chiefComplaint.message}</p>
+                  )}
+                </div>
+
+                <div>
+                  <h3 className="text-md font-medium text-gray-900 mb-2">Patient History</h3>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <h4 className="text-sm font-medium text-gray-700 mb-1">History of Presenting Illness</h4>
                     <textarea
-                      rows={2}
+                      rows={3}
                       className="form-input text-sm"
-                      placeholder="Enter gynecological or obstetric history if applicable..."
+                      placeholder="Enter details about the history of presenting illness..."
                     />
+                    
+                    {patient.gender === 'Female' && (
+                      <div className="mt-3">
+                        <h4 className="text-sm font-medium text-gray-700 mb-1">Gynecological/Obstetric History</h4>
+                        <textarea
+                          rows={2}
+                          className="form-input text-sm"
+                          placeholder="Enter gynecological or obstetric history if applicable..."
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="mt-3">
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">Past Medical and Surgical History</h4>
+                      <textarea
+                        rows={2}
+                        className="form-input text-sm"
+                        placeholder="Enter past medical and surgical history..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-md font-medium text-gray-900 mb-2">Family and Socioeconomic History</h3>
+                  <textarea
+                    rows={3}
+                    className="form-input"
+                    placeholder="Enter family history and socioeconomic information..."
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-md font-medium text-gray-900 mb-2">General Examination</h3>
+                  <textarea
+                    rows={3}
+                    className="form-input"
+                    placeholder="Enter general examination findings..."
+                  />
+                </div>
+
+                <div>
+                  <h3 className="text-md font-medium text-gray-900 mb-2">Systemic Examination</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">Cardiovascular System</h4>
+                      <textarea
+                        rows={2}
+                        className="form-input text-sm"
+                        placeholder="Enter cardiovascular findings..."
+                      />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">Respiratory System</h4>
+                      <textarea
+                        rows={2}
+                        className="form-input text-sm"
+                        placeholder="Enter respiratory findings..."
+                      />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">Gastrointestinal System</h4>
+                      <textarea
+                        rows={2}
+                        className="form-input text-sm"
+                        placeholder="Enter gastrointestinal findings..."
+                      />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">Central Nervous System</h4>
+                      <textarea
+                        rows={2}
+                        className="form-input text-sm"
+                        placeholder="Enter neurological findings..."
+                      />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">Musculoskeletal</h4>
+                      <textarea
+                        rows={2}
+                        className="form-input text-sm"
+                        placeholder="Enter musculoskeletal findings..."
+                      />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700 mb-1">Other Systems/Examination</h4>
+                      <textarea
+                        rows={2}
+                        className="form-input text-sm"
+                        placeholder="Enter other examination findings..."
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="diagnosis" className="form-label">Diagnosis</label>
+                  <textarea
+                    id="diagnosis"
+                    rows={3}
+                    {...register('diagnosis', { required: 'Diagnosis is required' })}
+                    className="form-input"
+                    placeholder="Clinical diagnosis"
+                  />
+                  {errors.diagnosis && (
+                    <p className="form-error">{errors.diagnosis.message}</p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Diagnostic Tests Tab */}
+            {activeTab === 'diagnostics' && (
+              <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
+                <h2 className="text-xl font-semibold text-gray-900">Diagnostic Tests</h2>
+                
+                <div className="flex justify-between items-center">
+                  <div className="space-x-2">
+                    <button
+                      type="button"
+                      onClick={() => setShowLabTestModal(true)}
+                      className="btn btn-primary inline-flex items-center"
+                    >
+                      Order Lab Tests
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowRadiologyModal(true)}
+                      className="btn btn-secondary inline-flex items-center"
+                    >
+                      Order Radiology
+                    </button>
+                  </div>
+                  
+                  <div className="text-sm text-gray-500">
+                    {labTests.length + radiologyTests.length} test(s) ordered
+                  </div>
+                </div>
+                
+                {/* Lab Tests Section */}
+                {labTests.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-md font-medium text-gray-900 mb-2">Laboratory Tests</h3>
+                    <div className="space-y-3">
+                      {labTests.map((test, index) => (
+                        <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-blue-50 border-blue-200">
+                          <div className="flex-1">
+                            <div className="flex items-center">
+                              <span className="font-medium text-gray-900">{test.testName}</span>
+                              <span className="ml-2 text-sm font-medium text-primary-600">{formatCurrency(test.price)}</span>
+                              <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+                                test.priority === 'urgent' 
+                                  ? 'bg-error-100 text-error-800' 
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {test.priority === 'urgent' ? 'Urgent' : 'Normal'}
+                              </span>
+                            </div>
+                            {test.notes && (
+                              <p className="mt-1 text-sm text-gray-600">{test.notes}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <select 
+                              className="form-input py-1 text-sm"
+                              value={test.priority}
+                              onChange={(e) => updateLabTestPriority(index, e.target.value)}
+                            >
+                              <option value="normal">Normal</option>
+                              <option value="urgent">Urgent</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => removeLabTest(index)}
+                              className="text-error-600 hover:text-error-900"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
                 
-                <div className="mt-3">
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Past Medical and Surgical History</h4>
-                  <textarea
-                    rows={2}
-                    className="form-input text-sm"
-                    placeholder="Enter past medical and surgical history..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-md font-medium text-gray-900 mb-2">Family and Socioeconomic History</h3>
-              <textarea
-                rows={3}
-                className="form-input"
-                placeholder="Enter family history and socioeconomic information..."
-              />
-            </div>
-
-            <div>
-              <h3 className="text-md font-medium text-gray-900 mb-2">General Examination</h3>
-              <textarea
-                rows={3}
-                className="form-input"
-                placeholder="Enter general examination findings..."
-              />
-            </div>
-
-            <div>
-              <h3 className="text-md font-medium text-gray-900 mb-2">Systemic Examination</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Cardiovascular System</h4>
-                  <textarea
-                    rows={2}
-                    className="form-input text-sm"
-                    placeholder="Enter cardiovascular findings..."
-                  />
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Respiratory System</h4>
-                  <textarea
-                    rows={2}
-                    className="form-input text-sm"
-                    placeholder="Enter respiratory findings..."
-                  />
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Gastrointestinal System</h4>
-                  <textarea
-                    rows={2}
-                    className="form-input text-sm"
-                    placeholder="Enter gastrointestinal findings..."
-                  />
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Central Nervous System</h4>
-                  <textarea
-                    rows={2}
-                    className="form-input text-sm"
-                    placeholder="Enter neurological findings..."
-                  />
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Musculoskeletal</h4>
-                  <textarea
-                    rows={2}
-                    className="form-input text-sm"
-                    placeholder="Enter musculoskeletal findings..."
-                  />
-                </div>
-                <div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-1">Other Systems/Examination</h4>
-                  <textarea
-                    rows={2}
-                    className="form-input text-sm"
-                    placeholder="Enter other examination findings..."
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="diagnosis" className="form-label">Diagnosis</label>
-              <textarea
-                id="diagnosis"
-                rows={3}
-                {...register('diagnosis', { required: 'Diagnosis is required' })}
-                className="form-input"
-                placeholder="Clinical diagnosis"
-              />
-              {errors.diagnosis && (
-                <p className="form-error">{errors.diagnosis.message}</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Diagnostic Tests Tab */}
-        {activeTab === 'diagnostics' && (
-          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
-            <h2 className="text-xl font-semibold text-gray-900">Diagnostic Tests</h2>
-            
-            <div className="flex justify-between items-center">
-              <div className="space-x-2">
-                <button
-                  type="button"
-                  onClick={() => setShowLabTestModal(true)}
-                  className="btn btn-primary inline-flex items-center"
-                >
-                  Order Lab Tests
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowRadiologyModal(true)}
-                  className="btn btn-secondary inline-flex items-center"
-                >
-                  Order Radiology
-                </button>
-              </div>
-              
-              <div className="text-sm text-gray-500">
-                {labTests.length + radiologyTests.length} test(s) ordered
-              </div>
-            </div>
-            
-            {/* Lab Tests Section */}
-            {labTests.length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-md font-medium text-gray-900 mb-2">Laboratory Tests</h3>
-                <div className="space-y-3">
-                  {labTests.map((test, index) => (
-                    <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-blue-50 border-blue-200">
-                      <div className="flex-1">
-                        <div className="flex items-center">
-                          <span className="font-medium text-gray-900">{test.testName}</span>
-                          <span className="ml-2 text-sm font-medium text-primary-600">{formatCurrency(test.price)}</span>
-                          <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-                            test.priority === 'urgent' 
-                              ? 'bg-error-100 text-error-800' 
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {test.priority === 'urgent' ? 'Urgent' : 'Normal'}
-                          </span>
+                {/* Radiology Tests Section */}
+                {radiologyTests.length > 0 && (
+                  <div className="mt-4">
+                    <h3 className="text-md font-medium text-gray-900 mb-2">Radiology Tests</h3>
+                    <div className="space-y-3">
+                      {radiologyTests.map((test, index) => (
+                        <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-indigo-50 border-indigo-200">
+                          <div className="flex-1">
+                            <div className="flex items-center">
+                              <span className="font-medium text-gray-900">{test.testName}</span>
+                              <span className="ml-2 text-sm font-medium text-primary-600">{formatCurrency(test.price)}</span>
+                              <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
+                                test.priority === 'urgent' 
+                                  ? 'bg-error-100 text-error-800' 
+                                  : 'bg-gray-100 text-gray-800'
+                              }`}>
+                                {test.priority === 'urgent' ? 'Urgent' : 'Normal'}
+                              </span>
+                            </div>
+                            {test.notes && (
+                              <p className="mt-1 text-sm text-gray-600">{test.notes}</p>
+                            )}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <select 
+                              className="form-input py-1 text-sm"
+                              value={test.priority}
+                              onChange={(e) => updateRadiologyTestPriority(index, e.target.value)}
+                            >
+                              <option value="normal">Normal</option>
+                              <option value="urgent">Urgent</option>
+                            </select>
+                            <button
+                              type="button"
+                              onClick={() => removeRadiologyTest(index)}
+                              className="text-error-600 hover:text-error-900"
+                            >
+                              <Trash2 className="h-5 w-5" />
+                            </button>
+                          </div>
                         </div>
-                        {test.notes && (
-                          <p className="mt-1 text-sm text-gray-600">{test.notes}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <select 
-                          className="form-input py-1 text-sm"
-                          value={test.priority}
-                          onChange={(e) => updateLabTestPriority(index, e.target.value)}
-                        >
-                          <option value="normal">Normal</option>
-                          <option value="urgent">Urgent</option>
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => removeLabTest(index)}
-                          className="text-error-600 hover:text-error-900"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Radiology Tests Section */}
-            {radiologyTests.length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-md font-medium text-gray-900 mb-2">Radiology Tests</h3>
-                <div className="space-y-3">
-                  {radiologyTests.map((test, index) => (
-                    <div key={index} className="flex items-start justify-between p-3 border rounded-lg bg-indigo-50 border-indigo-200">
-                      <div className="flex-1">
-                        <div className="flex items-center">
-                          <span className="font-medium text-gray-900">{test.testName}</span>
-                          <span className="ml-2 text-sm font-medium text-primary-600">{formatCurrency(test.price)}</span>
-                          <span className={`ml-2 px-2 py-0.5 text-xs rounded-full ${
-                            test.priority === 'urgent' 
-                              ? 'bg-error-100 text-error-800' 
-                              : 'bg-gray-100 text-gray-800'
-                          }`}>
-                            {test.priority === 'urgent' ? 'Urgent' : 'Normal'}
-                          </span>
-                        </div>
-                        {test.notes && (
-                          <p className="mt-1 text-sm text-gray-600">{test.notes}</p>
-                        )}
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <select 
-                          className="form-input py-1 text-sm"
-                          value={test.priority}
-                          onChange={(e) => updateRadiologyTestPriority(index, e.target.value)}
-                        >
-                          <option value="normal">Normal</option>
-                          <option value="urgent">Urgent</option>
-                        </select>
-                        <button
-                          type="button"
-                          onClick={() => removeRadiologyTest(index)}
-                          className="text-error-600 hover:text-error-900"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {labTests.length === 0 && radiologyTests.length === 0 && (
-              <div className="flex flex-col items-center justify-center py-12 text-center">
-                <div className="h-16 w-16 text-gray-300 mb-4 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="h-12 w-12">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                  </svg>
-                </div>
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No diagnostic tests ordered yet</h3>
-                <p className="text-gray-500 max-w-md mb-6">
-                  Order lab tests or radiology using the buttons above
-                </p>
-              </div>
-            )}
-            
-            {/* Total Cost Summary */}
-            {(labTests.length > 0 || radiologyTests.length > 0) && (
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <div className="flex justify-between items-center">
-                  <h3 className="text-md font-medium text-gray-900">Total Cost</h3>
-                  <span className="text-lg font-bold text-primary-600">
-                    {formatCurrency(
-                      labTests.reduce((sum, test) => sum + test.price, 0) +
-                      radiologyTests.reduce((sum, test) => sum + test.price, 0)
-                    )}
-                  </span>
-                </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  Patient will be directed to billing for payment after test ordering
-                </p>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Medications Tab */}
-        {activeTab === 'medications' && (
-          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
-            <h2 className="text-xl font-semibold text-gray-900">Prescriptions</h2>
-            
-            {/* Medication Search and Add Custom */}
-            <div className="flex items-center space-x-2">
-              <div className="relative flex-grow">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Search className="h-5 w-5 text-gray-400" />
-                </div>
-                <input
-                  type="text"
-                  value={searchTerm}
-                  onChange={handleSearch}
-                  className="form-input pl-10 pr-4 py-2 w-full"
-                  placeholder="Search medications..."
-                  onFocus={() => {
-                    if (searchTerm.length > 0) {
-                      setShowSearchResults(true);
-                    }
-                  }}
-                  onBlur={() => {
-                    // Delay hiding results to allow for clicking
-                    setTimeout(() => setShowSearchResults(false), 200);
-                  }}
-                />
-                {searchTerm && (
-                  <button
-                    type="button"
-                    className="absolute inset-y-0 right-0 pr-3 flex items-center"
-                    onClick={() => {
-                      setSearchTerm('');
-                      setSearchResults([]);
-                      setShowSearchResults(false);
-                    }}
-                  >
-                    <X className="h-5 w-5 text-gray-400 hover:text-gray-600" />
-                  </button>
+                  </div>
                 )}
                 
-                {/* Search Results Dropdown */}
-                {showSearchResults && searchResults.length > 0 && (
-                  <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-auto">
-                    {searchResults.map((medication, index) => (
-                      <button
-                        key={index}
-                        type="button"
-                        className={`w-full text-left px-4 py-2 text-sm hover:bg-gray-100 flex items-center ${
-                          selectedMedications.includes(medication) ? 'bg-primary-50 text-primary-700' : ''
-                        }`}
-                        onClick={() => handleSelectMedication(medication)}
-                        disabled={selectedMedications.includes(medication)}
-                      >
-                        <Pill className="h-4 w-4 mr-2 text-gray-400" />
-                        {medication}
-                        {selectedMedications.includes(medication) && (
-                          <span className="ml-2 text-xs text-primary-600">(Already added)</span>
+                {labTests.length === 0 && radiologyTests.length === 0 && (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="h-16 w-16 text-gray-300 mb-4 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" className="h-12 w-12">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">No diagnostic tests ordered yet</h3>
+                    <p className="text-gray-500 max-w-md mb-6">
+                      Order lab tests or radiology using the buttons above
+                    </p>
+                  </div>
+                )}
+                
+                {/* Total Cost Summary */}
+                {(labTests.length > 0 || radiologyTests.length > 0) && (
+                  <div className="mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <div className="flex justify-between items-center">
+                      <h3 className="text-md font-medium text-gray-900">Total Cost</h3>
+                      <span className="text-lg font-bold text-primary-600">
+                        {formatCurrency(
+                          labTests.reduce((sum, test) => sum + test.price, 0) +
+                          radiologyTests.reduce((sum, test) => sum + test.price, 0)
                         )}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Patient will be directed to billing for payment after test ordering
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Medications Tab */}
+            {activeTab === 'medications' && (
+              <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
+                <h2 className="text-xl font-semibold text-gray-900">Medications</h2>
+                
+                {/* Search and Add Custom Button */}
+                <div className="flex items-center space-x-2">
+                  <div className="relative flex-grow">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => handleMedicationSearch(e.target.value)}
+                      className="form-input pl-10 w-full"
+                      placeholder="Search medications..."
+                    />
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm('');
+                          setSearchResults([]);
+                        }}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      >
+                        <X className="h-5 w-5 text-gray-400 hover:text-gray-500" />
                       </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCustomForm(true)}
+                    className="btn btn-primary inline-flex items-center"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Custom
+                  </button>
+                </div>
+                
+                {/* Search Results */}
+                {searchResults.length > 0 && (
+                  <div className="bg-white border rounded-md shadow-sm max-h-60 overflow-y-auto">
+                    {searchResults.map((medication) => (
+                      <div key={medication.id} className="p-2 hover:bg-gray-50 border-b last:border-b-0">
+                        <div className="font-medium">{medication.name}</div>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                          {medication.dosages.map((dosage: string) => (
+                            <button
+                              key={dosage}
+                              type="button"
+                              onClick={() => addMedication(medication, dosage)}
+                              className="px-2 py-1 text-xs bg-primary-50 text-primary-700 rounded hover:bg-primary-100"
+                            >
+                              {dosage}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 )}
                 
-                {/* No Results Message */}
-                {showSearchResults && searchTerm.length > 0 && searchResults.length === 0 && (
-                  <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 p-4 text-center">
-                    <p className="text-sm text-gray-500">No medications found</p>
-                    <button
-                      type="button"
-                      className="mt-2 text-sm text-primary-600 hover:text-primary-800"
-                      onClick={handleAddCustomMedication}
-                    >
-                      Add "{searchTerm}" as custom medication
-                    </button>
-                  </div>
-                )}
-              </div>
-              
-              <button
-                type="button"
-                onClick={handleAddCustomMedication}
-                className="btn btn-primary inline-flex items-center"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Custom
-              </button>
-            </div>
-            
-            {/* Custom Medication Input */}
-            {showAddCustom && (
-              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-                <h3 className="text-sm font-medium text-gray-700 mb-2">Add Custom Medication</h3>
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="text"
-                    value={customMedication}
-                    onChange={(e) => setCustomMedication(e.target.value)}
-                    className="form-input flex-grow"
-                    placeholder="Enter medication name"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={confirmAddCustomMedication}
-                    className="btn btn-primary"
-                    disabled={!customMedication.trim()}
-                  >
-                    Add
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowAddCustom(false)}
-                    className="btn btn-outline"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
-            
-            {/* Prescriptions List */}
-            {prescriptions.length > 0 ? (
-              <div className="space-y-4">
-                {prescriptions.map((prescription, index) => (
-                  <div key={index} className="border rounded-lg p-4 space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-lg font-medium text-gray-900">{prescription.medication}</h3>
+                {/* Custom Medication Form */}
+                {showCustomForm && (
+                  <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div className="flex justify-between items-center mb-3">
+                      <h3 className="text-md font-medium text-gray-900">Add Custom Medication</h3>
                       <button
                         type="button"
-                        onClick={() => removePrescription(index)}
-                        className="text-error-600 hover:text-error-700"
+                        onClick={() => setShowCustomForm(false)}
+                        className="text-gray-400 hover:text-gray-500"
                       >
-                        <Trash2 className="h-5 w-5" />
+                        <X className="h-5 w-5" />
                       </button>
                     </div>
-
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
-                        <label className="form-label">Dosage</label>
+                        <label className="form-label text-sm">Medication Name</label>
                         <input
                           type="text"
-                          {...register(`prescriptions.${index}.dosage` as const, {
-                            required: 'Dosage is required'
-                          })}
+                          value={customMedication.medication}
+                          onChange={(e) => setCustomMedication({...customMedication, medication: e.target.value})}
+                          className="form-input"
+                          placeholder="Enter medication name"
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label text-sm">Dosage</label>
+                        <input
+                          type="text"
+                          value={customMedication.dosage}
+                          onChange={(e) => setCustomMedication({...customMedication, dosage: e.target.value})}
                           className="form-input"
                           placeholder="e.g., 500mg"
                         />
                       </div>
-
                       <div>
-                        <label className="form-label">Frequency</label>
-                        <select
-                          {...register(`prescriptions.${index}.frequency` as const, {
-                            required: 'Frequency is required'
-                          })}
+                        <label className="form-label text-sm">Frequency</label>
+                        <input
+                          type="text"
+                          value={customMedication.frequency}
+                          onChange={(e) => setCustomMedication({...customMedication, frequency: e.target.value})}
                           className="form-input"
-                        >
-                          <option value="">Select frequency</option>
-                          {commonFrequencies.map((freq, i) => (
-                            <option key={i} value={freq}>{freq}</option>
-                          ))}
-                        </select>
+                          placeholder="e.g., Twice daily"
+                        />
                       </div>
-
                       <div>
-                        <label className="form-label">Duration</label>
-                        <select
-                          {...register(`prescriptions.${index}.duration` as const, {
-                            required: 'Duration is required'
-                          })}
+                        <label className="form-label text-sm">Duration</label>
+                        <input
+                          type="text"
+                          value={customMedication.duration}
+                          onChange={(e) => setCustomMedication({...customMedication, duration: e.target.value})}
                           className="form-input"
-                        >
-                          <option value="">Select duration</option>
-                          {commonDurations.map((dur, i) => (
-                            <option key={i} value={dur}>{dur}</option>
-                          ))}
-                        </select>
+                          placeholder="e.g., 7 days"
+                        />
                       </div>
-
                       <div className="sm:col-span-2">
-                        <label className="form-label">Special Instructions</label>
+                        <label className="form-label text-sm">Instructions</label>
                         <textarea
-                          {...register(`prescriptions.${index}.instructions` as const)}
+                          value={customMedication.instructions}
+                          onChange={(e) => setCustomMedication({...customMedication, instructions: e.target.value})}
                           className="form-input"
                           rows={2}
-                          placeholder="e.g., Take with food"
+                          placeholder="Special instructions"
                         />
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-12 text-center bg-gray-50 rounded-lg border border-gray-200">
-                <Pill className="h-16 w-16 text-gray-300 mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-1">No medications prescribed yet</h3>
-                <p className="text-gray-500 max-w-md mb-2">
-                  Search above or click Add Custom to prescribe medications
-                </p>
-                <button
-                  type="button"
-                  className="text-primary-600 hover:text-primary-800 text-sm font-medium"
-                  onClick={() => setShowAddCustom(true)}
-                >
-                  Skip prescribing medications
-                </button>
-              </div>
-            )}
-            
-            {/* Allergies Warning */}
-            {patient.medical_history?.allergies && patient.medical_history.allergies.length > 0 && (
-              <div className="p-4 bg-warning-50 border border-warning-200 rounded-lg flex items-start">
-                <AlertTriangle className="h-5 w-5 text-warning-500 mt-0.5 mr-2 flex-shrink-0" />
-                <div>
-                  <h3 className="text-sm font-medium text-warning-800">Patient has allergies</h3>
-                  <ul className="mt-1 text-sm text-warning-700 list-disc list-inside">
-                    {patient.medical_history.allergies.map((allergy: any, index: number) => (
-                      <li key={index}>{allergy.allergen} - {allergy.reaction}</li>
-                    ))}
-                  </ul>
-                  <p className="mt-1 text-xs text-warning-600">Please verify medications for potential allergic reactions</p>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Notes Tab */}
-        {activeTab === 'notes' && (
-          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
-            <h2 className="text-xl font-semibold text-gray-900">Additional Information</h2>
-            
-            <div>
-              <label htmlFor="treatmentPlan" className="form-label">Treatment Plan</label>
-              <textarea
-                id="treatmentPlan"
-                rows={4}
-                {...register('treatmentPlan', { required: 'Treatment plan is required' })}
-                className="form-input"
-                placeholder="Detailed treatment plan"
-              />
-              {errors.treatmentPlan && (
-                <p className="form-error">{errors.treatmentPlan.message}</p>
-              )}
-            </div>
-            
-            <div>
-              <label htmlFor="notes" className="form-label">Notes</label>
-              <textarea
-                id="notes"
-                rows={4}
-                {...register('notes')}
-                className="form-input"
-                placeholder="Any additional notes or observations"
-              />
-            </div>
-
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="medicalCertificate"
-                {...register('medicalCertificate')}
-                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-              />
-              <label htmlFor="medicalCertificate" className="ml-2 flex items-center text-sm font-medium text-gray-700">
-                <FileText className="h-5 w-5 mr-1" />
-                Issue Medical Certificate
-              </label>
-            </div>
-            
-            {/* Medical Certificate Preview */}
-            {watch('medicalCertificate') && (
-              <div className="p-4 border border-gray-200 rounded-lg bg-gray-50">
-                <h3 className="text-md font-medium text-gray-900 mb-2">Medical Certificate Preview</h3>
-                <div className="bg-white p-4 border border-gray-300 rounded-lg">
-                  <div className="text-center mb-4">
-                    <h4 className="text-lg font-bold text-gray-900">MEDICAL CERTIFICATE</h4>
-                    <p className="text-sm text-gray-600">{hospital?.name || 'Hospital Management System'}</p>
-                  </div>
-                  
-                  <p className="text-sm mb-4">
-                    This is to certify that <span className="font-medium">{patient.first_name} {patient.last_name}</span>, 
-                    {patient.gender === 'Male' ? ' a ' : ' a '} 
-                    {new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} year old 
-                    {patient.gender === 'Male' ? ' male' : ' female'}, 
-                    was examined by me on <span className="font-medium">{new Date().toLocaleDateString()}</span>.
-                  </p>
-                  
-                  <p className="text-sm mb-4">
-                    Diagnosis: <span className="font-medium">{watch('diagnosis') || '[Diagnosis will appear here]'}</span>
-                  </p>
-                  
-                  <p className="text-sm mb-6">
-                    Treatment plan: <span className="font-medium">{watch('treatmentPlan') || '[Treatment plan will appear here]'}</span>
-                  </p>
-                  
-                  <div className="mt-8 pt-8 border-t border-gray-200">
-                    <div className="flex justify-between">
-                      <div>
-                        <p className="text-sm font-medium">Date Issued:</p>
-                        <p className="text-sm">{new Date().toLocaleDateString()}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-medium">Physician:</p>
-                        <p className="text-sm">Dr. {user?.first_name} {user?.last_name}</p>
-                      </div>
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={addCustomMedication}
+                        disabled={!customMedication.medication || !customMedication.dosage}
+                        className="btn btn-primary"
+                      >
+                        Add Medication
+                      </button>
                     </div>
                   </div>
+                )}
+                
+                {/* Selected Medications */}
+                {selectedMedications.length > 0 ? (
+                  <div className="space-y-4">
+                    <h3 className="text-md font-medium text-gray-900">Prescribed Medications</h3>
+                    {selectedMedications.map((medication, index) => (
+                      <div key={index} className="border rounded-lg p-4 bg-white shadow-sm">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <div className="flex items-center">
+                              <Pill className="h-4 w-4 text-primary-500 mr-2" />
+                              <h4 className="font-medium text-gray-900">{medication.medication} - {medication.dosage}</h4>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                              <div>
+                                <label className="form-label text-xs">Frequency</label>
+                                <input
+                                  type="text"
+                                  value={medication.frequency}
+                                  onChange={(e) => updateMedication(index, 'frequency', e.target.value)}
+                                  className="form-input py-1"
+                                  placeholder="e.g., Twice daily"
+                                />
+                              </div>
+                              <div>
+                                <label className="form-label text-xs">Duration</label>
+                                <input
+                                  type="text"
+                                  value={medication.duration}
+                                  onChange={(e) => updateMedication(index, 'duration', e.target.value)}
+                                  className="form-input py-1"
+                                  placeholder="e.g., 7 days"
+                                />
+                              </div>
+                              <div className="md:col-span-2">
+                                <label className="form-label text-xs">Instructions</label>
+                                <textarea
+                                  value={medication.instructions}
+                                  onChange={(e) => updateMedication(index, 'instructions', e.target.value)}
+                                  className="form-input py-1"
+                                  rows={2}
+                                  placeholder="Special instructions"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeMedication(index)}
+                            className="text-error-600 hover:text-error-900 ml-2"
+                          >
+                            <Trash2 className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <div className="h-16 w-16 text-gray-300 mb-4">
+                      <Pill className="h-16 w-16" />
+                    </div>
+                    <h3 className="text-lg font-medium text-gray-900 mb-1">No medications prescribed yet</h3>
+                    <p className="text-gray-500 max-w-md mb-6">
+                      Search above or click Add Custom to prescribe medications
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setShowCustomForm(true)}
+                      className="btn btn-outline"
+                    >
+                      Skip prescribing medications
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Notes Tab */}
+            {activeTab === 'notes' && (
+              <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
+                <h2 className="text-xl font-semibold text-gray-900">Additional Information</h2>
+                
+                <div>
+                  <label htmlFor="treatmentPlan" className="form-label">Treatment Plan</label>
+                  <textarea
+                    id="treatmentPlan"
+                    rows={4}
+                    {...register('treatmentPlan', { required: 'Treatment plan is required' })}
+                    className="form-input"
+                    placeholder="Detailed treatment plan"
+                  />
+                  {errors.treatmentPlan && (
+                    <p className="form-error">{errors.treatmentPlan.message}</p>
+                  )}
                 </div>
                 
-                <div className="mt-2 text-right">
-                  <button
-                    type="button"
-                    className="btn btn-outline inline-flex items-center text-sm"
-                    onClick={() => window.print()}
-                  >
-                    <FileText className="h-4 w-4 mr-1" />
-                    Print Certificate
-                  </button>
+                <div>
+                  <label htmlFor="notes" className="form-label">Notes</label>
+                  <textarea
+                    id="notes"
+                    rows={4}
+                    {...register('notes')}
+                    className="form-input"
+                    placeholder="Any additional notes or observations"
+                  />
+                </div>
+
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="medicalCertificate"
+                    {...register('medicalCertificate')}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="medicalCertificate" className="ml-2 flex items-center text-sm font-medium text-gray-700">
+                    <FileText className="h-5 w-5 mr-1" />
+                    Issue Medical Certificate
+                  </label>
                 </div>
               </div>
             )}
-          </div>
-        )}
 
-        <div className="flex justify-end space-x-4">
-          <button
-            type="button"
-            onClick={() => navigate('/patients')}
-            className="btn btn-outline"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={isSubmitting}
-            className="btn btn-primary"
-          >
-            {isSubmitting ? 'Submitting...' : 'Complete Consultation'}
-          </button>
+            <div className="flex justify-end space-x-4 mt-4">
+              <button
+                type="button"
+                onClick={() => navigate('/patients')}
+                className="btn btn-outline"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="btn btn-primary"
+              >
+                {isSubmitting ? 'Submitting...' : 'Complete Consultation'}
+              </button>
+            </div>
+          </div>
         </div>
       </form>
 
