@@ -411,57 +411,57 @@ const RadiologyProcessForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6">
+    <div className="max-w-5xl mx-auto space-y-5">
       {/* Header with workflow progress */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-secondary-600 to-secondary-500 px-6 py-4 flex justify-between items-center">
+        <div className="bg-gradient-to-r from-secondary-600 to-secondary-500 px-5 py-3.5 flex justify-between items-center">
           <div className="flex items-center">
             <button 
               onClick={() => navigate('/radiology')}
-              className="mr-4 p-2 rounded-full text-white hover:bg-white/10"
+              className="mr-3 p-1.5 rounded-full text-white hover:bg-white/10"
             >
-              <ArrowLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4" />
             </button>
             <div>
-              <h1 className="text-xl font-bold text-white">Process Radiology Scan</h1>
-              <p className="text-secondary-100 text-sm">
-                {getScanTypeLabel(scan.scan_type)} • {test.is_emergency && "EMERGENCY • "}
+              <h1 className="text-lg font-bold text-white">Process Radiology Scan</h1>
+              <p className="text-secondary-100 text-xs">
+                {getScanTypeLabel(scan.scan_type)} • {scan.is_emergency && "EMERGENCY • "}
                 {scan.patient.first_name} {scan.patient.last_name}
               </p>
             </div>
           </div>
           
           {/* Workflow progress indicator */}
-          <div className="hidden md:flex items-center space-x-2 text-white">
+          <div className="hidden md:flex items-center space-x-1.5 text-white">
             <div className={`flex items-center ${workflowStage === 'scan_setup' ? 'opacity-100' : 'opacity-70'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${workflowStage === 'scan_setup' ? 'bg-white text-secondary-600' : 'bg-secondary-400 text-white'}`}>
-                <Scan className="h-4 w-4" />
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center ${workflowStage === 'scan_setup' ? 'bg-white text-secondary-600' : 'bg-secondary-400 text-white'}`}>
+                <Scan className="h-3.5 w-3.5" />
               </div>
-              <span className="ml-2 text-sm font-medium">Setup</span>
+              <span className="ml-1.5 text-xs font-medium">Setup</span>
             </div>
             
-            <ChevronRight className="h-4 w-4 text-secondary-200" />
+            <ChevronRight className="h-3.5 w-3.5 text-secondary-200" />
             
             <div className={`flex items-center ${workflowStage === 'processing' ? 'opacity-100' : 'opacity-70'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${workflowStage === 'processing' ? 'bg-white text-secondary-600' : workflowStage === 'completed' ? 'bg-secondary-400 text-white' : 'bg-secondary-300/50 text-white'}`}>
-                <FileImage className="h-4 w-4" />
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center ${workflowStage === 'processing' ? 'bg-white text-secondary-600' : workflowStage === 'completed' ? 'bg-secondary-400 text-white' : 'bg-secondary-300/50 text-white'}`}>
+                <FileImage className="h-3.5 w-3.5" />
               </div>
-              <span className="ml-2 text-sm font-medium">Processing</span>
+              <span className="ml-1.5 text-xs font-medium">Processing</span>
             </div>
             
-            <ChevronRight className="h-4 w-4 text-secondary-200" />
+            <ChevronRight className="h-3.5 w-3.5 text-secondary-200" />
             
             <div className={`flex items-center ${workflowStage === 'completed' ? 'opacity-100' : 'opacity-70'}`}>
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${workflowStage === 'completed' ? 'bg-white text-secondary-600' : 'bg-secondary-300/50 text-white'}`}>
-                <CheckCircle className="h-4 w-4" />
+              <div className={`w-7 h-7 rounded-full flex items-center justify-center ${workflowStage === 'completed' ? 'bg-white text-secondary-600' : 'bg-secondary-300/50 text-white'}`}>
+                <CheckCircle className="h-3.5 w-3.5" />
               </div>
-              <span className="ml-2 text-sm font-medium">Complete</span>
+              <span className="ml-1.5 text-xs font-medium">Complete</span>
             </div>
           </div>
         </div>
         
         {/* Mobile progress indicator */}
-        <div className="md:hidden flex justify-between px-6 py-3 bg-gray-50">
+        <div className="md:hidden flex justify-between px-5 py-2.5 bg-gray-50">
           <div className={`text-xs font-medium ${workflowStage === 'scan_setup' ? 'text-secondary-600' : 'text-gray-500'}`}>
             Setup
           </div>
@@ -475,40 +475,40 @@ const RadiologyProcessForm: React.FC = () => {
       </div>
 
       {/* Patient and Scan Info */}
-      <div className="bg-white rounded-xl shadow-sm p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="flex space-x-4">
-          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-secondary-100 flex items-center justify-center">
-            <User className="h-6 w-6 text-secondary-600" />
+      <div className="bg-white rounded-xl shadow-sm p-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="flex space-x-3.5">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-secondary-100 flex items-center justify-center">
+            <User className="h-5 w-5 text-secondary-600" />
           </div>
           <div>
-            <h2 className="text-lg font-medium text-gray-900">Patient Information</h2>
-            <p className="text-gray-700 mt-1">
+            <h2 className="text-base font-medium text-gray-900">Patient Information</h2>
+            <p className="text-gray-700 mt-0.5 text-sm">
               <span className="font-medium">Name:</span> {scan.patient.first_name} {scan.patient.last_name}
             </p>
-            <p className="text-gray-700">
+            <p className="text-gray-700 text-sm">
               <span className="font-medium">DOB:</span> {new Date(scan.patient.date_of_birth).toLocaleDateString()}
             </p>
-            <a href={`/patients/${scan.patient.id}`} className="text-secondary-600 hover:text-secondary-800 text-sm mt-1 inline-block">
+            <a href={`/patients/${scan.patient.id}`} className="text-secondary-600 hover:text-secondary-800 text-xs mt-0.5 inline-block">
               View Patient Record
             </a>
           </div>
         </div>
 
-        <div className="flex space-x-4">
-          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-secondary-100 flex items-center justify-center">
-            <Microscope className="h-6 w-6 text-secondary-600" />
+        <div className="flex space-x-3.5">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-secondary-100 flex items-center justify-center">
+            <Microscope className="h-5 w-5 text-secondary-600" />
           </div>
           <div>
-            <h2 className="text-lg font-medium text-gray-900">Scan Information</h2>
-            <p className="text-gray-700 mt-1">
+            <h2 className="text-base font-medium text-gray-900">Scan Information</h2>
+            <p className="text-gray-700 mt-0.5 text-sm">
               <span className="font-medium">Scan Type:</span> {getScanTypeLabel(scan.scan_type)}
             </p>
-            <p className="text-gray-700">
+            <p className="text-gray-700 text-sm">
               <span className="font-medium">Date:</span> {new Date(scan.scan_date).toLocaleDateString()}
             </p>
             {scan.is_emergency && (
-              <div className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-error-100 text-error-800">
-                <AlertTriangle className="h-3 w-3 mr-1" />
+              <div className="mt-0.5 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-error-100 text-error-800">
+                <AlertTriangle className="h-3 w-3 mr-0.5" />
                 EMERGENCY
               </div>
             )}
@@ -519,37 +519,37 @@ const RadiologyProcessForm: React.FC = () => {
       {/* Workflow Stages */}
       {workflowStage === 'scan_setup' && (
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-            <h2 className="text-lg font-medium text-gray-900">Scan Setup</h2>
-            <p className="text-sm text-gray-500 mt-1">Configure the scan parameters and equipment</p>
+          <div className="px-5 py-3.5 bg-gray-50 border-b border-gray-200">
+            <h2 className="text-base font-medium text-gray-900">Scan Setup</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Configure the scan parameters and equipment</p>
           </div>
           
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
+          <div className="p-5">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              <div className="space-y-3.5">
                 <div>
-                  <label className="form-label required">Scan ID</label>
+                  <label className="form-label required text-sm">Scan ID</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <FileImage className="h-5 w-5 text-gray-400" />
+                      <FileImage className="h-4 w-4 text-gray-400" />
                     </div>
                     <input
                       type="text"
                       value={scanInfo.scan_id}
-                      className="form-input pl-10 bg-gray-50 rounded-lg"
+                      className="form-input pl-9 py-2 text-sm bg-gray-50 rounded-lg"
                       placeholder="RAD-20250511-1234"
                       readOnly
                     />
                   </div>
-                  <p className="mt-1 text-xs text-gray-500">Auto-generated unique scan identifier</p>
+                  <p className="mt-0.5 text-xs text-gray-500">Auto-generated unique scan identifier</p>
                 </div>
                 
                 <div>
-                  <label className="form-label required">Equipment Used</label>
+                  <label className="form-label required text-sm">Equipment Used</label>
                   <select
                     value={scanInfo.equipment_used}
                     onChange={(e) => setScanInfo({...scanInfo, equipment_used: e.target.value})}
-                    className="form-input rounded-lg"
+                    className="form-input py-2 text-sm rounded-lg"
                   >
                     <option value="x_ray_machine">X-Ray Machine</option>
                     <option value="ct_scanner">CT Scanner</option>
@@ -564,39 +564,39 @@ const RadiologyProcessForm: React.FC = () => {
                 </div>
               </div>
               
-              <div className="space-y-4">
+              <div className="space-y-3.5">
                 <div>
-                  <label className="form-label required">Scan Time</label>
+                  <label className="form-label required text-sm">Scan Time</label>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Clock className="h-5 w-5 text-gray-400" />
+                      <Clock className="h-4 w-4 text-gray-400" />
                     </div>
                     <input
                       type="datetime-local"
                       value={new Date(scanInfo.scan_time).toISOString().slice(0, 16)}
                       onChange={(e) => setScanInfo({...scanInfo, scan_time: new Date(e.target.value).toISOString()})}
-                      className="form-input pl-10 rounded-lg"
+                      className="form-input pl-9 py-2 text-sm rounded-lg"
                     />
                   </div>
                 </div>
                 
                 <div>
-                  <label className="form-label required">Performed By</label>
+                  <label className="form-label required text-sm">Performed By</label>
                   <input
                     type="text"
                     value={scanInfo.performed_by}
                     onChange={(e) => setScanInfo({...scanInfo, performed_by: e.target.value})}
-                    className="form-input rounded-lg"
+                    className="form-input py-2 text-sm rounded-lg"
                     placeholder="Radiologist/Technician Name"
                   />
                 </div>
                 
                 <div>
-                  <label className="form-label">Notes</label>
+                  <label className="form-label text-sm">Notes</label>
                   <textarea
                     value={scanInfo.notes || ''}
                     onChange={(e) => setScanInfo({...scanInfo, notes: e.target.value})}
-                    className="form-input rounded-lg"
+                    className="form-input py-2 text-sm rounded-lg"
                     rows={2}
                     placeholder="Any special instructions or observations during scan setup"
                   />
@@ -604,26 +604,26 @@ const RadiologyProcessForm: React.FC = () => {
               </div>
             </div>
             
-            <div className="flex justify-end space-x-4 mt-8">
+            <div className="flex justify-end space-x-3.5 mt-6">
               <button
                 onClick={() => navigate('/radiology')}
-                className="btn btn-outline"
+                className="btn btn-outline py-2 text-sm px-4"
               >
                 Cancel
               </button>
               <button
                 onClick={handleScanSetup}
                 disabled={isSaving || !scanInfo.scan_id || !scanInfo.performed_by || !scanInfo.equipment_used}
-                className="btn btn-primary"
+                className="btn btn-primary py-2 text-sm px-4"
               >
                 {isSaving ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-1.5"></div>
                     Saving...
                   </>
                 ) : (
                   <>
-                    Start Scan <ArrowRight className="h-5 w-5 ml-2" />
+                    Start Scan <ArrowRight className="h-4 w-4 ml-1.5" />
                   </>
                 )}
               </button>
@@ -636,73 +636,73 @@ const RadiologyProcessForm: React.FC = () => {
         <>
           {/* Scan Info Summary */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+            <div className="px-5 py-3.5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
               <div>
-                <h2 className="text-lg font-medium text-gray-900">Scan Information</h2>
-                <p className="text-sm text-gray-500 mt-1">Scan details for reference during processing</p>
+                <h2 className="text-base font-medium text-gray-900">Scan Information</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Scan details for reference during processing</p>
               </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-3 h-3 rounded-full bg-success-500"></div>
-                <span className="text-sm font-medium text-success-700">Scan Complete</span>
+              <div className="flex items-center space-x-1.5">
+                <div className="w-2.5 h-2.5 rounded-full bg-success-500"></div>
+                <span className="text-xs font-medium text-success-700">Scan Complete</span>
               </div>
             </div>
             
-            <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50/50">
-              <div className="bg-white p-3 rounded-lg shadow-sm">
+            <div className="p-3.5 grid grid-cols-2 md:grid-cols-4 gap-3.5 bg-gray-50/50">
+              <div className="bg-white p-2.5 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Scan ID</p>
-                <p className="text-sm font-medium text-gray-900 mt-1">{scanInfo.scan_id}</p>
+                <p className="text-sm font-medium text-gray-900 mt-0.5">{scanInfo.scan_id}</p>
               </div>
-              <div className="bg-white p-3 rounded-lg shadow-sm">
+              <div className="bg-white p-2.5 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Equipment</p>
-                <p className="text-sm font-medium text-gray-900 mt-1">{getEquipmentLabel(scanInfo.equipment_used)}</p>
+                <p className="text-sm font-medium text-gray-900 mt-0.5">{getEquipmentLabel(scanInfo.equipment_used)}</p>
               </div>
-              <div className="bg-white p-3 rounded-lg shadow-sm">
+              <div className="bg-white p-2.5 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Performed By</p>
-                <p className="text-sm font-medium text-gray-900 mt-1">{scanInfo.performed_by}</p>
+                <p className="text-sm font-medium text-gray-900 mt-0.5">{scanInfo.performed_by}</p>
               </div>
-              <div className="bg-white p-3 rounded-lg shadow-sm">
+              <div className="bg-white p-2.5 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Scan Time</p>
-                <p className="text-sm font-medium text-gray-900 mt-1">{new Date(scanInfo.scan_time).toLocaleString()}</p>
+                <p className="text-sm font-medium text-gray-900 mt-0.5">{new Date(scanInfo.scan_time).toLocaleString()}</p>
               </div>
             </div>
           </div>
 
           {/* Scan Results */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">Scan Results</h2>
-              <p className="text-sm text-gray-500 mt-1">Enter the radiological findings and interpretation</p>
+            <div className="px-5 py-3.5 bg-gray-50 border-b border-gray-200">
+              <h2 className="text-base font-medium text-gray-900">Scan Results</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Enter the radiological findings and interpretation</p>
             </div>
             
-            <div className="p-6 space-y-6">
+            <div className="p-5 space-y-5">
               <div>
-                <label className="form-label required">Findings</label>
+                <label className="form-label required text-sm">Findings</label>
                 <textarea
                   value={findings}
                   onChange={(e) => setFindings(e.target.value)}
-                  className="form-input rounded-lg"
-                  rows={4}
+                  className="form-input py-2 text-sm rounded-lg"
+                  rows={3}
                   placeholder="Describe what is observed in the scan"
                 />
               </div>
 
               <div>
-                <label className="form-label required">Impression</label>
+                <label className="form-label required text-sm">Impression</label>
                 <textarea
                   value={impression}
                   onChange={(e) => setImpression(e.target.value)}
-                  className="form-input rounded-lg"
-                  rows={3}
+                  className="form-input py-2 text-sm rounded-lg"
+                  rows={2}
                   placeholder="Clinical interpretation of the findings"
                 />
               </div>
 
               <div>
-                <label className="form-label">Recommendations</label>
+                <label className="form-label text-sm">Recommendations</label>
                 <textarea
                   value={recommendations}
                   onChange={(e) => setRecommendations(e.target.value)}
-                  className="form-input rounded-lg"
+                  className="form-input py-2 text-sm rounded-lg"
                   rows={2}
                   placeholder="Suggested follow-up or additional tests"
                 />
@@ -712,16 +712,16 @@ const RadiologyProcessForm: React.FC = () => {
 
           {/* Image Upload */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">Scan Images</h2>
-              <p className="text-sm text-gray-500 mt-1">Upload images from the radiological scan</p>
+            <div className="px-5 py-3.5 bg-gray-50 border-b border-gray-200">
+              <h2 className="text-base font-medium text-gray-900">Scan Images</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Upload images from the radiological scan</p>
             </div>
             
-            <div className="p-6">
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
+            <div className="p-5">
+              <div className="mt-1 flex justify-center px-5 pt-4 pb-5 border-2 border-gray-300 border-dashed rounded-lg">
                 <div className="space-y-1 text-center">
-                  <FileImage className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600">
+                  <FileImage className="mx-auto h-10 w-10 text-gray-400" />
+                  <div className="flex text-xs text-gray-600">
                     <label
                       htmlFor="file-upload"
                       className="relative cursor-pointer bg-white rounded-md font-medium text-secondary-600 hover:text-secondary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-secondary-500"
@@ -747,9 +747,9 @@ const RadiologyProcessForm: React.FC = () => {
 
               {/* Display uploaded images */}
               {(uploadedFiles.length > 0 || imageUrls.length > 0) && (
-                <div className="mt-6">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">Images</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                <div className="mt-5">
+                  <h3 className="text-sm font-medium text-gray-700 mb-2.5">Images</h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3.5">
                     {imageUrls.map((url, index) => (
                       <div key={`url-${index}`} className="relative group">
                         <div className="aspect-w-1 aspect-h-1 w-full overflow-hidden rounded-lg bg-gray-100 shadow-sm">
@@ -759,7 +759,7 @@ const RadiologyProcessForm: React.FC = () => {
                             onClick={() => handleRemoveImageUrl(index)}
                             className="absolute top-2 right-2 p-1.5 rounded-full bg-white shadow-md text-error-600 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                       </div>
@@ -774,14 +774,14 @@ const RadiologyProcessForm: React.FC = () => {
                               className="object-cover"
                             />
                           ) : (
-                            <FileImage className="h-8 w-8 text-gray-400" />
+                            <FileImage className="h-7 w-7 text-gray-400" />
                           )}
                           <button
                             type="button"
                             onClick={() => handleRemoveFile(index)}
                             className="absolute top-2 right-2 p-1.5 rounded-full bg-white shadow-md text-error-600 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <Trash2 className="h-4 w-4" />
+                            <Trash2 className="h-3.5 w-3.5" />
                           </button>
                         </div>
                         <p className="mt-1 text-xs text-gray-500 truncate">{file.name}</p>
@@ -794,26 +794,26 @@ const RadiologyProcessForm: React.FC = () => {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex justify-end space-x-4">
+          <div className="flex justify-end space-x-3.5">
             <button
               onClick={() => navigate('/radiology')}
-              className="btn btn-outline"
+              className="btn btn-outline py-2 text-sm px-4"
             >
               Cancel
             </button>
             <button
               onClick={handleSave}
               disabled={isSaving}
-              className="btn btn-primary"
+              className="btn btn-primary py-2 text-sm px-4"
             >
               {isSaving ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-1.5"></div>
                   Saving...
                 </>
               ) : (
                 <>
-                  Complete & Submit <CheckCircle className="h-5 w-5 ml-2" />
+                  Complete & Submit <CheckCircle className="h-4 w-4 ml-1.5" />
                 </>
               )}
             </button>
@@ -822,15 +822,15 @@ const RadiologyProcessForm: React.FC = () => {
       )}
 
       {workflowStage === 'completed' && (
-        <div className="bg-white rounded-xl shadow-sm p-8 text-center">
-          <div className="w-16 h-16 mx-auto bg-success-100 rounded-full flex items-center justify-center mb-4">
-            <CheckCircle className="h-8 w-8 text-success-600" />
+        <div className="bg-white rounded-xl shadow-sm p-6 text-center">
+          <div className="w-14 h-14 mx-auto bg-success-100 rounded-full flex items-center justify-center mb-3.5">
+            <CheckCircle className="h-7 w-7 text-success-600" />
           </div>
-          <h2 className="text-xl font-medium text-gray-900 mb-2">Scan Results Finalized</h2>
-          <p className="text-gray-600 mb-6 max-w-md mx-auto">This scan has been completed and the results have been finalized. The results are now available to the requesting physician.</p>
+          <h2 className="text-lg font-medium text-gray-900 mb-1.5">Scan Results Finalized</h2>
+          <p className="text-gray-600 mb-5 max-w-md mx-auto text-sm">This scan has been completed and the results have been finalized. The results are now available to the requesting physician.</p>
           <button
             onClick={() => navigate('/radiology')}
-            className="btn btn-primary"
+            className="btn btn-primary py-2 text-sm px-4"
           >
             Return to Radiology
           </button>
