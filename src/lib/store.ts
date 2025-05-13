@@ -39,9 +39,12 @@ interface Hospital {
 
 interface NotificationState {
   notifications: Notification[];
+  notifiedEmergencies: Set<string>; // Track emergency IDs that have been notified
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
   removeNotification: (id: string) => void;
   clearNotifications: () => void;
+  hasNotifiedAbout: (emergencyKey: string) => boolean;
+  markAsNotified: (emergencyKey: string) => void;
 }
 
 export interface Notification {
@@ -369,8 +372,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 }));
 
 // Notification store
-export const useNotificationStore = create<NotificationState>((set) => ({
+export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
+  notifiedEmergencies: new Set<string>(),
   
   addNotification: (notification) => {
     const id = Math.random().toString(36).substring(2, 9);
@@ -402,5 +406,15 @@ export const useNotificationStore = create<NotificationState>((set) => ({
   
   clearNotifications: () => {
     set({ notifications: [] });
+  },
+  
+  hasNotifiedAbout: (emergencyKey) => {
+    return get().notifiedEmergencies.has(emergencyKey);
+  },
+  
+  markAsNotified: (emergencyKey) => {
+    set((state) => ({
+      notifiedEmergencies: new Set([...state.notifiedEmergencies, emergencyKey])
+    }));
   }
 }));

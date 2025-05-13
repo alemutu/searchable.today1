@@ -30,11 +30,10 @@ const PharmacyList: React.FC = () => {
   const [orders, setOrders] = useState<PharmacyOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { hospital, user } = useAuthStore();
-  const { addNotification } = useNotificationStore();
+  const { addNotification, hasNotifiedAbout, markAsNotified } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'pending' | 'processing'>('pending');
   const [inventoryStatus, setInventoryStatus] = useState<{[key: string]: {inStock: boolean, quantity: number}}>({});
   const [assignedToMe, setAssignedToMe] = useState(false);
-  const [notifiedEmergencies, setNotifiedEmergencies] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -193,28 +192,23 @@ const PharmacyList: React.FC = () => {
         
         // Show notification for emergency cases
         const emergencyCases = mockOrders.filter(order => order.is_emergency && (order.status === 'pending' || order.status === 'processing'));
-        if (emergencyCases.length > 0) {
-          // Create a new Set of emergency IDs that we've already notified about
-          const newNotifiedEmergencies = new Set(notifiedEmergencies);
+        
+        emergencyCases.forEach(emergency => {
+          // Create a unique key for this emergency
+          const emergencyKey = `pharm-${emergency.id}-${emergency.patient.id}`;
           
-          emergencyCases.forEach(emergency => {
-            // Only show notification if we haven't already notified about this emergency
-            const emergencyKey = `${emergency.id}-${emergency.patient.id}`;
-            if (!newNotifiedEmergencies.has(emergencyKey)) {
-              addNotification({
-                message: `EMERGENCY: Prescription for ${emergency.patient.first_name} ${emergency.patient.last_name} needs immediate attention`,
-                type: 'error',
-                duration: 5000
-              });
-              
-              // Add this emergency to our set of notified emergencies
-              newNotifiedEmergencies.add(emergencyKey);
-            }
-          });
-          
-          // Update the state with our new set of notified emergencies
-          setNotifiedEmergencies(newNotifiedEmergencies);
-        }
+          // Only show notification if we haven't already notified about this emergency
+          if (!hasNotifiedAbout(emergencyKey)) {
+            addNotification({
+              message: `EMERGENCY: Prescription for ${emergency.patient.first_name} ${emergency.patient.last_name} needs immediate attention`,
+              type: 'error',
+              duration: 5000
+            });
+            
+            // Mark this emergency as notified
+            markAsNotified(emergencyKey);
+          }
+        });
         
         // Check inventory status for all medications
         const mockInventory: {[key: string]: {inStock: boolean, quantity: number}} = {

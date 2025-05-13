@@ -36,11 +36,10 @@ const Radiology: React.FC = () => {
   const [radiologyResults, setRadiologyResults] = useState<RadiologyResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { hospital, user } = useAuthStore();
-  const { addNotification } = useNotificationStore();
+  const { addNotification, hasNotifiedAbout, markAsNotified } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'pending' | 'in_progress'>('pending');
   const navigate = useNavigate();
   const [assignedToMe, setAssignedToMe] = useState(false);
-  const [notifiedEmergencies, setNotifiedEmergencies] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchRadiologyResults();
@@ -175,28 +174,23 @@ const Radiology: React.FC = () => {
       
       // Show notification for emergency cases
       const emergencyCases = mockResults.filter(result => result.is_emergency && (result.status === 'pending' || result.status === 'in_progress'));
-      if (emergencyCases.length > 0) {
-        // Create a new Set of emergency IDs that we've already notified about
-        const newNotifiedEmergencies = new Set(notifiedEmergencies);
+      
+      emergencyCases.forEach(emergency => {
+        // Create a unique key for this emergency
+        const emergencyKey = `rad-${emergency.id}-${emergency.patient.id}`;
         
-        emergencyCases.forEach(emergency => {
-          // Only show notification if we haven't already notified about this emergency
-          const emergencyKey = `${emergency.id}-${emergency.patient.id}`;
-          if (!newNotifiedEmergencies.has(emergencyKey)) {
-            addNotification({
-              message: `EMERGENCY: ${getScanTypeLabel(emergency.scan_type)} needed for ${emergency.patient.first_name} ${emergency.patient.last_name}`,
-              type: 'error',
-              duration: 5000
-            });
-            
-            // Add this emergency to our set of notified emergencies
-            newNotifiedEmergencies.add(emergencyKey);
-          }
-        });
-        
-        // Update the state with our new set of notified emergencies
-        setNotifiedEmergencies(newNotifiedEmergencies);
-      }
+        // Only show notification if we haven't already notified about this emergency
+        if (!hasNotifiedAbout(emergencyKey)) {
+          addNotification({
+            message: `EMERGENCY: ${getScanTypeLabel(emergency.scan_type)} needed for ${emergency.patient.first_name} ${emergency.patient.last_name}`,
+            type: 'error',
+            duration: 5000
+          });
+          
+          // Mark this emergency as notified
+          markAsNotified(emergencyKey);
+        }
+      });
     } catch (error) {
       console.error('Error fetching radiology results:', error);
       addNotification({

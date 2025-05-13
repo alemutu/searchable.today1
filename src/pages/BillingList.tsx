@@ -35,10 +35,9 @@ const BillingList: React.FC = () => {
   const [bills, setBills] = useState<Bill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { hospital, user } = useAuthStore();
-  const { addNotification } = useNotificationStore();
+  const { addNotification, hasNotifiedAbout, markAsNotified } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'pending' | 'processing'>('pending');
   const [assignedToMe, setAssignedToMe] = useState(false);
-  const [notifiedEmergencies, setNotifiedEmergencies] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchBills = async () => {
@@ -216,28 +215,22 @@ const BillingList: React.FC = () => {
           bill.services.some(service => service.name.includes('Emergency'))
         );
         
-        if (urgentBills.length > 0) {
-          // Create a new Set of emergency IDs that we've already notified about
-          const newNotifiedEmergencies = new Set(notifiedEmergencies);
+        urgentBills.forEach(bill => {
+          // Create a unique key for this emergency
+          const emergencyKey = `bill-${bill.id}-${bill.patient.id}`;
           
-          urgentBills.forEach(bill => {
-            // Only show notification if we haven't already notified about this emergency
-            const emergencyKey = `${bill.id}-${bill.patient.id}`;
-            if (!newNotifiedEmergencies.has(emergencyKey)) {
-              addNotification({
-                message: `Urgent: Process payment for ${bill.patient.first_name} ${bill.patient.last_name}`,
-                type: 'warning',
-                duration: 5000
-              });
-              
-              // Add this emergency to our set of notified emergencies
-              newNotifiedEmergencies.add(emergencyKey);
-            }
-          });
-          
-          // Update the state with our new set of notified emergencies
-          setNotifiedEmergencies(newNotifiedEmergencies);
-        }
+          // Only show notification if we haven't already notified about this emergency
+          if (!hasNotifiedAbout(emergencyKey)) {
+            addNotification({
+              message: `Urgent: Process payment for ${bill.patient.first_name} ${bill.patient.last_name}`,
+              type: 'warning',
+              duration: 5000
+            });
+            
+            // Mark this emergency as notified
+            markAsNotified(emergencyKey);
+          }
+        });
       } catch (error) {
         console.error('Error fetching bills:', error);
         addNotification({
