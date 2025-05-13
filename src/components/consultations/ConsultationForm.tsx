@@ -3,40 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { 
-  FileText, 
-  Plus, 
-  Trash2, 
-  User, 
-  Activity, 
-  Thermometer, 
-  Settings as Lungs, 
-  Droplets, 
-  Scale, 
-  Ruler, 
-  Calculator, 
-  Clock, 
-  AlertTriangle, 
-  Stethoscope, 
-  Building2, 
-  Save, 
-  ArrowLeft, 
-  Brain, 
-  FileText as FileTextIcon, 
-  Pill, 
-  AlertCircle, 
-  Heart, 
-  Eye, 
-  Bone, 
-  Bluetooth as Tooth, 
-  Baby, 
-  UserRound, 
-  Syringe, 
-  ActivitySquare, 
-  ChevronDown, 
-  ChevronUp, 
-  Printer
-} from 'lucide-react';
+import { FileText, Plus, Trash2, User, AlertTriangle, Activity, Clock, Calculator, Ruler, Scale, Droplets, Heart, Thermometer, Settings as Lungs, Brain, FileBarChart2, Pill, AlertCircle, Save, ArrowLeft, Eye, Stethoscope, Baby, UserRound, Bone, Bluetooth as Tooth, Syringe } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
@@ -69,84 +36,7 @@ interface ConsultationFormData {
     priority: string;
     notes: string;
   }[];
-  // Department-specific fields
-  departmentSpecific: {
-    // Cardiology
-    cardiology?: {
-      heartRate?: number;
-      bloodPressure?: string;
-      ecgFindings?: string;
-      heartSounds?: string;
-      chestPain?: string;
-      cardiovascularRiskFactors?: string[];
-    };
-    // Ophthalmology
-    eyeClinic?: {
-      visualAcuity?: {
-        right: string;
-        left: string;
-      };
-      intraocularPressure?: {
-        right: number;
-        left: number;
-      };
-      fundoscopy?: string;
-      slitLampExam?: string;
-      colorVision?: string;
-    };
-    // Dental
-    dental?: {
-      dentalChart?: string;
-      oralHygiene?: string;
-      teethCondition?: string;
-      gumHealth?: string;
-      dentalProcedure?: string;
-    };
-    // Orthopedic
-    orthopedic?: {
-      jointExamination?: string;
-      rangeOfMotion?: string;
-      muscleStrength?: string;
-      gait?: string;
-      deformities?: string;
-    };
-    // Pediatrics
-    pediatrics?: {
-      growthPercentile?: string;
-      developmentalMilestones?: string;
-      immunizationStatus?: string;
-      feedingHistory?: string;
-    };
-    // Gynecology
-    gynecology?: {
-      lastMenstrualPeriod?: string;
-      menstrualHistory?: string;
-      pregnancyHistory?: string;
-      pelvicExamination?: string;
-      papSmearResults?: string;
-    };
-    // General Medicine
-    generalMedicine?: {
-      generalAppearance?: string;
-      systemicReview?: string;
-      chronicDiseaseStatus?: string;
-    };
-    // Surgical
-    surgical?: {
-      surgicalSite?: string;
-      preOpAssessment?: string;
-      surgicalProcedure?: string;
-      postOpInstructions?: string;
-    };
-    // Physiotherapy
-    physiotherapy?: {
-      functionalAssessment?: string;
-      painScale?: number;
-      treatmentPlan?: string;
-      exercisePrescription?: string;
-      rehabilitationGoals?: string;
-    };
-  };
+  departmentSpecificData?: any;
 }
 
 const ConsultationForm: React.FC = () => {
@@ -161,17 +51,19 @@ const ConsultationForm: React.FC = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [showLabTestModal, setShowLabTestModal] = useState(false);
   const [showRadiologyModal, setShowRadiologyModal] = useState(false);
-  const [showMedicalCertificatePreview, setShowMedicalCertificatePreview] = useState(false);
-  const [departmentName, setDepartmentName] = useState<string>('');
-  const [expandedSections, setExpandedSections] = useState({
-    patientHistory: true,
+  const [showMedicalCertificateModal, setShowMedicalCertificateModal] = useState(false);
+  const [searchMedication, setSearchMedication] = useState('');
+  const [medicationResults, setMedicationResults] = useState<string[]>([]);
+  const [showMedicationResults, setShowMedicationResults] = useState(false);
+  const [collapsedSections, setCollapsedSections] = useState({
+    patientHistory: false,
     familyHistory: false,
     generalExamination: false,
     systemicExamination: false,
-    departmentSpecific: true
+    departmentSpecific: false
   });
   
-  const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch } = useForm<ConsultationFormData>({
+  const { register, handleSubmit, control, formState: { errors, isSubmitting }, setValue, watch, getValues } = useForm<ConsultationFormData>({
     defaultValues: {
       prescriptions: [{ medication: '', dosage: '', frequency: '', duration: '', instructions: '' }],
       labTests: [],
@@ -182,8 +74,7 @@ const ConsultationForm: React.FC = () => {
         endDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
         reason: '',
         recommendations: ''
-      },
-      departmentSpecific: {}
+      }
     }
   });
 
@@ -191,6 +82,61 @@ const ConsultationForm: React.FC = () => {
   const radiologyTests = watch('radiologyTests');
   const medicalCertificate = watch('medicalCertificate');
   const medicalCertificateDetails = watch('medicalCertificateDetails');
+  const prescriptions = watch('prescriptions');
+
+  // Common medications database
+  const commonMedications = [
+    { name: 'Amoxicillin', dosages: ['250mg', '500mg'] },
+    { name: 'Paracetamol', dosages: ['500mg', '1g'] },
+    { name: 'Ibuprofen', dosages: ['200mg', '400mg', '600mg'] },
+    { name: 'Omeprazole', dosages: ['20mg', '40mg'] },
+    { name: 'Metformin', dosages: ['500mg', '850mg', '1000mg'] },
+    { name: 'Atorvastatin', dosages: ['10mg', '20mg', '40mg', '80mg'] },
+    { name: 'Lisinopril', dosages: ['5mg', '10mg', '20mg'] },
+    { name: 'Amlodipine', dosages: ['5mg', '10mg'] },
+    { name: 'Metoprolol', dosages: ['25mg', '50mg', '100mg'] },
+    { name: 'Losartan', dosages: ['25mg', '50mg', '100mg'] },
+    { name: 'Sertraline', dosages: ['50mg', '100mg'] },
+    { name: 'Fluoxetine', dosages: ['10mg', '20mg', '40mg'] },
+    { name: 'Albuterol', dosages: ['2mg', '4mg'] },
+    { name: 'Prednisone', dosages: ['5mg', '10mg', '20mg'] },
+    { name: 'Levothyroxine', dosages: ['25mcg', '50mcg', '75mcg', '100mcg'] },
+    { name: 'Warfarin', dosages: ['1mg', '2mg', '5mg'] },
+    { name: 'Clopidogrel', dosages: ['75mg'] },
+    { name: 'Aspirin', dosages: ['81mg', '325mg'] },
+    { name: 'Furosemide', dosages: ['20mg', '40mg', '80mg'] },
+    { name: 'Hydrochlorothiazide', dosages: ['12.5mg', '25mg'] }
+  ];
+
+  // Common frequencies
+  const frequencies = [
+    'Once daily',
+    'Twice daily',
+    'Three times daily',
+    'Four times daily',
+    'Every 4 hours',
+    'Every 6 hours',
+    'Every 8 hours',
+    'Every 12 hours',
+    'As needed',
+    'Before meals',
+    'After meals',
+    'At bedtime'
+  ];
+
+  // Common durations
+  const durations = [
+    '3 days',
+    '5 days',
+    '7 days',
+    '10 days',
+    '14 days',
+    '1 month',
+    '2 months',
+    '3 months',
+    '6 months',
+    'Indefinite'
+  ];
 
   useEffect(() => {
     if (patientId) {
@@ -198,29 +144,7 @@ const ConsultationForm: React.FC = () => {
     } else {
       setIsLoading(false);
     }
-    
-    // Get current user's department
-    if (user?.department_id) {
-      fetchDepartmentName(user.department_id);
-    }
-  }, [patientId, user]);
-
-  const fetchDepartmentName = async (departmentId: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('departments')
-        .select('name')
-        .eq('id', departmentId)
-        .single();
-
-      if (error) throw error;
-      if (data) {
-        setDepartmentName(data.name);
-      }
-    } catch (error) {
-      console.error('Error fetching department:', error);
-    }
-  };
+  }, [patientId]);
 
   const fetchPatient = async () => {
     try {
@@ -277,15 +201,77 @@ const ConsultationForm: React.FC = () => {
     }
   };
 
+  const handleSearchMedication = (searchTerm: string) => {
+    setSearchMedication(searchTerm);
+    if (searchTerm.length > 1) {
+      const results = commonMedications
+        .filter(med => med.name.toLowerCase().includes(searchTerm.toLowerCase()))
+        .map(med => med.name);
+      setMedicationResults(results);
+      setShowMedicationResults(true);
+    } else {
+      setMedicationResults([]);
+      setShowMedicationResults(false);
+    }
+  };
+
+  const handleSelectMedication = (medication: string, index: number) => {
+    const selectedMed = commonMedications.find(med => med.name === medication);
+    
+    // Update the form with the selected medication
+    const updatedPrescriptions = [...prescriptions];
+    updatedPrescriptions[index] = {
+      ...updatedPrescriptions[index],
+      medication: medication,
+      dosage: selectedMed?.dosages[0] || ''
+    };
+    
+    setValue('prescriptions', updatedPrescriptions);
+    setSearchMedication('');
+    setShowMedicationResults(false);
+    
+    // Show notification
+    addNotification({
+      message: `Added ${medication} to prescription`,
+      type: 'success',
+      duration: 2000
+    });
+  };
+
+  const handleAddCustomMedication = (index: number) => {
+    if (!searchMedication.trim()) return;
+    
+    // Update the form with the custom medication
+    const updatedPrescriptions = [...prescriptions];
+    updatedPrescriptions[index] = {
+      ...updatedPrescriptions[index],
+      medication: searchMedication
+    };
+    
+    setValue('prescriptions', updatedPrescriptions);
+    setSearchMedication('');
+    setShowMedicationResults(false);
+    
+    // Show notification
+    addNotification({
+      message: `Added custom medication: ${searchMedication}`,
+      type: 'info',
+      duration: 2000
+    });
+  };
+
+  const toggleSection = (section: keyof typeof collapsedSections) => {
+    setCollapsedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
   const onSubmit = async (data: ConsultationFormData) => {
     try {
       if (!hospital || !user || !patient) throw new Error('Missing required data');
 
       setIsSaving(true);
-      addNotification({
-        message: 'Saving consultation data...',
-        type: 'info'
-      });
 
       // Create consultation record
       const { error: consultationError } = await supabase
@@ -298,12 +284,11 @@ const ConsultationForm: React.FC = () => {
           chief_complaint: data.chiefComplaint,
           diagnosis: data.diagnosis,
           treatment_plan: data.treatmentPlan,
-          prescriptions: data.prescriptions,
+          prescriptions: data.prescriptions.filter(p => p.medication.trim() !== ''),
           notes: data.notes,
           medical_certificate: data.medicalCertificate,
           department_id: user.department_id,
-          // Store department-specific data
-          department_specific_data: data.departmentSpecific
+          departmentSpecificData: data.departmentSpecificData
         });
 
       if (consultationError) throw consultationError;
@@ -315,7 +300,7 @@ const ConsultationForm: React.FC = () => {
         nextFlowStep = 'lab_tests';
       } else if (data.radiologyTests.length > 0) {
         nextFlowStep = 'radiology';
-      } else if (data.prescriptions.some(p => p.medication)) {
+      } else if (data.prescriptions.some(p => p.medication.trim() !== '')) {
         nextFlowStep = 'pharmacy';
       }
 
@@ -364,17 +349,19 @@ const ConsultationForm: React.FC = () => {
       }
 
       // If prescriptions were added, create pharmacy order
-      if (data.prescriptions.some(p => p.medication)) {
+      if (data.prescriptions.some(p => p.medication.trim() !== '')) {
         const { error: pharmacyError } = await supabase
           .from('pharmacy')
           .insert({
             patient_id: patientId,
             hospital_id: hospital.id,
-            medications: data.prescriptions.filter(p => p.medication).map(p => ({
-              ...p,
-              quantity: 1,
-              dispensed: false
-            })),
+            medications: data.prescriptions
+              .filter(p => p.medication.trim() !== '')
+              .map(p => ({
+                ...p,
+                quantity: 1,
+                dispensed: false
+              })),
             status: 'pending',
             payment_status: 'pending',
             is_emergency: false
@@ -384,15 +371,15 @@ const ConsultationForm: React.FC = () => {
       }
 
       addNotification({
-        message: 'Consultation saved successfully',
+        message: 'Consultation completed successfully',
         type: 'success'
       });
-      
+
       navigate('/patients');
     } catch (error: any) {
       console.error('Error submitting consultation:', error.message);
       addNotification({
-        message: `Error saving consultation: ${error.message}`,
+        message: `Error: ${error.message}`,
         type: 'error'
       });
     } finally {
@@ -449,28 +436,6 @@ const ConsultationForm: React.FC = () => {
     ]}
   ];
 
-  // Common medications for autocomplete
-  const commonMedications = [
-    'Acetaminophen', 'Amoxicillin', 'Atorvastatin', 'Azithromycin', 'Cephalexin',
-    'Ciprofloxacin', 'Diazepam', 'Hydrochlorothiazide', 'Ibuprofen', 'Levothyroxine',
-    'Lisinopril', 'Loratadine', 'Metformin', 'Metoprolol', 'Omeprazole',
-    'Prednisone', 'Sertraline', 'Simvastatin', 'Tramadol', 'Warfarin'
-  ];
-
-  // Common frequencies for medication
-  const commonFrequencies = [
-    'Once daily', 'Twice daily', 'Three times daily', 'Four times daily',
-    'Every 4 hours', 'Every 6 hours', 'Every 8 hours', 'Every 12 hours',
-    'As needed', 'Before meals', 'After meals', 'At bedtime'
-  ];
-
-  // Common durations for medication
-  const commonDurations = [
-    '3 days', '5 days', '7 days', '10 days', '14 days',
-    '1 week', '2 weeks', '3 weeks', '1 month', '2 months',
-    '3 months', '6 months', 'Indefinitely'
-  ];
-
   const addLabTest = (test: { name: string, price: number }) => {
     const currentTests = watch('labTests') || [];
     setValue('labTests', [
@@ -484,6 +449,7 @@ const ConsultationForm: React.FC = () => {
     ]);
     setShowLabTestModal(false);
     
+    // Show notification
     addNotification({
       message: `Added ${test.name} to lab tests`,
       type: 'success',
@@ -504,6 +470,7 @@ const ConsultationForm: React.FC = () => {
     ]);
     setShowRadiologyModal(false);
     
+    // Show notification
     addNotification({
       message: `Added ${test.name} to radiology tests`,
       type: 'success',
@@ -516,6 +483,7 @@ const ConsultationForm: React.FC = () => {
     const testName = currentTests[index].testName;
     setValue('labTests', currentTests.filter((_, i) => i !== index));
     
+    // Show notification
     addNotification({
       message: `Removed ${testName} from lab tests`,
       type: 'info',
@@ -528,6 +496,7 @@ const ConsultationForm: React.FC = () => {
     const testName = currentTests[index].testName;
     setValue('radiologyTests', currentTests.filter((_, i) => i !== index));
     
+    // Show notification
     addNotification({
       message: `Removed ${testName} from radiology tests`,
       type: 'info',
@@ -557,634 +526,498 @@ const ConsultationForm: React.FC = () => {
     }).format(amount);
   };
 
-  const toggleSection = (section: keyof typeof expandedSections) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
-  const renderDepartmentSpecificFields = () => {
-    // Normalize department name for comparison
-    const normalizedDeptName = departmentName.toLowerCase().replace(/\s+/g, '');
+  // Get department-specific fields based on user's department
+  const getDepartmentSpecificFields = () => {
+    // Get user's department from profile
+    const departmentId = user?.department_id;
+    const departmentName = user?.department?.name || '';
     
-    if (normalizedDeptName.includes('cardio') || normalizedDeptName.includes('heart')) {
+    // If no department, return empty
+    if (!departmentId && !departmentName) return null;
+    
+    // Determine which department-specific fields to show
+    if (departmentName.toLowerCase().includes('cardio') || departmentId === '3') {
       return (
-        <div className="space-y-4 bg-primary-50 p-4 rounded-lg border border-primary-100">
-          <h3 className="text-md font-medium text-primary-800 flex items-center">
-            <Heart className="h-4 w-4 mr-2 text-primary-500" />
-            Cardiology Examination
-          </h3>
-          
+        <div className="space-y-4">
+          <h3 className="text-md font-medium text-gray-900">Cardiology Assessment</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="form-label text-sm">Heart Rate (bpm)</label>
-              <input
-                type="number"
-                className="form-input"
-                {...register('departmentSpecific.cardiology.heartRate')}
-              />
-            </div>
-            
-            <div>
-              <label className="form-label text-sm">Blood Pressure (mmHg)</label>
+              <label className="form-label">Heart Rate</label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g., 120/80"
-                {...register('departmentSpecific.cardiology.bloodPressure')}
+                placeholder="e.g., 72 bpm"
+                {...register('departmentSpecificData.heartRate')}
               />
             </div>
-            
-            <div className="md:col-span-2">
-              <label className="form-label text-sm">ECG Findings</label>
+            <div>
+              <label className="form-label">Blood Pressure</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., 120/80 mmHg"
+                {...register('departmentSpecificData.bloodPressure')}
+              />
+            </div>
+            <div>
+              <label className="form-label">ECG Findings</label>
               <textarea
                 className="form-input"
                 rows={2}
-                {...register('departmentSpecific.cardiology.ecgFindings')}
+                placeholder="Describe ECG findings"
+                {...register('departmentSpecificData.ecgFindings')}
               />
             </div>
-            
             <div>
-              <label className="form-label text-sm">Heart Sounds</label>
-              <select className="form-input" {...register('departmentSpecific.cardiology.heartSounds')}>
-                <option value="">Select</option>
-                <option value="normal">Normal</option>
-                <option value="s3_gallop">S3 Gallop</option>
-                <option value="s4_gallop">S4 Gallop</option>
-                <option value="systolic_murmur">Systolic Murmur</option>
-                <option value="diastolic_murmur">Diastolic Murmur</option>
-                <option value="pericardial_friction_rub">Pericardial Friction Rub</option>
-              </select>
+              <label className="form-label">Heart Sounds</label>
+              <textarea
+                className="form-input"
+                rows={2}
+                placeholder="Describe heart sounds"
+                {...register('departmentSpecificData.heartSounds')}
+              />
             </div>
-            
-            <div>
-              <label className="form-label text-sm">Chest Pain Assessment</label>
-              <select className="form-input" {...register('departmentSpecific.cardiology.chestPain')}>
-                <option value="">Select</option>
-                <option value="none">None</option>
-                <option value="typical_angina">Typical Angina</option>
-                <option value="atypical_angina">Atypical Angina</option>
-                <option value="non_anginal">Non-anginal Pain</option>
-                <option value="acute_coronary_syndrome">Acute Coronary Syndrome</option>
-              </select>
-            </div>
-            
             <div className="md:col-span-2">
-              <label className="form-label text-sm">Cardiovascular Risk Factors</label>
-              <div className="grid grid-cols-2 gap-2 mt-1">
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="hypertension"
-                    value="hypertension"
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    {...register('departmentSpecific.cardiology.cardiovascularRiskFactors')}
-                  />
-                  <label htmlFor="hypertension" className="ml-2 text-sm text-gray-700">Hypertension</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="diabetes"
-                    value="diabetes"
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    {...register('departmentSpecific.cardiology.cardiovascularRiskFactors')}
-                  />
-                  <label htmlFor="diabetes" className="ml-2 text-sm text-gray-700">Diabetes</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="smoking"
-                    value="smoking"
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    {...register('departmentSpecific.cardiology.cardiovascularRiskFactors')}
-                  />
-                  <label htmlFor="smoking" className="ml-2 text-sm text-gray-700">Smoking</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="dyslipidemia"
-                    value="dyslipidemia"
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    {...register('departmentSpecific.cardiology.cardiovascularRiskFactors')}
-                  />
-                  <label htmlFor="dyslipidemia" className="ml-2 text-sm text-gray-700">Dyslipidemia</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="family_history"
-                    value="family_history"
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    {...register('departmentSpecific.cardiology.cardiovascularRiskFactors')}
-                  />
-                  <label htmlFor="family_history" className="ml-2 text-sm text-gray-700">Family History</label>
-                </div>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="obesity"
-                    value="obesity"
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    {...register('departmentSpecific.cardiology.cardiovascularRiskFactors')}
-                  />
-                  <label htmlFor="obesity" className="ml-2 text-sm text-gray-700">Obesity</label>
-                </div>
-              </div>
+              <label className="form-label">Chest Pain Assessment</label>
+              <textarea
+                className="form-input"
+                rows={2}
+                placeholder="Describe chest pain characteristics"
+                {...register('departmentSpecificData.chestPainAssessment')}
+              />
+            </div>
+            <div className="md:col-span-2">
+              <label className="form-label">Cardiovascular Risk Factors</label>
+              <textarea
+                className="form-input"
+                rows={2}
+                placeholder="List cardiovascular risk factors"
+                {...register('departmentSpecificData.riskFactors')}
+              />
             </div>
           </div>
         </div>
       );
-    } 
-    else if (normalizedDeptName.includes('eye') || normalizedDeptName.includes('ophthal')) {
+    } else if (departmentName.toLowerCase().includes('eye') || departmentId === '8') {
       return (
-        <div className="space-y-4 bg-primary-50 p-4 rounded-lg border border-primary-100">
-          <h3 className="text-md font-medium text-primary-800 flex items-center">
-            <Eye className="h-4 w-4 mr-2 text-primary-500" />
-            Ophthalmology Examination
-          </h3>
-          
+        <div className="space-y-4">
+          <h3 className="text-md font-medium text-gray-900">Ophthalmology Assessment</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="form-label text-sm">Visual Acuity (Right Eye)</label>
+              <label className="form-label">Visual Acuity (Right Eye)</label>
               <input
                 type="text"
                 className="form-input"
                 placeholder="e.g., 20/20"
-                {...register('departmentSpecific.eyeClinic.visualAcuity.right')}
+                {...register('departmentSpecificData.visualAcuityRight')}
               />
             </div>
-            
             <div>
-              <label className="form-label text-sm">Visual Acuity (Left Eye)</label>
+              <label className="form-label">Visual Acuity (Left Eye)</label>
               <input
                 type="text"
                 className="form-input"
                 placeholder="e.g., 20/20"
-                {...register('departmentSpecific.eyeClinic.visualAcuity.left')}
+                {...register('departmentSpecificData.visualAcuityLeft')}
               />
             </div>
-            
             <div>
-              <label className="form-label text-sm">Intraocular Pressure (Right Eye, mmHg)</label>
+              <label className="form-label">Intraocular Pressure (Right Eye)</label>
               <input
-                type="number"
+                type="text"
                 className="form-input"
-                {...register('departmentSpecific.eyeClinic.intraocularPressure.right')}
+                placeholder="e.g., 15 mmHg"
+                {...register('departmentSpecificData.iop_right')}
               />
             </div>
-            
             <div>
-              <label className="form-label text-sm">Intraocular Pressure (Left Eye, mmHg)</label>
+              <label className="form-label">Intraocular Pressure (Left Eye)</label>
               <input
-                type="number"
+                type="text"
                 className="form-input"
-                {...register('departmentSpecific.eyeClinic.intraocularPressure.left')}
+                placeholder="e.g., 15 mmHg"
+                {...register('departmentSpecificData.iop_left')}
               />
             </div>
-            
             <div className="md:col-span-2">
-              <label className="form-label text-sm">Fundoscopy Findings</label>
+              <label className="form-label">Fundoscopy Findings</label>
               <textarea
                 className="form-input"
                 rows={2}
-                {...register('departmentSpecific.eyeClinic.fundoscopy')}
+                placeholder="Describe fundoscopy findings"
+                {...register('departmentSpecificData.fundoscopyFindings')}
               />
             </div>
-            
             <div className="md:col-span-2">
-              <label className="form-label text-sm">Slit Lamp Examination</label>
+              <label className="form-label">Slit Lamp Examination</label>
               <textarea
                 className="form-input"
                 rows={2}
-                {...register('departmentSpecific.eyeClinic.slitLampExam')}
+                placeholder="Describe slit lamp examination findings"
+                {...register('departmentSpecificData.slitLampExamination')}
               />
             </div>
-            
             <div>
-              <label className="form-label text-sm">Color Vision</label>
-              <select className="form-input" {...register('departmentSpecific.eyeClinic.colorVision')}>
-                <option value="">Select</option>
-                <option value="normal">Normal</option>
-                <option value="deficient">Deficient</option>
-                <option value="not_tested">Not Tested</option>
-              </select>
+              <label className="form-label">Color Vision</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Normal, Deficient"
+                {...register('departmentSpecificData.colorVision')}
+              />
             </div>
           </div>
         </div>
       );
-    }
-    else if (normalizedDeptName.includes('dental') || normalizedDeptName.includes('tooth')) {
+    } else if (departmentName.toLowerCase().includes('dental') || departmentId === '7') {
       return (
-        <div className="space-y-4 bg-primary-50 p-4 rounded-lg border border-primary-100">
-          <h3 className="text-md font-medium text-primary-800 flex items-center">
-            <Tooth className="h-4 w-4 mr-2 text-primary-500" />
-            Dental Examination
-          </h3>
-          
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <label className="form-label text-sm">Dental Chart</label>
+        <div className="space-y-4">
+          <h3 className="text-md font-medium text-gray-900">Dental Assessment</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="form-label">Dental Chart</label>
               <textarea
                 className="form-input"
                 rows={3}
-                placeholder="Document dental chart findings"
-                {...register('departmentSpecific.dental.dentalChart')}
+                placeholder="Describe dental chart findings"
+                {...register('departmentSpecificData.dentalChart')}
               />
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="form-label text-sm">Oral Hygiene</label>
-                <select className="form-input" {...register('departmentSpecific.dental.oralHygiene')}>
-                  <option value="">Select</option>
-                  <option value="excellent">Excellent</option>
-                  <option value="good">Good</option>
-                  <option value="fair">Fair</option>
-                  <option value="poor">Poor</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="form-label text-sm">Gum Health</label>
-                <select className="form-input" {...register('departmentSpecific.dental.gumHealth')}>
-                  <option value="">Select</option>
-                  <option value="healthy">Healthy</option>
-                  <option value="gingivitis">Gingivitis</option>
-                  <option value="periodontitis">Periodontitis</option>
-                  <option value="severe_periodontitis">Severe Periodontitis</option>
-                </select>
-              </div>
-            </div>
-            
             <div>
-              <label className="form-label text-sm">Teeth Condition</label>
-              <textarea
+              <label className="form-label">Oral Hygiene</label>
+              <select
                 className="form-input"
-                rows={2}
-                placeholder="Document teeth condition, cavities, etc."
-                {...register('departmentSpecific.dental.teethCondition')}
-              />
-            </div>
-            
-            <div>
-              <label className="form-label text-sm">Dental Procedure Performed/Recommended</label>
-              <textarea
-                className="form-input"
-                rows={2}
-                placeholder="Document procedures performed or recommended"
-                {...register('departmentSpecific.dental.dentalProcedure')}
-              />
-            </div>
-          </div>
-        </div>
-      );
-    }
-    else if (normalizedDeptName.includes('ortho') || normalizedDeptName.includes('bone')) {
-      return (
-        <div className="space-y-4 bg-primary-50 p-4 rounded-lg border border-primary-100">
-          <h3 className="text-md font-medium text-primary-800 flex items-center">
-            <Bone className="h-4 w-4 mr-2 text-primary-500" />
-            Orthopedic Examination
-          </h3>
-          
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <label className="form-label text-sm">Joint Examination</label>
-              <textarea
-                className="form-input"
-                rows={2}
-                placeholder="Document joint examination findings"
-                {...register('departmentSpecific.orthopedic.jointExamination')}
-              />
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="form-label text-sm">Range of Motion</label>
-                <textarea
-                  className="form-input"
-                  rows={2}
-                  placeholder="Document range of motion findings"
-                  {...register('departmentSpecific.orthopedic.rangeOfMotion')}
-                />
-              </div>
-              
-              <div>
-                <label className="form-label text-sm">Muscle Strength</label>
-                <textarea
-                  className="form-input"
-                  rows={2}
-                  placeholder="Document muscle strength findings"
-                  {...register('departmentSpecific.orthopedic.muscleStrength')}
-                />
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="form-label text-sm">Gait Assessment</label>
-                <select className="form-input" {...register('departmentSpecific.orthopedic.gait')}>
-                  <option value="">Select</option>
-                  <option value="normal">Normal</option>
-                  <option value="antalgic">Antalgic</option>
-                  <option value="trendelenburg">Trendelenburg</option>
-                  <option value="steppage">Steppage</option>
-                  <option value="spastic">Spastic</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-              
-              <div>
-                <label className="form-label text-sm">Deformities</label>
-                <textarea
-                  className="form-input"
-                  rows={2}
-                  placeholder="Document any deformities"
-                  {...register('departmentSpecific.orthopedic.deformities')}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-      );
-    }
-    else if (normalizedDeptName.includes('pedia') || normalizedDeptName.includes('child')) {
-      return (
-        <div className="space-y-4 bg-primary-50 p-4 rounded-lg border border-primary-100">
-          <h3 className="text-md font-medium text-primary-800 flex items-center">
-            <Baby className="h-4 w-4 mr-2 text-primary-500" />
-            Pediatric Examination
-          </h3>
-          
-          <div className="grid grid-cols-1 gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="form-label text-sm">Growth Percentile</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g., 75th percentile"
-                  {...register('departmentSpecific.pediatrics.growthPercentile')}
-                />
-              </div>
-              
-              <div>
-                <label className="form-label text-sm">Immunization Status</label>
-                <select className="form-input" {...register('departmentSpecific.pediatrics.immunizationStatus')}>
-                  <option value="">Select</option>
-                  <option value="up_to_date">Up to date</option>
-                  <option value="incomplete">Incomplete</option>
-                  <option value="delayed">Delayed</option>
-                  <option value="unknown">Unknown</option>
-                </select>
-              </div>
-            </div>
-            
-            <div>
-              <label className="form-label text-sm">Developmental Milestones</label>
-              <textarea
-                className="form-input"
-                rows={2}
-                placeholder="Document developmental milestones"
-                {...register('departmentSpecific.pediatrics.developmentalMilestones')}
-              />
-            </div>
-            
-            <div>
-              <label className="form-label text-sm">Feeding History</label>
-              <textarea
-                className="form-input"
-                rows={2}
-                placeholder="Document feeding history"
-                {...register('departmentSpecific.pediatrics.feedingHistory')}
-              />
-            </div>
-          </div>
-        </div>
-      );
-    }
-    else if (normalizedDeptName.includes('gyne') || normalizedDeptName.includes('obstet')) {
-      return (
-        <div className="space-y-4 bg-primary-50 p-4 rounded-lg border border-primary-100">
-          <h3 className="text-md font-medium text-primary-800 flex items-center">
-            <UserRound className="h-4 w-4 mr-2 text-primary-500" />
-            Gynecology Examination
-          </h3>
-          
-          <div className="grid grid-cols-1 gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="form-label text-sm">Last Menstrual Period</label>
-                <input
-                  type="date"
-                  className="form-input"
-                  {...register('departmentSpecific.gynecology.lastMenstrualPeriod')}
-                />
-              </div>
-              
-              <div>
-                <label className="form-label text-sm">Menstrual History</label>
-                <select className="form-input" {...register('departmentSpecific.gynecology.menstrualHistory')}>
-                  <option value="">Select</option>
-                  <option value="regular">Regular</option>
-                  <option value="irregular">Irregular</option>
-                  <option value="amenorrhea">Amenorrhea</option>
-                  <option value="menopause">Menopause</option>
-                </select>
-              </div>
-            </div>
-            
-            <div>
-              <label className="form-label text-sm">Pregnancy History</label>
-              <textarea
-                className="form-input"
-                rows={2}
-                placeholder="Document pregnancy history (G P A L)"
-                {...register('departmentSpecific.gynecology.pregnancyHistory')}
-              />
-            </div>
-            
-            <div>
-              <label className="form-label text-sm">Pelvic Examination</label>
-              <textarea
-                className="form-input"
-                rows={2}
-                placeholder="Document pelvic examination findings"
-                {...register('departmentSpecific.gynecology.pelvicExamination')}
-              />
-            </div>
-            
-            <div>
-              <label className="form-label text-sm">Pap Smear Results</label>
-              <select className="form-input" {...register('departmentSpecific.gynecology.papSmearResults')}>
+                {...register('departmentSpecificData.oralHygiene')}
+              >
                 <option value="">Select</option>
-                <option value="normal">Normal</option>
-                <option value="abnormal">Abnormal</option>
-                <option value="pending">Pending</option>
-                <option value="not_done">Not Done</option>
+                <option value="Good">Good</option>
+                <option value="Fair">Fair</option>
+                <option value="Poor">Poor</option>
               </select>
             </div>
+            <div>
+              <label className="form-label">Teeth Condition</label>
+              <select
+                className="form-input"
+                {...register('departmentSpecificData.teethCondition')}
+              >
+                <option value="">Select</option>
+                <option value="Good">Good</option>
+                <option value="Fair">Fair</option>
+                <option value="Poor">Poor</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Gum Health</label>
+              <select
+                className="form-input"
+                {...register('departmentSpecificData.gumHealth')}
+              >
+                <option value="">Select</option>
+                <option value="Healthy">Healthy</option>
+                <option value="Gingivitis">Gingivitis</option>
+                <option value="Periodontitis">Periodontitis</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Dental Procedures</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Filling, Extraction"
+                {...register('departmentSpecificData.dentalProcedures')}
+              />
+            </div>
           </div>
         </div>
       );
-    }
-    else if (normalizedDeptName.includes('general') || normalizedDeptName.includes('medicine')) {
+    } else if (departmentName.toLowerCase().includes('ortho') || departmentId === '6') {
       return (
-        <div className="space-y-4 bg-primary-50 p-4 rounded-lg border border-primary-100">
-          <h3 className="text-md font-medium text-primary-800 flex items-center">
-            <Stethoscope className="h-4 w-4 mr-2 text-primary-500" />
-            General Medicine Examination
-          </h3>
-          
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <label className="form-label text-sm">General Appearance</label>
+        <div className="space-y-4">
+          <h3 className="text-md font-medium text-gray-900">Orthopedic Assessment</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="form-label">Joint Examination</label>
               <textarea
                 className="form-input"
                 rows={2}
-                placeholder="Document general appearance"
-                {...register('departmentSpecific.generalMedicine.generalAppearance')}
+                placeholder="Describe joint examination findings"
+                {...register('departmentSpecificData.jointExamination')}
               />
             </div>
-            
             <div>
-              <label className="form-label text-sm">Systemic Review</label>
+              <label className="form-label">Range of Motion</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Full, Limited"
+                {...register('departmentSpecificData.rangeOfMotion')}
+              />
+            </div>
+            <div>
+              <label className="form-label">Muscle Strength</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., 5/5, 4/5"
+                {...register('departmentSpecificData.muscleStrength')}
+              />
+            </div>
+            <div>
+              <label className="form-label">Gait Assessment</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Normal, Antalgic"
+                {...register('departmentSpecificData.gaitAssessment')}
+              />
+            </div>
+            <div>
+              <label className="form-label">Deformities</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Describe any deformities"
+                {...register('departmentSpecificData.deformities')}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    } else if (departmentName.toLowerCase().includes('pediatric') || departmentId === '4') {
+      return (
+        <div className="space-y-4">
+          <h3 className="text-md font-medium text-gray-900">Pediatric Assessment</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Growth Percentile</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., 50th percentile"
+                {...register('departmentSpecificData.growthPercentile')}
+              />
+            </div>
+            <div>
+              <label className="form-label">Developmental Milestones</label>
+              <select
+                className="form-input"
+                {...register('departmentSpecificData.developmentalMilestones')}
+              >
+                <option value="">Select</option>
+                <option value="Age-appropriate">Age-appropriate</option>
+                <option value="Delayed">Delayed</option>
+                <option value="Advanced">Advanced</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Immunization Status</label>
+              <select
+                className="form-input"
+                {...register('departmentSpecificData.immunizationStatus')}
+              >
+                <option value="">Select</option>
+                <option value="Up to date">Up to date</option>
+                <option value="Incomplete">Incomplete</option>
+                <option value="Not started">Not started</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Feeding History</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Breastfed, Formula"
+                {...register('departmentSpecificData.feedingHistory')}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    } else if (departmentName.toLowerCase().includes('gyn') || departmentId === '4') {
+      return (
+        <div className="space-y-4">
+          <h3 className="text-md font-medium text-gray-900">Gynecology Assessment</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="form-label">Last Menstrual Period</label>
+              <input
+                type="date"
+                className="form-input"
+                {...register('departmentSpecificData.lastMenstrualPeriod')}
+              />
+            </div>
+            <div>
+              <label className="form-label">Menstrual History</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Regular, Irregular"
+                {...register('departmentSpecificData.menstrualHistory')}
+              />
+            </div>
+            <div>
+              <label className="form-label">Pregnancy History</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., G2P1"
+                {...register('departmentSpecificData.pregnancyHistory')}
+              />
+            </div>
+            <div>
+              <label className="form-label">Pelvic Examination</label>
+              <textarea
+                className="form-input"
+                rows={2}
+                placeholder="Describe pelvic examination findings"
+                {...register('departmentSpecificData.pelvicExamination')}
+              />
+            </div>
+            <div>
+              <label className="form-label">Pap Smear Results</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Normal, Abnormal"
+                {...register('departmentSpecificData.papSmearResults')}
+              />
+            </div>
+          </div>
+        </div>
+      );
+    } else if (departmentName.toLowerCase().includes('general') || departmentId === '2') {
+      return (
+        <div className="space-y-4">
+          <h3 className="text-md font-medium text-gray-900">General Medicine Assessment</h3>
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="form-label">General Appearance</label>
+              <textarea
+                className="form-input"
+                rows={2}
+                placeholder="Describe general appearance"
+                {...register('departmentSpecificData.generalAppearance')}
+              />
+            </div>
+            <div>
+              <label className="form-label">Systemic Review</label>
               <textarea
                 className="form-input"
                 rows={3}
-                placeholder="Document systemic review findings"
-                {...register('departmentSpecific.generalMedicine.systemicReview')}
+                placeholder="Describe systemic review findings"
+                {...register('departmentSpecificData.systemicReview')}
               />
             </div>
-            
             <div>
-              <label className="form-label text-sm">Chronic Disease Status</label>
+              <label className="form-label">Chronic Disease Status</label>
               <textarea
                 className="form-input"
                 rows={2}
-                placeholder="Document status of any chronic diseases"
-                {...register('departmentSpecific.generalMedicine.chronicDiseaseStatus')}
+                placeholder="Describe status of any chronic diseases"
+                {...register('departmentSpecificData.chronicDiseaseStatus')}
               />
             </div>
           </div>
         </div>
       );
-    }
-    else if (normalizedDeptName.includes('surg')) {
+    } else if (departmentName.toLowerCase().includes('surgical') || departmentId === '5') {
       return (
-        <div className="space-y-4 bg-primary-50 p-4 rounded-lg border border-primary-100">
-          <h3 className="text-md font-medium text-primary-800 flex items-center">
-            <Syringe className="h-4 w-4 mr-2 text-primary-500" />
-            Surgical Examination
-          </h3>
-          
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <label className="form-label text-sm">Surgical Site</label>
+        <div className="space-y-4">
+          <h3 className="text-md font-medium text-gray-900">Surgical Assessment</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="form-label">Surgical Site Assessment</label>
               <textarea
                 className="form-input"
                 rows={2}
-                placeholder="Document surgical site examination"
-                {...register('departmentSpecific.surgical.surgicalSite')}
+                placeholder="Describe surgical site"
+                {...register('departmentSpecificData.surgicalSiteAssessment')}
               />
             </div>
-            
             <div>
-              <label className="form-label text-sm">Pre-operative Assessment</label>
-              <textarea
+              <label className="form-label">Pre-operative Assessment</label>
+              <select
                 className="form-input"
-                rows={2}
-                placeholder="Document pre-operative assessment"
-                {...register('departmentSpecific.surgical.preOpAssessment')}
+                {...register('departmentSpecificData.preOperativeAssessment')}
+              >
+                <option value="">Select</option>
+                <option value="Fit for surgery">Fit for surgery</option>
+                <option value="Requires optimization">Requires optimization</option>
+                <option value="High risk">High risk</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Surgical Procedure</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Appendectomy"
+                {...register('departmentSpecificData.surgicalProcedure')}
               />
             </div>
-            
-            <div>
-              <label className="form-label text-sm">Surgical Procedure</label>
+            <div className="md:col-span-2">
+              <label className="form-label">Post-operative Instructions</label>
               <textarea
                 className="form-input"
                 rows={2}
-                placeholder="Document surgical procedure details"
-                {...register('departmentSpecific.surgical.surgicalProcedure')}
-              />
-            </div>
-            
-            <div>
-              <label className="form-label text-sm">Post-operative Instructions</label>
-              <textarea
-                className="form-input"
-                rows={2}
-                placeholder="Document post-operative instructions"
-                {...register('departmentSpecific.surgical.postOpInstructions')}
+                placeholder="Describe post-operative instructions"
+                {...register('departmentSpecificData.postOperativeInstructions')}
               />
             </div>
           </div>
         </div>
       );
-    }
-    else if (normalizedDeptName.includes('physio') || normalizedDeptName.includes('therapy')) {
+    } else if (departmentName.toLowerCase().includes('physio') || departmentId === '9') {
       return (
-        <div className="space-y-4 bg-primary-50 p-4 rounded-lg border border-primary-100">
-          <h3 className="text-md font-medium text-primary-800 flex items-center">
-            <ActivitySquare className="h-4 w-4 mr-2 text-primary-500" />
-            Physiotherapy Assessment
-          </h3>
-          
-          <div className="grid grid-cols-1 gap-4">
-            <div>
-              <label className="form-label text-sm">Functional Assessment</label>
+        <div className="space-y-4">
+          <h3 className="text-md font-medium text-gray-900">Physiotherapy Assessment</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="md:col-span-2">
+              <label className="form-label">Functional Assessment</label>
               <textarea
                 className="form-input"
                 rows={2}
-                placeholder="Document functional assessment"
-                {...register('departmentSpecific.physiotherapy.functionalAssessment')}
+                placeholder="Describe functional assessment"
+                {...register('departmentSpecificData.functionalAssessment')}
               />
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="form-label text-sm">Pain Scale (0-10)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="10"
-                  className="form-input"
-                  {...register('departmentSpecific.physiotherapy.painScale')}
-                />
-              </div>
-              
-              <div>
-                <label className="form-label text-sm">Rehabilitation Goals</label>
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="e.g., Improve mobility"
-                  {...register('departmentSpecific.physiotherapy.rehabilitationGoals')}
-                />
-              </div>
-            </div>
-            
             <div>
-              <label className="form-label text-sm">Treatment Plan</label>
-              <textarea
+              <label className="form-label">Pain Scale (0-10)</label>
+              <input
+                type="number"
+                min="0"
+                max="10"
                 className="form-input"
-                rows={2}
-                placeholder="Document treatment plan"
-                {...register('departmentSpecific.physiotherapy.treatmentPlan')}
+                placeholder="e.g., 5"
+                {...register('departmentSpecificData.painScale')}
               />
             </div>
-            
             <div>
-              <label className="form-label text-sm">Exercise Prescription</label>
+              <label className="form-label">Treatment Plan</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder="e.g., Heat therapy, exercises"
+                {...register('departmentSpecificData.treatmentPlan')}
+              />
+            </div>
+            <div>
+              <label className="form-label">Exercise Prescription</label>
               <textarea
                 className="form-input"
                 rows={2}
-                placeholder="Document exercise prescription"
-                {...register('departmentSpecific.physiotherapy.exercisePrescription')}
+                placeholder="Describe exercise prescription"
+                {...register('departmentSpecificData.exercisePrescription')}
+              />
+            </div>
+            <div>
+              <label className="form-label">Rehabilitation Goals</label>
+              <textarea
+                className="form-input"
+                rows={2}
+                placeholder="Describe rehabilitation goals"
+                {...register('departmentSpecificData.rehabilitationGoals')}
               />
             </div>
           </div>
@@ -1192,115 +1025,8 @@ const ConsultationForm: React.FC = () => {
       );
     }
     
-    // Default case - no department-specific fields
-    return (
-      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-        <p className="text-gray-500 text-sm">No department-specific fields available for this department.</p>
-      </div>
-    );
-  };
-
-  const renderMedicalCertificatePreview = () => {
-    if (!medicalCertificate || !medicalCertificateDetails) return null;
-    
-    const today = new Date().toLocaleDateString();
-    const doctorName = user ? `${user.first_name} ${user.last_name}` : 'Doctor';
-    const patientName = patient ? `${patient.first_name} ${patient.last_name}` : 'Patient';
-    const patientGender = patient?.gender || 'Unknown';
-    const patientAge = patient?.date_of_birth ? 
-      new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear() : 'Unknown';
-    
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-auto">
-          <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-            <h3 className="text-lg font-medium text-gray-900">Medical Certificate Preview</h3>
-            <button 
-              onClick={() => setShowMedicalCertificatePreview(false)}
-              className="text-gray-400 hover:text-gray-500"
-            >
-              <X className="h-6 w-6" />
-            </button>
-          </div>
-          
-          <div className="p-6" id="medical-certificate-print">
-            <div className="text-center mb-6">
-              <h2 className="text-xl font-bold text-gray-900">{hospital?.name || 'Hospital'}</h2>
-              <p className="text-sm text-gray-600">{hospital?.address || 'Hospital Address'}</p>
-              <p className="text-sm text-gray-600">Phone: {hospital?.phone || 'Phone Number'}</p>
-              {hospital?.email && <p className="text-sm text-gray-600">Email: {hospital.email}</p>}
-            </div>
-            
-            <div className="text-center mb-6">
-              <h1 className="text-2xl font-bold text-gray-900 border-b-2 border-t-2 border-gray-300 py-2">MEDICAL CERTIFICATE</h1>
-            </div>
-            
-            <div className="mb-6">
-              <p className="text-right text-sm text-gray-600">Date: {today}</p>
-            </div>
-            
-            <div className="mb-6">
-              <p className="mb-4">This is to certify that <span className="font-bold">{patientName}</span>, a {patientAge}-year-old {patientGender}, has been examined by me on {today} and has been diagnosed with:</p>
-              
-              <p className="font-medium text-gray-900 my-4 p-2 border-l-4 border-primary-500 bg-gray-50">
-                {watch('diagnosis') || '[Diagnosis will appear here]'}
-              </p>
-              
-              <p className="mb-4">Due to the above condition, the patient is advised to:</p>
-              
-              <div className="p-4 bg-gray-50 rounded-lg mb-4">
-                <p className="font-medium">Rest and recuperate from {medicalCertificateDetails.startDate} to {medicalCertificateDetails.endDate}</p>
-                {medicalCertificateDetails.reason && (
-                  <p className="mt-2">Reason: {medicalCertificateDetails.reason}</p>
-                )}
-                {medicalCertificateDetails.recommendations && (
-                  <p className="mt-2">Recommendations: {medicalCertificateDetails.recommendations}</p>
-                )}
-              </div>
-              
-              <p className="mb-4">The patient is fit to return to work/school on {new Date(medicalCertificateDetails.endDate + 'T00:00:00').toLocaleDateString()}.</p>
-            </div>
-            
-            <div className="mt-12 pt-8 border-t border-gray-200">
-              <div className="flex justify-end">
-                <div className="text-center">
-                  <div className="mb-2 border-b border-gray-400 w-48"></div>
-                  <p className="font-medium">Dr. {doctorName}</p>
-                  <p className="text-sm text-gray-600">{departmentName || 'Department'}</p>
-                  <p className="text-sm text-gray-600">License No: [License Number]</p>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="p-4 border-t border-gray-200 flex justify-end space-x-3">
-            <button
-              onClick={() => setShowMedicalCertificatePreview(false)}
-              className="btn btn-outline"
-            >
-              Close
-            </button>
-            <button
-              onClick={() => {
-                const printContent = document.getElementById('medical-certificate-print');
-                const originalContents = document.body.innerHTML;
-                
-                if (printContent) {
-                  document.body.innerHTML = printContent.innerHTML;
-                  window.print();
-                  document.body.innerHTML = originalContents;
-                  window.location.reload();
-                }
-              }}
-              className="btn btn-primary inline-flex items-center"
-            >
-              <Printer className="h-5 w-5 mr-2" />
-              Print Certificate
-            </button>
-          </div>
-        </div>
-      </div>
-    );
+    // Default to general assessment if no specific department is matched
+    return null;
   };
 
   if (isLoading) {
@@ -1392,7 +1118,7 @@ const ConsultationForm: React.FC = () => {
 
         {/* Assessment Tab */}
         {activeTab === 'assessment' && (
-          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6 max-h-[calc(100vh-250px)] overflow-y-auto">
+          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
             <h2 className="text-xl font-semibold text-gray-900">Patient Assessment</h2>
             
             <div>
@@ -1409,167 +1135,180 @@ const ConsultationForm: React.FC = () => {
               )}
             </div>
 
-            {/* 1. Patient History (Collapsible) */}
+            {/* Patient History Section - Collapsible */}
             <div className="border rounded-lg overflow-hidden">
               <div 
-                className="p-3 bg-gray-50 border-b flex justify-between items-center cursor-pointer"
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
                 onClick={() => toggleSection('patientHistory')}
               >
-                <h3 className="text-md font-medium text-gray-900">1. Patient History</h3>
-                {expandedSections.patientHistory ? (
-                  <ChevronUp className="h-5 w-5 text-gray-500" />
-                ) : (
-                  <ChevronDown className="h-5 w-5 text-gray-500" />
-                )}
+                <h3 className="text-md font-medium text-gray-900">Patient History</h3>
+                <button type="button" className="text-gray-500">
+                  {collapsedSections.patientHistory ? 
+                    <Plus className="h-5 w-5" /> : 
+                    <Minus className="h-5 w-5" />
+                  }
+                </button>
               </div>
               
-              {expandedSections.patientHistory && (
-                <div className="p-4 space-y-4">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-700 mb-1">History of Presenting Illness</h4>
-                    <textarea
-                      rows={3}
-                      className="form-input text-sm w-full"
-                      placeholder="Enter details about the history of presenting illness..."
-                    />
-                  </div>
+              {!collapsedSections.patientHistory && (
+                <div className="p-4 bg-gray-50">
+                  <h4 className="text-sm font-medium text-gray-700 mb-1">History of Presenting Illness</h4>
+                  <textarea
+                    rows={3}
+                    className="form-input text-sm"
+                    placeholder="Enter details about the history of presenting illness..."
+                    {...register('departmentSpecificData.historyOfPresentingIllness')}
+                  />
                   
                   {patient.gender === 'Female' && (
-                    <div>
+                    <div className="mt-3">
                       <h4 className="text-sm font-medium text-gray-700 mb-1">Gynecological/Obstetric History</h4>
                       <textarea
                         rows={2}
-                        className="form-input text-sm w-full"
+                        className="form-input text-sm"
                         placeholder="Enter gynecological or obstetric history if applicable..."
+                        {...register('departmentSpecificData.gynecologicalHistory')}
                       />
                     </div>
                   )}
                   
-                  <div>
+                  <div className="mt-3">
                     <h4 className="text-sm font-medium text-gray-700 mb-1">Past Medical and Surgical History</h4>
                     <textarea
                       rows={2}
-                      className="form-input text-sm w-full"
+                      className="form-input text-sm"
                       placeholder="Enter past medical and surgical history..."
+                      {...register('departmentSpecificData.pastMedicalHistory')}
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* 2. Family and Socioeconomic History */}
+            {/* Family and Socioeconomic History - Collapsible */}
             <div className="border rounded-lg overflow-hidden">
               <div 
-                className="p-3 bg-gray-50 border-b flex justify-between items-center cursor-pointer"
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
                 onClick={() => toggleSection('familyHistory')}
               >
-                <h3 className="text-md font-medium text-gray-900">2. Family and Socioeconomic History</h3>
-                {expandedSections.familyHistory ? (
-                  <ChevronUp className="h-5 w-5 text-gray-500" />
-                ) : (
-                  <ChevronDown className="h-5 w-5 text-gray-500" />
-                )}
+                <h3 className="text-md font-medium text-gray-900">Family and Socioeconomic History</h3>
+                <button type="button" className="text-gray-500">
+                  {collapsedSections.familyHistory ? 
+                    <Plus className="h-5 w-5" /> : 
+                    <Minus className="h-5 w-5" />
+                  }
+                </button>
               </div>
               
-              {expandedSections.familyHistory && (
+              {!collapsedSections.familyHistory && (
                 <div className="p-4">
                   <textarea
                     rows={3}
-                    className="form-input w-full"
+                    className="form-input"
                     placeholder="Enter family history and socioeconomic information..."
+                    {...register('departmentSpecificData.familyAndSocioeconomicHistory')}
                   />
                 </div>
               )}
             </div>
 
-            {/* 3. General Examination */}
+            {/* General Examination - Collapsible */}
             <div className="border rounded-lg overflow-hidden">
               <div 
-                className="p-3 bg-gray-50 border-b flex justify-between items-center cursor-pointer"
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
                 onClick={() => toggleSection('generalExamination')}
               >
-                <h3 className="text-md font-medium text-gray-900">3. General Examination</h3>
-                {expandedSections.generalExamination ? (
-                  <ChevronUp className="h-5 w-5 text-gray-500" />
-                ) : (
-                  <ChevronDown className="h-5 w-5 text-gray-500" />
-                )}
+                <h3 className="text-md font-medium text-gray-900">General Examination</h3>
+                <button type="button" className="text-gray-500">
+                  {collapsedSections.generalExamination ? 
+                    <Plus className="h-5 w-5" /> : 
+                    <Minus className="h-5 w-5" />
+                  }
+                </button>
               </div>
               
-              {expandedSections.generalExamination && (
+              {!collapsedSections.generalExamination && (
                 <div className="p-4">
                   <textarea
                     rows={3}
-                    className="form-input w-full"
+                    className="form-input"
                     placeholder="Enter general examination findings..."
+                    {...register('departmentSpecificData.generalExamination')}
                   />
                 </div>
               )}
             </div>
 
-            {/* 4. Systemic Examination */}
+            {/* Systemic Examination - Collapsible */}
             <div className="border rounded-lg overflow-hidden">
               <div 
-                className="p-3 bg-gray-50 border-b flex justify-between items-center cursor-pointer"
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
                 onClick={() => toggleSection('systemicExamination')}
               >
-                <h3 className="text-md font-medium text-gray-900">4. Systemic Examination</h3>
-                {expandedSections.systemicExamination ? (
-                  <ChevronUp className="h-5 w-5 text-gray-500" />
-                ) : (
-                  <ChevronDown className="h-5 w-5 text-gray-500" />
-                )}
+                <h3 className="text-md font-medium text-gray-900">Systemic Examination</h3>
+                <button type="button" className="text-gray-500">
+                  {collapsedSections.systemicExamination ? 
+                    <Plus className="h-5 w-5" /> : 
+                    <Minus className="h-5 w-5" />
+                  }
+                </button>
               </div>
               
-              {expandedSections.systemicExamination && (
+              {!collapsedSections.systemicExamination && (
                 <div className="p-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <h4 className="text-sm font-medium text-gray-700 mb-1">Cardiovascular System</h4>
                       <textarea
                         rows={2}
-                        className="form-input text-sm w-full"
+                        className="form-input text-sm"
                         placeholder="Enter cardiovascular findings..."
+                        {...register('departmentSpecificData.cardiovascularSystem')}
                       />
                     </div>
                     <div>
                       <h4 className="text-sm font-medium text-gray-700 mb-1">Respiratory System</h4>
                       <textarea
                         rows={2}
-                        className="form-input text-sm w-full"
+                        className="form-input text-sm"
                         placeholder="Enter respiratory findings..."
+                        {...register('departmentSpecificData.respiratorySystem')}
                       />
                     </div>
                     <div>
                       <h4 className="text-sm font-medium text-gray-700 mb-1">Gastrointestinal System</h4>
                       <textarea
                         rows={2}
-                        className="form-input text-sm w-full"
+                        className="form-input text-sm"
                         placeholder="Enter gastrointestinal findings..."
+                        {...register('departmentSpecificData.gastrointestinalSystem')}
                       />
                     </div>
                     <div>
                       <h4 className="text-sm font-medium text-gray-700 mb-1">Central Nervous System</h4>
                       <textarea
                         rows={2}
-                        className="form-input text-sm w-full"
+                        className="form-input text-sm"
                         placeholder="Enter neurological findings..."
+                        {...register('departmentSpecificData.centralNervousSystem')}
                       />
                     </div>
                     <div>
                       <h4 className="text-sm font-medium text-gray-700 mb-1">Musculoskeletal</h4>
                       <textarea
                         rows={2}
-                        className="form-input text-sm w-full"
+                        className="form-input text-sm"
                         placeholder="Enter musculoskeletal findings..."
+                        {...register('departmentSpecificData.musculoskeletal')}
                       />
                     </div>
                     <div>
                       <h4 className="text-sm font-medium text-gray-700 mb-1">Other Systems/Examination</h4>
                       <textarea
                         rows={2}
-                        className="form-input text-sm w-full"
+                        className="form-input text-sm"
                         placeholder="Enter other examination findings..."
+                        {...register('departmentSpecificData.otherSystems')}
                       />
                     </div>
                   </div>
@@ -1577,28 +1316,29 @@ const ConsultationForm: React.FC = () => {
               )}
             </div>
 
-            {/* 5. Department-Specific Fields */}
-            <div className="border rounded-lg overflow-hidden">
-              <div 
-                className="p-3 bg-gray-50 border-b flex justify-between items-center cursor-pointer"
-                onClick={() => toggleSection('departmentSpecific')}
-              >
-                <h3 className="text-md font-medium text-gray-900">
-                  5. {departmentName || 'Department'}-Specific Assessment
-                </h3>
-                {expandedSections.departmentSpecific ? (
-                  <ChevronUp className="h-5 w-5 text-gray-500" />
-                ) : (
-                  <ChevronDown className="h-5 w-5 text-gray-500" />
+            {/* Department-Specific Fields - Collapsible */}
+            {getDepartmentSpecificFields() && (
+              <div className="border rounded-lg overflow-hidden bg-blue-50 border-blue-200">
+                <div 
+                  className="bg-blue-100 p-3 flex justify-between items-center cursor-pointer"
+                  onClick={() => toggleSection('departmentSpecific')}
+                >
+                  <h3 className="text-md font-medium text-blue-900">Department-Specific Assessment</h3>
+                  <button type="button" className="text-blue-500">
+                    {collapsedSections.departmentSpecific ? 
+                      <Plus className="h-5 w-5" /> : 
+                      <Minus className="h-5 w-5" />
+                    }
+                  </button>
+                </div>
+                
+                {!collapsedSections.departmentSpecific && (
+                  <div className="p-4">
+                    {getDepartmentSpecificFields()}
+                  </div>
                 )}
               </div>
-              
-              {expandedSections.departmentSpecific && (
-                <div className="p-4">
-                  {renderDepartmentSpecificFields()}
-                </div>
-              )}
-            </div>
+            )}
 
             <div>
               <label htmlFor="diagnosis" className="form-label">Diagnosis</label>
@@ -1618,7 +1358,7 @@ const ConsultationForm: React.FC = () => {
 
         {/* Diagnostic Tests Tab */}
         {activeTab === 'diagnostics' && (
-          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6 max-h-[calc(100vh-250px)] overflow-y-auto">
+          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
             <h2 className="text-xl font-semibold text-gray-900">Diagnostic Tests</h2>
             
             <div className="flex justify-between items-center">
@@ -1772,7 +1512,7 @@ const ConsultationForm: React.FC = () => {
 
         {/* Medications Tab */}
         {activeTab === 'medications' && (
-          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6 max-h-[calc(100vh-250px)] overflow-y-auto">
+          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold text-gray-900">Prescriptions</h2>
               <button
@@ -1785,6 +1525,16 @@ const ConsultationForm: React.FC = () => {
               </button>
             </div>
             
+            {prescriptions.length === 0 || (prescriptions.length === 1 && !prescriptions[0].medication) ? (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Pill className="h-12 w-12 text-gray-300 mb-3" />
+                <h3 className="text-lg font-medium text-gray-900 mb-1">No medications prescribed yet</h3>
+                <p className="text-gray-500 max-w-md mb-2">
+                  Search for medications or add custom ones
+                </p>
+              </div>
+            ) : null}
+            
             {Array.from({ length: prescriptionCount }).map((_, index) => (
               <div key={index} className="border rounded-lg p-4 space-y-4">
                 <div className="flex justify-between items-center">
@@ -1793,7 +1543,12 @@ const ConsultationForm: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => {
+                        const updatedPrescriptions = [...prescriptions];
+                        updatedPrescriptions.splice(index, 1);
+                        setValue('prescriptions', updatedPrescriptions);
                         setPrescriptionCount(prev => prev - 1);
+                        
+                        // Show notification
                         addNotification({
                           message: 'Medication removed',
                           type: 'info',
@@ -1808,24 +1563,56 @@ const ConsultationForm: React.FC = () => {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
+                  <div className="sm:col-span-2">
                     <label className="form-label">Medication Name</label>
                     <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Pill className="h-5 w-5 text-gray-400" />
+                      </div>
                       <input
                         type="text"
-                        list="medications"
-                        {...register(`prescriptions.${index}.medication` as const, {
-                          required: 'Medication name is required'
-                        })}
-                        className="form-input"
-                        placeholder="Start typing to search..."
+                        value={prescriptions[index]?.medication || searchMedication}
+                        onChange={(e) => {
+                          if (!prescriptions[index]?.medication) {
+                            handleSearchMedication(e.target.value);
+                          } else {
+                            const updatedPrescriptions = [...prescriptions];
+                            updatedPrescriptions[index] = {
+                              ...updatedPrescriptions[index],
+                              medication: e.target.value
+                            };
+                            setValue('prescriptions', updatedPrescriptions);
+                          }
+                        }}
+                        className="form-input pl-10 pr-24"
+                        placeholder="Search medication..."
                       />
-                      <datalist id="medications">
-                        {commonMedications.map((med, i) => (
-                          <option key={i} value={med} />
-                        ))}
-                      </datalist>
+                      <div className="absolute inset-y-0 right-0 flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => handleAddCustomMedication(index)}
+                          className="h-full px-3 py-0 border-l border-gray-300 bg-gray-50 text-gray-500 hover:text-gray-700 text-sm rounded-r-md"
+                        >
+                          Add Custom
+                        </button>
+                      </div>
                     </div>
+                    
+                    {/* Medication search results */}
+                    {showMedicationResults && medicationResults.length > 0 && (
+                      <div className="absolute z-10 mt-1 w-full bg-white shadow-lg rounded-md border border-gray-200 max-h-60 overflow-auto">
+                        {medicationResults.map((med, i) => (
+                          <div
+                            key={i}
+                            className="px-4 py-2 hover:bg-gray-100 cursor-pointer flex items-center"
+                            onClick={() => handleSelectMedication(med, index)}
+                          >
+                            <Pill className="h-4 w-4 text-primary-500 mr-2" />
+                            {med}
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   <div>
@@ -1833,10 +1620,9 @@ const ConsultationForm: React.FC = () => {
                     <input
                       type="text"
                       {...register(`prescriptions.${index}.dosage` as const, {
-                        required: 'Dosage is required'
+                        required: prescriptions[index]?.medication ? 'Dosage is required' : false
                       })}
                       className="form-input"
-                      placeholder="e.g., 500mg"
                     />
                   </div>
 
@@ -1844,12 +1630,12 @@ const ConsultationForm: React.FC = () => {
                     <label className="form-label">Frequency</label>
                     <select
                       {...register(`prescriptions.${index}.frequency` as const, {
-                        required: 'Frequency is required'
+                        required: prescriptions[index]?.medication ? 'Frequency is required' : false
                       })}
                       className="form-input"
                     >
                       <option value="">Select frequency</option>
-                      {commonFrequencies.map((freq, i) => (
+                      {frequencies.map((freq, i) => (
                         <option key={i} value={freq}>{freq}</option>
                       ))}
                     </select>
@@ -1859,13 +1645,13 @@ const ConsultationForm: React.FC = () => {
                     <label className="form-label">Duration</label>
                     <select
                       {...register(`prescriptions.${index}.duration` as const, {
-                        required: 'Duration is required'
+                        required: prescriptions[index]?.medication ? 'Duration is required' : false
                       })}
                       className="form-input"
                     >
                       <option value="">Select duration</option>
-                      {commonDurations.map((dur, i) => (
-                        <option key={i} value={dur}>{dur}</option>
+                      {durations.map((duration, i) => (
+                        <option key={i} value={duration}>{duration}</option>
                       ))}
                     </select>
                   </div>
@@ -1876,7 +1662,6 @@ const ConsultationForm: React.FC = () => {
                       {...register(`prescriptions.${index}.instructions` as const)}
                       className="form-input"
                       rows={2}
-                      placeholder="e.g., Take with food, avoid alcohol"
                     />
                   </div>
                 </div>
@@ -1887,7 +1672,7 @@ const ConsultationForm: React.FC = () => {
 
         {/* Notes Tab */}
         {activeTab === 'notes' && (
-          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6 max-h-[calc(100vh-250px)] overflow-y-auto">
+          <div className="bg-white p-6 rounded-lg shadow-sm space-y-6">
             <h2 className="text-xl font-semibold text-gray-900">Additional Information</h2>
             
             <div>
@@ -1915,72 +1700,26 @@ const ConsultationForm: React.FC = () => {
               />
             </div>
 
-            <div className="border rounded-lg p-4">
-              <div className="flex items-center mb-4">
-                <input
-                  type="checkbox"
-                  id="medicalCertificate"
-                  {...register('medicalCertificate')}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                />
-                <label htmlFor="medicalCertificate" className="ml-2 flex items-center text-sm font-medium text-gray-700">
-                  <FileTextIcon className="h-5 w-5 mr-1" />
-                  Issue Medical Certificate
-                </label>
-              </div>
+            <div className="flex items-center">
+              <input
+                type="checkbox"
+                id="medicalCertificate"
+                {...register('medicalCertificate')}
+                className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+              />
+              <label htmlFor="medicalCertificate" className="ml-2 flex items-center text-sm font-medium text-gray-700">
+                <FileText className="h-5 w-5 mr-1" />
+                Issue Medical Certificate
+              </label>
               
               {medicalCertificate && (
-                <div className="space-y-4 pl-6 border-l-2 border-primary-200">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="form-label text-sm">Start Date</label>
-                      <input
-                        type="date"
-                        className="form-input"
-                        {...register('medicalCertificateDetails.startDate')}
-                        defaultValue={new Date().toISOString().split('T')[0]}
-                      />
-                    </div>
-                    <div>
-                      <label className="form-label text-sm">End Date</label>
-                      <input
-                        type="date"
-                        className="form-input"
-                        {...register('medicalCertificateDetails.endDate')}
-                        defaultValue={new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]}
-                      />
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <label className="form-label text-sm">Reason for Certificate</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      placeholder="e.g., Medical condition requiring rest"
-                      {...register('medicalCertificateDetails.reason')}
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="form-label text-sm">Recommendations</label>
-                    <textarea
-                      className="form-input"
-                      rows={2}
-                      placeholder="e.g., Rest, avoid strenuous activities"
-                      {...register('medicalCertificateDetails.recommendations')}
-                    />
-                  </div>
-                  
-                  <button
-                    type="button"
-                    onClick={() => setShowMedicalCertificatePreview(true)}
-                    className="btn btn-outline inline-flex items-center text-sm"
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    Preview & Print Certificate
-                  </button>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowMedicalCertificateModal(true)}
+                  className="ml-4 text-primary-600 text-sm hover:text-primary-700"
+                >
+                  Configure Certificate
+                </button>
               )}
             </div>
           </div>
@@ -1999,7 +1738,17 @@ const ConsultationForm: React.FC = () => {
             disabled={isSubmitting}
             className="btn btn-primary"
           >
-            {isSubmitting ? 'Submitting...' : 'Complete Consultation'}
+            {isSubmitting ? (
+              <div className="flex items-center">
+                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                Submitting...
+              </div>
+            ) : (
+              <div className="flex items-center">
+                <Save className="h-5 w-5 mr-2" />
+                Complete Consultation
+              </div>
+            )}
           </button>
         </div>
       </form>
@@ -2236,10 +1985,142 @@ const ConsultationForm: React.FC = () => {
         </div>
       )}
 
-      {/* Medical Certificate Preview Modal */}
-      {showMedicalCertificatePreview && renderMedicalCertificatePreview()}
+      {/* Medical Certificate Modal */}
+      {showMedicalCertificateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-medium text-gray-900">Medical Certificate</h3>
+              <button 
+                onClick={() => setShowMedicalCertificateModal(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Start Date</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    {...register('medicalCertificateDetails.startDate')}
+                  />
+                </div>
+                <div>
+                  <label className="form-label">End Date</label>
+                  <input
+                    type="date"
+                    className="form-input"
+                    {...register('medicalCertificateDetails.endDate')}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="form-label">Reason</label>
+                <textarea
+                  className="form-input"
+                  rows={3}
+                  placeholder="Reason for medical certificate"
+                  {...register('medicalCertificateDetails.reason')}
+                />
+              </div>
+              
+              <div>
+                <label className="form-label">Recommendations</label>
+                <textarea
+                  className="form-input"
+                  rows={3}
+                  placeholder="Recommendations for patient"
+                  {...register('medicalCertificateDetails.recommendations')}
+                />
+              </div>
+              
+              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h4 className="text-sm font-medium text-gray-900 mb-2">Preview</h4>
+                <div className="p-4 border border-gray-300 bg-white rounded">
+                  <div className="text-center mb-4">
+                    <h5 className="text-lg font-bold">{hospital?.name || 'Hospital'}</h5>
+                    <p className="text-sm">{hospital?.address || 'Hospital Address'}</p>
+                    <p className="text-sm">Phone: {hospital?.phone || 'Hospital Phone'}</p>
+                  </div>
+                  
+                  <div className="text-center mb-4">
+                    <h5 className="text-lg font-bold">MEDICAL CERTIFICATE</h5>
+                  </div>
+                  
+                  <p className="mb-4">
+                    This is to certify that <strong>{patient.first_name} {patient.last_name}</strong>, 
+                    {patient.gender === 'Male' ? ' a ' : ' a '} 
+                    {new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} year old 
+                    {patient.gender === 'Male' ? ' male' : ' female'}, 
+                    was examined by me on <strong>{new Date().toLocaleDateString()}</strong>.
+                  </p>
+                  
+                  <p className="mb-4">
+                    {medicalCertificateDetails?.reason || 'The patient requires medical leave as specified.'}
+                  </p>
+                  
+                  <p className="mb-4">
+                    The patient is advised to rest from <strong>{medicalCertificateDetails?.startDate || 'start date'}</strong> to <strong>{medicalCertificateDetails?.endDate || 'end date'}</strong>.
+                  </p>
+                  
+                  {medicalCertificateDetails?.recommendations && (
+                    <p className="mb-4">
+                      <strong>Recommendations:</strong> {medicalCertificateDetails.recommendations}
+                    </p>
+                  )}
+                  
+                  <div className="mt-8 flex justify-end">
+                    <div className="text-center">
+                      <div className="border-t border-gray-300 w-48 mb-1"></div>
+                      <p className="text-sm">Dr. {user?.first_name} {user?.last_name}</p>
+                      <p className="text-xs">{user?.specialization || 'Physician'}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => setShowMedicalCertificateModal(false)}
+                className="btn btn-outline"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  window.print();
+                  addNotification({
+                    message: 'Medical certificate printed',
+                    type: 'success'
+                  });
+                }}
+                className="btn btn-primary"
+              >
+                Print Certificate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
+
+// Minus component for collapsible sections
+const Minus: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+  </svg>
+);
 
 export default ConsultationForm;
