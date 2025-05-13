@@ -17,7 +17,11 @@ import {
   ArrowRight,
   Beaker,
   Clock,
-  Droplets
+  Droplets,
+  Microscope,
+  ChevronRight,
+  Check,
+  X
 } from 'lucide-react';
 
 interface LabTest {
@@ -659,185 +663,254 @@ const LabTestProcessForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div className="flex items-center">
-        <button 
-          onClick={() => navigate('/laboratory')}
-          className="mr-4 p-2 rounded-full hover:bg-gray-100"
-        >
-          <ArrowLeft className="h-5 w-5 text-gray-500" />
-        </button>
-        <h1 className="text-2xl font-bold text-gray-900">Process Lab Test</h1>
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* Header with workflow progress */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-primary-600 to-primary-500 px-6 py-4 flex justify-between items-center">
+          <div className="flex items-center">
+            <button 
+              onClick={() => navigate('/laboratory')}
+              className="mr-4 p-2 rounded-full text-white hover:bg-white/10"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </button>
+            <div>
+              <h1 className="text-xl font-bold text-white">Process Lab Test</h1>
+              <p className="text-primary-100 text-sm">
+                {getTestTypeLabel(test.test_type)} • {test.is_emergency && "EMERGENCY • "}
+                {test.patient.first_name} {test.patient.last_name}
+              </p>
+            </div>
+          </div>
+          
+          {/* Workflow progress indicator */}
+          <div className="hidden md:flex items-center space-x-2 text-white">
+            <div className={`flex items-center ${workflowStage === 'sample_collection' ? 'opacity-100' : 'opacity-70'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${workflowStage === 'sample_collection' ? 'bg-white text-primary-600' : 'bg-primary-400 text-white'}`}>
+                <Beaker className="h-4 w-4" />
+              </div>
+              <span className="ml-2 text-sm font-medium">Sample</span>
+            </div>
+            
+            <ChevronRight className="h-4 w-4 text-primary-200" />
+            
+            <div className={`flex items-center ${workflowStage === 'testing' ? 'opacity-100' : 'opacity-70'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${workflowStage === 'testing' ? 'bg-white text-primary-600' : workflowStage === 'review' || workflowStage === 'completed' ? 'bg-primary-400 text-white' : 'bg-primary-300/50 text-white'}`}>
+                <Microscope className="h-4 w-4" />
+              </div>
+              <span className="ml-2 text-sm font-medium">Testing</span>
+            </div>
+            
+            <ChevronRight className="h-4 w-4 text-primary-200" />
+            
+            <div className={`flex items-center ${workflowStage === 'review' ? 'opacity-100' : 'opacity-70'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${workflowStage === 'review' ? 'bg-white text-primary-600' : workflowStage === 'completed' ? 'bg-primary-400 text-white' : 'bg-primary-300/50 text-white'}`}>
+                <FileText className="h-4 w-4" />
+              </div>
+              <span className="ml-2 text-sm font-medium">Review</span>
+            </div>
+            
+            <ChevronRight className="h-4 w-4 text-primary-200" />
+            
+            <div className={`flex items-center ${workflowStage === 'completed' ? 'opacity-100' : 'opacity-70'}`}>
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${workflowStage === 'completed' ? 'bg-white text-primary-600' : 'bg-primary-300/50 text-white'}`}>
+                <CheckCircle className="h-4 w-4" />
+              </div>
+              <span className="ml-2 text-sm font-medium">Complete</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Mobile progress indicator */}
+        <div className="md:hidden flex justify-between px-6 py-3 bg-gray-50">
+          <div className={`text-xs font-medium ${workflowStage === 'sample_collection' ? 'text-primary-600' : 'text-gray-500'}`}>
+            Sample
+          </div>
+          <div className={`text-xs font-medium ${workflowStage === 'testing' ? 'text-primary-600' : 'text-gray-500'}`}>
+            Testing
+          </div>
+          <div className={`text-xs font-medium ${workflowStage === 'review' ? 'text-primary-600' : 'text-gray-500'}`}>
+            Review
+          </div>
+          <div className={`text-xs font-medium ${workflowStage === 'completed' ? 'text-primary-600' : 'text-gray-500'}`}>
+            Complete
+          </div>
+        </div>
       </div>
 
       {/* Patient and Test Info */}
-      <div className="bg-white rounded-lg shadow-sm p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div>
-          <div className="flex items-center mb-4">
-            <User className="h-5 w-5 text-gray-400 mr-2" />
-            <h2 className="text-lg font-medium text-gray-900">Patient Information</h2>
+      <div className="bg-white rounded-xl shadow-sm p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="flex space-x-4">
+          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center">
+            <User className="h-6 w-6 text-primary-600" />
           </div>
-          <p className="text-gray-700">
-            <span className="font-medium">Name:</span> {test.patient.first_name} {test.patient.last_name}
-          </p>
-          <p className="text-gray-700">
-            <span className="font-medium">DOB:</span> {new Date(test.patient.date_of_birth).toLocaleDateString()}
-          </p>
-          <p className="text-gray-700 mt-2">
-            <a href={`/patients/${test.patient.id}`} className="text-primary-600 hover:text-primary-800">
+          <div>
+            <h2 className="text-lg font-medium text-gray-900">Patient Information</h2>
+            <p className="text-gray-700 mt-1">
+              <span className="font-medium">Name:</span> {test.patient.first_name} {test.patient.last_name}
+            </p>
+            <p className="text-gray-700">
+              <span className="font-medium">DOB:</span> {new Date(test.patient.date_of_birth).toLocaleDateString()}
+            </p>
+            <a href={`/patients/${test.patient.id}`} className="text-primary-600 hover:text-primary-800 text-sm mt-1 inline-block">
               View Patient Record
             </a>
-          </p>
+          </div>
         </div>
 
-        <div>
-          <div className="flex items-center mb-4">
-            <Flask className="h-5 w-5 text-gray-400 mr-2" />
-            <h2 className="text-lg font-medium text-gray-900">Test Information</h2>
+        <div className="flex space-x-4">
+          <div className="flex-shrink-0 w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center">
+            <Flask className="h-6 w-6 text-primary-600" />
           </div>
-          <p className="text-gray-700">
-            <span className="font-medium">Test Type:</span> {getTestTypeLabel(test.test_type)}
-          </p>
-          <p className="text-gray-700">
-            <span className="font-medium">Date:</span> {new Date(test.test_date).toLocaleDateString()}
-          </p>
-          {test.is_emergency && (
-            <div className="mt-2 flex items-center text-error-600">
-              <AlertTriangle className="h-5 w-5 mr-2" />
-              <span className="font-medium">EMERGENCY</span>
-            </div>
-          )}
+          <div>
+            <h2 className="text-lg font-medium text-gray-900">Test Information</h2>
+            <p className="text-gray-700 mt-1">
+              <span className="font-medium">Test Type:</span> {getTestTypeLabel(test.test_type)}
+            </p>
+            <p className="text-gray-700">
+              <span className="font-medium">Date:</span> {new Date(test.test_date).toLocaleDateString()}
+            </p>
+            {test.is_emergency && (
+              <div className="mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-error-100 text-error-800">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                EMERGENCY
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Workflow Stages */}
       {workflowStage === 'sample_collection' && (
-        <div className="bg-white rounded-lg shadow-sm p-6 space-y-6">
-          <div className="flex items-center justify-between mb-2">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
             <h2 className="text-lg font-medium text-gray-900">Sample Collection</h2>
-            <div className="px-3 py-1 bg-primary-100 text-primary-800 text-sm font-medium rounded-full">
-              Step 1 of 3
-            </div>
+            <p className="text-sm text-gray-500 mt-1">Collect and label the patient sample for laboratory testing</p>
           </div>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="form-label required">Sample ID</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Beaker className="h-5 w-5 text-gray-400" />
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="form-label required">Sample ID</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Beaker className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      value={sampleInfo.sample_id}
+                      className="form-input pl-10 bg-gray-50"
+                      placeholder="LAB-20250511-1234"
+                      readOnly
+                    />
+                  </div>
+                  <p className="mt-1 text-xs text-gray-500">Auto-generated unique sample identifier</p>
                 </div>
-                <input
-                  type="text"
-                  value={sampleInfo.sample_id}
-                  onChange={(e) => setSampleInfo({...sampleInfo, sample_id: e.target.value})}
-                  className="form-input pl-10"
-                  placeholder="LAB-20250511-1234"
-                  readOnly
-                />
-              </div>
-              <p className="mt-1 text-xs text-gray-500">Auto-generated unique sample identifier</p>
-            </div>
-            
-            <div>
-              <label className="form-label required">Collection Time</label>
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <Clock className="h-5 w-5 text-gray-400" />
+                
+                <div>
+                  <label className="form-label required">Sample Type</label>
+                  <select
+                    value={sampleInfo.sample_type}
+                    onChange={(e) => setSampleInfo({...sampleInfo, sample_type: e.target.value})}
+                    className="form-input"
+                  >
+                    <option value="blood">Blood</option>
+                    <option value="urine">Urine</option>
+                    <option value="stool">Stool</option>
+                    <option value="sputum">Sputum</option>
+                    <option value="csf">Cerebrospinal Fluid (CSF)</option>
+                    <option value="tissue">Tissue</option>
+                    <option value="swab">Swab</option>
+                    <option value="other">Other</option>
+                  </select>
                 </div>
-                <input
-                  type="datetime-local"
-                  value={new Date(sampleInfo.collection_time).toISOString().slice(0, 16)}
-                  onChange={(e) => setSampleInfo({...sampleInfo, collection_time: new Date(e.target.value).toISOString()})}
-                  className="form-input pl-10"
-                />
+                
+                <div>
+                  <label className="form-label required">Collected By</label>
+                  <input
+                    type="text"
+                    value={sampleInfo.collected_by}
+                    onChange={(e) => setSampleInfo({...sampleInfo, collected_by: e.target.value})}
+                    className="form-input"
+                    placeholder="Lab Technician Name"
+                  />
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="form-label required">Collection Time</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Clock className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="datetime-local"
+                      value={new Date(sampleInfo.collection_time).toISOString().slice(0, 16)}
+                      onChange={(e) => setSampleInfo({...sampleInfo, collection_time: new Date(e.target.value).toISOString()})}
+                      className="form-input pl-10"
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="form-label required">Container Type</label>
+                  <select
+                    value={sampleInfo.container_type}
+                    onChange={(e) => setSampleInfo({...sampleInfo, container_type: e.target.value})}
+                    className="form-input"
+                  >
+                    <option value="tube">Blood Tube</option>
+                    <option value="edta">EDTA Tube</option>
+                    <option value="serum">Serum Separator Tube</option>
+                    <option value="heparin">Heparin Tube</option>
+                    <option value="urine_container">Urine Container</option>
+                    <option value="stool_container">Stool Container</option>
+                    <option value="swab_tube">Swab Tube</option>
+                    <option value="slide">Microscope Slide</option>
+                    <option value="vial">Vial</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="form-label">Notes</label>
+                  <textarea
+                    value={sampleInfo.notes || ''}
+                    onChange={(e) => setSampleInfo({...sampleInfo, notes: e.target.value})}
+                    className="form-input"
+                    rows={2}
+                    placeholder="Any special instructions or observations during collection"
+                  />
+                </div>
               </div>
             </div>
             
-            <div>
-              <label className="form-label required">Sample Type</label>
-              <select
-                value={sampleInfo.sample_type}
-                onChange={(e) => setSampleInfo({...sampleInfo, sample_type: e.target.value})}
-                className="form-input"
+            <div className="flex justify-end space-x-4 mt-8">
+              <button
+                onClick={() => navigate('/laboratory')}
+                className="btn btn-outline"
               >
-                <option value="blood">Blood</option>
-                <option value="urine">Urine</option>
-                <option value="stool">Stool</option>
-                <option value="sputum">Sputum</option>
-                <option value="csf">Cerebrospinal Fluid (CSF)</option>
-                <option value="tissue">Tissue</option>
-                <option value="swab">Swab</option>
-                <option value="other">Other</option>
-              </select>
-            </div>
-            
-            <div>
-              <label className="form-label required">Container Type</label>
-              <select
-                value={sampleInfo.container_type}
-                onChange={(e) => setSampleInfo({...sampleInfo, container_type: e.target.value})}
-                className="form-input"
+                Cancel
+              </button>
+              <button
+                onClick={handleSampleCollection}
+                disabled={isSaving || !sampleInfo.sample_id || !sampleInfo.sample_type || !sampleInfo.container_type}
+                className="btn btn-primary"
               >
-                <option value="tube">Blood Tube</option>
-                <option value="edta">EDTA Tube</option>
-                <option value="serum">Serum Separator Tube</option>
-                <option value="heparin">Heparin Tube</option>
-                <option value="urine_container">Urine Container</option>
-                <option value="stool_container">Stool Container</option>
-                <option value="swab_tube">Swab Tube</option>
-                <option value="slide">Microscope Slide</option>
-                <option value="vial">Vial</option>
-                <option value="other">Other</option>
-              </select>
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    Collect Sample <ArrowRight className="h-5 w-5 ml-2" />
+                  </>
+                )}
+              </button>
             </div>
-            
-            <div>
-              <label className="form-label required">Collected By</label>
-              <input
-                type="text"
-                value={sampleInfo.collected_by}
-                onChange={(e) => setSampleInfo({...sampleInfo, collected_by: e.target.value})}
-                className="form-input"
-                placeholder="Lab Technician Name"
-              />
-            </div>
-            
-            <div className="md:col-span-2">
-              <label className="form-label">Notes</label>
-              <textarea
-                value={sampleInfo.notes || ''}
-                onChange={(e) => setSampleInfo({...sampleInfo, notes: e.target.value})}
-                className="form-input"
-                rows={2}
-                placeholder="Any special instructions or observations during collection"
-              />
-            </div>
-          </div>
-          
-          <div className="flex justify-end space-x-4 mt-4">
-            <button
-              onClick={() => navigate('/laboratory')}
-              className="btn btn-outline"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSampleCollection}
-              disabled={isSaving || !sampleInfo.sample_id || !sampleInfo.sample_type || !sampleInfo.container_type}
-              className="btn btn-primary"
-            >
-              {isSaving ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  Collect Sample <ArrowRight className="h-5 w-5 ml-2" />
-                </>
-              )}
-            </button>
           </div>
         </div>
       )}
@@ -845,44 +918,49 @@ const LabTestProcessForm: React.FC = () => {
       {workflowStage === 'testing' && (
         <>
           {/* Sample Info Summary */}
-          <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-primary-500">
-            <div className="flex justify-between items-center">
-              <h3 className="text-md font-medium text-gray-900">Sample Information</h3>
-              <div className="px-3 py-1 bg-primary-100 text-primary-800 text-sm font-medium rounded-full">
-                Step 2 of 3
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div>
+                <h2 className="text-lg font-medium text-gray-900">Sample Information</h2>
+                <p className="text-sm text-gray-500 mt-1">Sample details for reference during testing</p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded-full bg-success-500"></div>
+                <span className="text-sm font-medium text-success-700">Sample Collected</span>
               </div>
             </div>
-            <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div>
+            
+            <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50/50">
+              <div className="bg-white p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Sample ID</p>
-                <p className="text-sm font-medium">{sampleInfo.sample_id}</p>
+                <p className="text-sm font-medium text-gray-900 mt-1">{sampleInfo.sample_id}</p>
               </div>
-              <div>
+              <div className="bg-white p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Sample Type</p>
-                <p className="text-sm font-medium">{sampleInfo.sample_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                <p className="text-sm font-medium text-gray-900 mt-1">{sampleInfo.sample_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
               </div>
-              <div>
+              <div className="bg-white p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Container</p>
-                <p className="text-sm font-medium">{sampleInfo.container_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                <p className="text-sm font-medium text-gray-900 mt-1">{sampleInfo.container_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
               </div>
-              <div>
+              <div className="bg-white p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Collection Time</p>
-                <p className="text-sm font-medium">{new Date(sampleInfo.collection_time).toLocaleString()}</p>
+                <p className="text-sm font-medium text-gray-900 mt-1">{new Date(sampleInfo.collection_time).toLocaleString()}</p>
               </div>
             </div>
           </div>
 
           {/* Test Results */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center">
-                <FileText className="h-5 w-5 text-gray-400 mr-2" />
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div>
                 <h2 className="text-lg font-medium text-gray-900">Test Results</h2>
+                <p className="text-sm text-gray-500 mt-1">Enter the laboratory test results</p>
               </div>
               <button
                 type="button"
                 onClick={handleAddParameter}
-                className="btn btn-outline btn-sm flex items-center"
+                className="btn btn-sm btn-primary flex items-center"
               >
                 <Plus className="h-4 w-4 mr-1" />
                 Add Parameter
@@ -915,13 +993,13 @@ const LabTestProcessForm: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {results.map((result, index) => (
-                    <tr key={index}>
+                    <tr key={index} className={result.is_abnormal ? 'bg-error-50/30' : ''}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <input
                           type="text"
                           value={result.parameter}
                           onChange={(e) => handleParameterChange(index, 'parameter', e.target.value)}
-                          className="form-input py-1 text-sm"
+                          className="form-input py-1 text-sm border-gray-200 rounded-lg"
                           placeholder="Parameter name"
                         />
                       </td>
@@ -930,7 +1008,7 @@ const LabTestProcessForm: React.FC = () => {
                           type="text"
                           value={result.value}
                           onChange={(e) => handleValueChange(index, e.target.value)}
-                          className="form-input py-1 text-sm"
+                          className={`form-input py-1 text-sm rounded-lg ${result.is_abnormal ? 'border-error-300' : 'border-gray-200'}`}
                           placeholder="Result value"
                         />
                       </td>
@@ -939,7 +1017,7 @@ const LabTestProcessForm: React.FC = () => {
                           type="text"
                           value={result.unit}
                           onChange={(e) => handleParameterChange(index, 'unit', e.target.value)}
-                          className="form-input py-1 text-sm"
+                          className="form-input py-1 text-sm border-gray-200 rounded-lg"
                           placeholder="Unit"
                         />
                       </td>
@@ -948,7 +1026,7 @@ const LabTestProcessForm: React.FC = () => {
                           type="text"
                           value={result.reference_range}
                           onChange={(e) => handleParameterChange(index, 'reference_range', e.target.value)}
-                          className="form-input py-1 text-sm"
+                          className="form-input py-1 text-sm border-gray-200 rounded-lg"
                           placeholder="Reference range"
                         />
                       </td>
@@ -956,8 +1034,8 @@ const LabTestProcessForm: React.FC = () => {
                         <select
                           value={result.is_abnormal ? 'abnormal' : 'normal'}
                           onChange={(e) => handleParameterChange(index, 'is_abnormal', e.target.value === 'abnormal')}
-                          className={`form-input py-1 text-sm ${
-                            result.is_abnormal ? 'text-error-600 border-error-300' : 'text-success-600 border-success-300'
+                          className={`form-input py-1 text-sm rounded-lg ${
+                            result.is_abnormal ? 'bg-error-50 text-error-700 border-error-300' : 'bg-success-50 text-success-700 border-success-300'
                           }`}
                         >
                           <option value="normal">Normal</option>
@@ -968,7 +1046,7 @@ const LabTestProcessForm: React.FC = () => {
                         <button
                           type="button"
                           onClick={() => handleRemoveParameter(index)}
-                          className="text-error-600 hover:text-error-900"
+                          className="text-error-600 hover:text-error-900 p-1 rounded-full hover:bg-error-50"
                         >
                           <Trash2 className="h-5 w-5" />
                         </button>
@@ -981,90 +1059,99 @@ const LabTestProcessForm: React.FC = () => {
           </div>
 
           {/* Notes and Files */}
-          <div className="bg-white rounded-lg shadow-sm p-6 space-y-4">
-            <div>
-              <label className="form-label">Notes</label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="form-input"
-                rows={3}
-                placeholder="Add any additional notes or observations"
-              />
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <h2 className="text-lg font-medium text-gray-900">Additional Information</h2>
+              <p className="text-sm text-gray-500 mt-1">Add notes and supporting documents</p>
             </div>
+            
+            <div className="p-6 space-y-6">
+              <div>
+                <label className="form-label">Notes</label>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  className="form-input rounded-lg"
+                  rows={3}
+                  placeholder="Add any additional notes or observations"
+                />
+              </div>
 
-            <div>
-              <label className="form-label">Attach Files</label>
-              <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-                <div className="space-y-1 text-center">
-                  <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                  <div className="flex text-sm text-gray-600">
-                    <label
-                      htmlFor="file-upload"
-                      className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500"
-                    >
-                      <span>Upload files</span>
-                      <input
-                        id="file-upload"
-                        name="file-upload"
-                        type="file"
-                        className="sr-only"
-                        multiple
-                        onChange={handleFileChange}
-                      />
-                    </label>
-                    <p className="pl-1">or drag and drop</p>
+              <div>
+                <label className="form-label">Attach Files</label>
+                <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
+                  <div className="space-y-1 text-center">
+                    <Upload className="mx-auto h-12 w-12 text-gray-400" />
+                    <div className="flex text-sm text-gray-600">
+                      <label
+                        htmlFor="file-upload"
+                        className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500"
+                      >
+                        <span>Upload files</span>
+                        <input
+                          id="file-upload"
+                          name="file-upload"
+                          type="file"
+                          className="sr-only"
+                          multiple
+                          onChange={handleFileChange}
+                        />
+                      </label>
+                      <p className="pl-1">or drag and drop</p>
+                    </div>
+                    <p className="text-xs text-gray-500">
+                      PNG, JPG, PDF up to 10MB
+                    </p>
                   </div>
-                  <p className="text-xs text-gray-500">
-                    PNG, JPG, PDF up to 10MB
-                  </p>
                 </div>
               </div>
-            </div>
 
-            {/* Display uploaded files */}
-            {(uploadedFiles.length > 0 || fileUrls.length > 0) && (
-              <div className="mt-4">
-                <h3 className="text-sm font-medium text-gray-700">Files</h3>
-                <ul className="mt-2 divide-y divide-gray-200">
-                  {fileUrls.map((url, index) => (
-                    <li key={`url-${index}`} className="py-3 flex justify-between items-center">
-                      <div className="flex items-center">
-                        <FileText className="h-5 w-5 text-gray-400 mr-2" />
-                        <span className="text-sm text-gray-900">
-                          {url.split('/').pop()}
-                        </span>
+              {/* Display uploaded files */}
+              {(uploadedFiles.length > 0 || fileUrls.length > 0) && (
+                <div className="mt-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Files</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {fileUrls.map((url, index) => (
+                      <div key={`url-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center">
+                          <FileText className="h-5 w-5 text-gray-400 mr-2" />
+                          <span className="text-sm text-gray-900 truncate max-w-[180px]">
+                            {url.split('/').pop()}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFileUrl(index)}
+                          className="text-error-600 hover:text-error-900 p-1 rounded-full hover:bg-error-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFileUrl(index)}
-                        className="text-error-600 hover:text-error-900"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    </li>
-                  ))}
-                  {uploadedFiles.map((file, index) => (
-                    <li key={`file-${index}`} className="py-3 flex justify-between items-center">
-                      <div className="flex items-center">
-                        <FileText className="h-5 w-5 text-gray-400 mr-2" />
-                        <span className="text-sm text-gray-900">{file.name}</span>
-                        <span className="ml-2 text-xs text-gray-500">
-                          {(file.size / 1024).toFixed(0)} KB
-                        </span>
+                    ))}
+                    {uploadedFiles.map((file, index) => (
+                      <div key={`file-${index}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="flex items-center">
+                          <FileText className="h-5 w-5 text-gray-400 mr-2" />
+                          <div>
+                            <span className="text-sm text-gray-900 truncate max-w-[180px] block">{file.name}</span>
+                            <span className="text-xs text-gray-500">
+                              {(file.size / 1024).toFixed(0)} KB
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveFile(index)}
+                          className="text-error-600 hover:text-error-900 p-1 rounded-full hover:bg-error-50"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFile(index)}
-                        className="text-error-600 hover:text-error-900"
-                      >
-                        <Trash2 className="h-5 w-5" />
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Action Buttons */}
@@ -1098,38 +1185,43 @@ const LabTestProcessForm: React.FC = () => {
       {workflowStage === 'review' && (
         <>
           {/* Sample Info Summary */}
-          <div className="bg-white rounded-lg shadow-sm p-4 border-l-4 border-primary-500">
-            <h3 className="text-md font-medium text-gray-900">Sample Information</h3>
-            <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
               <div>
+                <h2 className="text-lg font-medium text-gray-900">Sample Information</h2>
+                <p className="text-sm text-gray-500 mt-1">Sample details for reference during review</p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-3 h-3 rounded-full bg-success-500"></div>
+                <span className="text-sm font-medium text-success-700">Sample Collected</span>
+              </div>
+            </div>
+            
+            <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50/50">
+              <div className="bg-white p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Sample ID</p>
-                <p className="text-sm font-medium">{sampleInfo.sample_id}</p>
+                <p className="text-sm font-medium text-gray-900 mt-1">{sampleInfo.sample_id}</p>
               </div>
-              <div>
+              <div className="bg-white p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Sample Type</p>
-                <p className="text-sm font-medium">{sampleInfo.sample_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                <p className="text-sm font-medium text-gray-900 mt-1">{sampleInfo.sample_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
               </div>
-              <div>
+              <div className="bg-white p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Container</p>
-                <p className="text-sm font-medium">{sampleInfo.container_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
+                <p className="text-sm font-medium text-gray-900 mt-1">{sampleInfo.container_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}</p>
               </div>
-              <div>
+              <div className="bg-white p-3 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Collection Time</p>
-                <p className="text-sm font-medium">{new Date(sampleInfo.collection_time).toLocaleString()}</p>
+                <p className="text-sm font-medium text-gray-900 mt-1">{new Date(sampleInfo.collection_time).toLocaleString()}</p>
               </div>
             </div>
           </div>
 
           {/* Test Results Review */}
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center">
-                <FileText className="h-5 w-5 text-gray-400 mr-2" />
-                <h2 className="text-lg font-medium text-gray-900">Review Test Results</h2>
-              </div>
-              <div className="px-3 py-1 bg-primary-100 text-primary-800 text-sm font-medium rounded-full">
-                Step 3 of 3
-              </div>
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <h2 className="text-lg font-medium text-gray-900">Review Test Results</h2>
+              <p className="text-sm text-gray-500 mt-1">Verify the accuracy of test results before finalizing</p>
             </div>
             
             <div className="overflow-x-auto">
@@ -1155,7 +1247,7 @@ const LabTestProcessForm: React.FC = () => {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {results.map((result, index) => (
-                    <tr key={index} className={result.is_abnormal ? 'bg-error-50' : ''}>
+                    <tr key={index} className={result.is_abnormal ? 'bg-error-50/30' : ''}>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm font-medium text-gray-900">{result.parameter}</span>
                       </td>
@@ -1171,7 +1263,7 @@ const LabTestProcessForm: React.FC = () => {
                         <span className="text-sm text-gray-900">{result.reference_range}</span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
                           result.is_abnormal ? 'bg-error-100 text-error-800' : 'bg-success-100 text-success-800'
                         }`}>
                           {result.is_abnormal ? 'Abnormal' : 'Normal'}
@@ -1185,50 +1277,59 @@ const LabTestProcessForm: React.FC = () => {
 
             {/* Notes */}
             {notes && (
-              <div className="mt-4 p-4 bg-gray-50 rounded-md">
-                <h3 className="text-sm font-medium text-gray-900">Technician Notes</h3>
-                <p className="mt-1 text-sm text-gray-700">{notes}</p>
+              <div className="m-6 p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-sm font-medium text-gray-900 mb-2">Technician Notes</h3>
+                <p className="text-sm text-gray-700">{notes}</p>
               </div>
             )}
 
             {/* Files */}
             {fileUrls.length > 0 && (
-              <div className="mt-4">
-                <h3 className="text-sm font-medium text-gray-900">Attached Files</h3>
-                <ul className="mt-2 divide-y divide-gray-200">
+              <div className="mx-6 mb-6">
+                <h3 className="text-sm font-medium text-gray-900 mb-3">Attached Files</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {fileUrls.map((url, index) => (
-                    <li key={index} className="py-2 flex items-center">
+                    <div key={index} className="flex items-center p-3 bg-gray-50 rounded-lg">
                       <FileText className="h-5 w-5 text-gray-400 mr-2" />
                       <a 
                         href={url} 
                         target="_blank" 
                         rel="noopener noreferrer"
-                        className="text-sm text-primary-600 hover:text-primary-800"
+                        className="text-sm text-primary-600 hover:text-primary-800 truncate"
                       >
                         {url.split('/').pop()}
                       </a>
-                    </li>
+                    </div>
                   ))}
-                </ul>
+                </div>
               </div>
             )}
+          </div>
 
-            {/* Review Form */}
-            <div className="mt-6 p-4 bg-gray-50 rounded-md">
-              <h3 className="text-sm font-medium text-gray-900">Review Comments</h3>
-              <textarea
-                value={reviewNotes}
-                onChange={(e) => setReviewNotes(e.target.value)}
-                className="form-input mt-2"
-                rows={3}
-                placeholder="Add any review comments or observations"
-              />
+          {/* Review Form */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+              <h2 className="text-lg font-medium text-gray-900">Review Decision</h2>
+              <p className="text-sm text-gray-500 mt-1">Approve or reject the test results</p>
+            </div>
+            
+            <div className="p-6">
+              <div className="mb-4">
+                <label className="form-label">Review Comments</label>
+                <textarea
+                  value={reviewNotes}
+                  onChange={(e) => setReviewNotes(e.target.value)}
+                  className="form-input rounded-lg"
+                  rows={3}
+                  placeholder="Add any review comments or observations"
+                />
+              </div>
               
-              <div className="mt-4 flex justify-end space-x-4">
+              <div className="flex flex-col sm:flex-row sm:justify-end space-y-3 sm:space-y-0 sm:space-x-4 mt-6">
                 <button
                   onClick={() => handleReviewResults(false)}
                   disabled={isSaving}
-                  className="btn btn-outline text-error-600 border-error-300 hover:bg-error-50"
+                  className="btn btn-outline border-error-300 text-error-600 hover:bg-error-50 flex-1 sm:flex-initial"
                 >
                   {isSaving ? (
                     <>
@@ -1245,7 +1346,7 @@ const LabTestProcessForm: React.FC = () => {
                 <button
                   onClick={() => handleReviewResults(true)}
                   disabled={isSaving}
-                  className="btn btn-primary"
+                  className="btn btn-primary flex-1 sm:flex-initial"
                 >
                   {isSaving ? (
                     <>
@@ -1266,10 +1367,12 @@ const LabTestProcessForm: React.FC = () => {
       )}
 
       {workflowStage === 'completed' && (
-        <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-          <CheckCircle className="h-16 w-16 text-success-500 mx-auto mb-4" />
+        <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+          <div className="w-16 h-16 mx-auto bg-success-100 rounded-full flex items-center justify-center mb-4">
+            <CheckCircle className="h-8 w-8 text-success-600" />
+          </div>
           <h2 className="text-xl font-medium text-gray-900 mb-2">Test Results Finalized</h2>
-          <p className="text-gray-600 mb-6">This test has been completed and the results have been finalized.</p>
+          <p className="text-gray-600 mb-6 max-w-md mx-auto">This test has been completed and the results have been finalized. The results are now available to the requesting physician.</p>
           <button
             onClick={() => navigate('/laboratory')}
             className="btn btn-primary"

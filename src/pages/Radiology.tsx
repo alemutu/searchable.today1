@@ -262,14 +262,74 @@ const Radiology: React.FC = () => {
   }
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center space-x-2">
-        <Link to="/dashboard" className="text-gray-500 hover:text-gray-700">
-          <ArrowLeft className="w-4 h-4" />
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">Radiology</h1>
-          <p className="text-xs text-gray-500">Imaging & Scan Management</p>
+    <div className="space-y-5">
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <div className="bg-gradient-to-r from-secondary-600 to-secondary-500 px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <div className="p-2 bg-white/10 rounded-lg">
+                <Microscope className="h-6 w-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white">Radiology</h1>
+                <p className="text-secondary-100 text-sm">Imaging & Scan Management</p>
+              </div>
+            </div>
+            <Link to="/radiology/new-scan" className="btn bg-white text-secondary-600 hover:bg-white/90 shadow-sm flex items-center">
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Scan
+            </Link>
+          </div>
+        </div>
+        
+        <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50">
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-500">Pending</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900">{pendingCount}</p>
+              </div>
+              <div className="p-2 rounded-full bg-warning-100">
+                <Clock className="h-5 w-5 text-warning-600" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-500">In Progress</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900">{inProgressCount}</p>
+              </div>
+              <div className="p-2 rounded-full bg-secondary-100">
+                <Microscope className="h-5 w-5 text-secondary-600" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-500">Completed</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900">{completedCount}</p>
+              </div>
+              <div className="p-2 rounded-full bg-success-100">
+                <CheckCircle className="h-5 w-5 text-success-600" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-4 rounded-lg shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-500">Urgent</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900">{urgentCount}</p>
+              </div>
+              <div className="p-2 rounded-full bg-error-100">
+                <AlertTriangle className="h-5 w-5 text-error-600" />
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -297,9 +357,9 @@ const Radiology: React.FC = () => {
           }`}
           onClick={() => setActiveTab('in_progress')}
         >
-          <Microscope className="h-4 w-4 text-primary-500" />
+          <Microscope className="h-4 w-4 text-secondary-500" />
           <span className="font-medium text-sm">In Progress</span>
-          <span className="ml-auto bg-primary-100 text-primary-800 rounded-full w-5 h-5 flex items-center justify-center text-xs">
+          <span className="ml-auto bg-secondary-100 text-secondary-800 rounded-full w-5 h-5 flex items-center justify-center text-xs">
             {inProgressCount}
           </span>
         </div>
@@ -314,7 +374,7 @@ const Radiology: React.FC = () => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="form-input pl-7 py-1.5 text-sm w-full"
+            className="form-input pl-7 py-1.5 text-sm w-full rounded-lg"
             placeholder="Search scans..."
           />
         </div>
@@ -323,7 +383,7 @@ const Radiology: React.FC = () => {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="form-input appearance-none pr-7 py-1.5 text-sm"
+            className="form-input appearance-none pr-7 py-1.5 text-sm rounded-lg"
           >
             <option value="all">All Priority</option>
             <option value="normal">Normal</option>
@@ -339,24 +399,24 @@ const Radiology: React.FC = () => {
       <div className="flex space-x-3">
         {/* Left Section - Scan Queue */}
         <div className="w-2/3">
-          <div className="bg-white rounded-lg shadow-sm">
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             {filteredResults.length === 0 ? (
               <div className="p-6 text-center">
-                <div className="mx-auto w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-                  <Microscope className="h-5 w-5 text-gray-400" />
+                <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                  <Microscope className="h-8 w-8 text-gray-400" />
                 </div>
                 <h3 className="text-base font-medium text-gray-900 mb-1">No scans {activeTab === 'pending' ? 'pending' : 'in progress'}</h3>
-                <p className="text-xs text-gray-500">There are currently no scans in this category</p>
+                <p className="text-sm text-gray-500 max-w-md mx-auto">There are currently no scans in this category. New scans will appear here when ordered by physicians.</p>
               </div>
             ) : (
-              <div className="divide-y divide-gray-200">
-                {filteredResults.map((result) => (
-                  <div key={result.id} className={`p-3 hover:bg-gray-50 ${result.is_emergency ? 'bg-error-50' : ''}`}>
+              <div>
+                {filteredResults.map((result, index) => (
+                  <div key={result.id} className={`p-4 ${index !== filteredResults.length - 1 ? 'border-b border-gray-200' : ''} hover:bg-gray-50 transition-colors ${result.is_emergency ? 'bg-error-50/50' : ''}`}>
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm">
+                      <div className="flex-shrink-0 h-10 w-10 rounded-full bg-secondary-100 flex items-center justify-center text-secondary-700 font-medium text-sm">
                         {result.patient.first_name.charAt(0)}
                       </div>
-                      <div className="ml-3 flex-1">
+                      <div className="ml-4 flex-1">
                         <div className="flex items-center justify-between">
                           <div>
                             <h3 className="text-base font-medium text-gray-900">
@@ -375,35 +435,36 @@ const Radiology: React.FC = () => {
                           </div>
                           <div className="flex items-center space-x-2">
                             {result.is_emergency && (
-                              <span className="px-2 py-0.5 inline-flex text-xs leading-5 font-medium rounded-full bg-error-100 text-error-800">
-                                Emergency
+                              <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-error-100 text-error-800">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                EMERGENCY
                               </span>
                             )}
                             {activeTab === 'pending' ? (
                               <button 
                                 onClick={() => handleStartScan(result.id)}
-                                className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
+                                className="btn btn-primary inline-flex items-center text-xs py-1.5 px-3 rounded-lg"
                               >
-                                Start Scan <FileImage className="h-3 w-3 ml-1" />
+                                Start Scan <FileImage className="h-3 w-3 ml-1.5" />
                               </button>
                             ) : (
                               <button 
                                 onClick={() => handleProcessScan(result.id)}
-                                className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
+                                className="btn btn-primary inline-flex items-center text-xs py-1.5 px-3 rounded-lg"
                               >
-                                Process Scan <ArrowRight className="h-3 w-3 ml-1" />
+                                Process Scan <ArrowRight className="h-3 w-3 ml-1.5" />
                               </button>
                             )}
                           </div>
                         </div>
-                        <div className="mt-0.5">
-                          <span className="text-xs font-medium">Scan: </span>
-                          <span className="text-xs">{getScanTypeLabel(result.scan_type)}</span>
+                        <div className="mt-1 flex items-center">
+                          <span className="text-xs font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full">
+                            {getScanTypeLabel(result.scan_type)}
+                          </span>
                           {result.scan_info?.equipment_used && (
-                            <>
-                              <span className="mx-1">•</span>
-                              <span className="text-xs">{getEquipmentLabel(result.scan_info.equipment_used)}</span>
-                            </>
+                            <span className="ml-2 text-xs text-gray-500">
+                              {getEquipmentLabel(result.scan_info.equipment_used)}
+                            </span>
                           )}
                         </div>
                       </div>
@@ -417,90 +478,98 @@ const Radiology: React.FC = () => {
 
         {/* Right Section - Overview and Quick Actions */}
         <div className="w-1/3 space-y-3">
-          {/* Overview Card */}
-          <div className="bg-white rounded-lg shadow-sm p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-base font-medium text-gray-900">Radiology Overview</h2>
-              <span className="text-xs text-gray-500">Today</span>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
-                <div className="flex items-center">
-                  <Clock className="h-4 w-4 text-gray-400 mr-1.5" />
-                  <span className="text-sm text-gray-700">Pending</span>
-                </div>
-                <span className="font-medium text-sm">{pendingCount}</span>
-              </div>
-              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
-                <div className="flex items-center">
-                  <Microscope className="h-4 w-4 text-primary-500 mr-1.5" />
-                  <span className="text-sm text-gray-700">In Progress</span>
-                </div>
-                <span className="font-medium text-sm">{inProgressCount}</span>
-              </div>
-              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
-                <div className="flex items-center">
-                  <CheckCircle className="h-4 w-4 text-success-500 mr-1.5" />
-                  <span className="text-sm text-gray-700">Completed</span>
-                </div>
-                <span className="font-medium text-sm">{completedCount}</span>
-              </div>
-              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
-                <div className="flex items-center">
-                  <AlertTriangle className="h-4 w-4 text-warning-500 mr-1.5" />
-                  <span className="text-sm text-gray-700">Urgent</span>
-                </div>
-                <span className="font-medium text-sm">{urgentCount}</span>
-              </div>
-            </div>
-          </div>
-
           {/* Quick Actions Card */}
-          <div className="bg-white rounded-lg shadow-sm p-3">
-            <div className="flex items-center justify-between mb-2">
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
               <h2 className="text-base font-medium text-gray-900">Quick Actions</h2>
             </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Link to="/radiology/new-scan" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200">
-                <Plus className="h-4 w-4 text-primary-500 mr-1.5" />
+            <div className="p-4 grid grid-cols-2 gap-2">
+              <Link to="/radiology/new-scan" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200 transition-colors">
+                <Plus className="h-4 w-4 text-secondary-500 mr-1.5" />
                 <span className="text-xs text-gray-700">New Scan</span>
               </Link>
-              <Link to="/patients" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200">
-                <FileText className="h-4 w-4 text-primary-500 mr-1.5" />
+              <Link to="/patients" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200 transition-colors">
+                <FileText className="h-4 w-4 text-secondary-500 mr-1.5" />
                 <span className="text-xs text-gray-700">View Records</span>
               </Link>
-              <Link to="/reception" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200">
-                <User className="h-4 w-4 text-primary-500 mr-1.5" />
+              <Link to="/reception" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200 transition-colors">
+                <User className="h-4 w-4 text-secondary-500 mr-1.5" />
                 <span className="text-xs text-gray-700">Reception</span>
               </Link>
-              <Link to="/appointments" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200">
-                <Calendar className="h-4 w-4 text-primary-500 mr-1.5" />
+              <Link to="/appointments" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200 transition-colors">
+                <Calendar className="h-4 w-4 text-secondary-500 mr-1.5" />
                 <span className="text-xs text-gray-700">Appointments</span>
               </Link>
             </div>
           </div>
 
           {/* Reference Card */}
-          <div className="bg-white rounded-lg shadow-sm p-3">
-            <div className="flex items-center justify-between mb-2">
-              <h2 className="text-base font-medium text-gray-900 flex items-center">
-                <FileImage className="h-4 w-4 text-primary-500 mr-1.5" />
-                Scan Reference
-              </h2>
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div className="flex items-center">
+                <FileImage className="h-4 w-4 text-secondary-500 mr-1.5" />
+                <h2 className="text-base font-medium text-gray-900">Scan Reference</h2>
+              </div>
               <ChevronDown className="h-4 w-4 text-gray-400" />
             </div>
-            <div className="space-y-2">
-              <div>
-                <h3 className="text-xs font-medium text-gray-700 mb-1">Common Scans</h3>
-                <div className="grid grid-cols-2 gap-1 text-xs">
-                  <div className="text-gray-600">X-Ray</div>
-                  <div className="text-right">Chest, Bone, Abdomen</div>
-                  <div className="text-gray-600">CT Scan</div>
-                  <div className="text-right">Head, Chest, Abdomen</div>
-                  <div className="text-gray-600">MRI</div>
-                  <div className="text-right">Brain, Spine, Joints</div>
-                  <div className="text-gray-600">Ultrasound</div>
-                  <div className="text-right">Abdomen, Pelvis, Cardiac</div>
+            <div className="p-4">
+              <h3 className="text-xs font-medium text-gray-700 mb-2">Common Scans</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center p-2 rounded-md hover:bg-gray-50">
+                  <span className="text-xs text-gray-600">X-Ray</span>
+                  <span className="text-xs text-gray-600">Chest, Bone, Abdomen</span>
+                </div>
+                <div className="flex justify-between items-center p-2 rounded-md hover:bg-gray-50">
+                  <span className="text-xs text-gray-600">CT Scan</span>
+                  <span className="text-xs text-gray-600">Head, Chest, Abdomen</span>
+                </div>
+                <div className="flex justify-between items-center p-2 rounded-md hover:bg-gray-50">
+                  <span className="text-xs text-gray-600">MRI</span>
+                  <span className="text-xs text-gray-600">Brain, Spine, Joints</span>
+                </div>
+                <div className="flex justify-between items-center p-2 rounded-md hover:bg-gray-50">
+                  <span className="text-xs text-gray-600">Ultrasound</span>
+                  <span className="text-xs text-gray-600">Abdomen, Pelvis, Cardiac</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Workflow Stages Card */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+              <h2 className="text-base font-medium text-gray-900">Workflow Stages</h2>
+            </div>
+            <div className="p-4">
+              <div className="space-y-3">
+                <div className="flex items-center p-2 rounded-md bg-gray-50">
+                  <div className="w-6 h-6 rounded-full bg-warning-100 flex items-center justify-center mr-2">
+                    <span className="text-xs font-medium text-warning-700">1</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-700">Scan Setup</p>
+                    <p className="text-xs text-gray-500">Prepare equipment and patient</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center p-2 rounded-md bg-gray-50">
+                  <div className="w-6 h-6 rounded-full bg-secondary-100 flex items-center justify-center mr-2">
+                    <span className="text-xs font-medium text-secondary-700">2</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-700">Processing</p>
+                    <p className="text-xs text-gray-500">Analyze images and document findings</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-center p-2 rounded-md bg-gray-50">
+                  <div className="w-6 h-6 rounded-full bg-success-100 flex items-center justify-center mr-2">
+                    <span className="text-xs font-medium text-success-700">3</span>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-gray-700">Complete</p>
+                    <p className="text-xs text-gray-500">Results sent to requesting physician</p>
+                  </div>
                 </div>
               </div>
             </div>
