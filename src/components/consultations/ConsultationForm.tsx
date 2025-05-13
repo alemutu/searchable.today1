@@ -76,4 +76,13 @@ interface Appointment {
   doctor: string;
 }
 
-export default React;
+const ConsultationForm: React.FC = () => {
+  // Component implementation will go here
+  return (
+    <div>
+      {/* Component content will go here */}
+    </div>
+  );
+};
+
+export default ConsultationForm;
