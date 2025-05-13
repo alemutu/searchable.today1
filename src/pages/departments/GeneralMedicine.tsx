@@ -1,29 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { 
-  Search, 
-  Filter, 
-  Stethoscope, 
-  CheckCircle, 
-  Clock, 
-  ArrowLeft, 
-  FileText, 
-  User, 
-  Calendar, 
-  ChevronDown,
-  Activity,
-  AlertTriangle,
-  Layers,
-  MoreHorizontal,
-  XCircle,
-  Loader2,
-  Flask,
-  Microscope,
-  DollarSign,
-  Pill,
-  Building2
-} from 'lucide-react';
+import { Search, Filter, Stethoscope, CheckCircle, Clock, ArrowLeft, FileText, User, Calendar, ChevronDown, Activity, AlertTriangle, Layers, MoreHorizontal, XCircle, Loader2, FlaskRound as Flask, Microscope, DollarSign, Pill, Building2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface Patient {
