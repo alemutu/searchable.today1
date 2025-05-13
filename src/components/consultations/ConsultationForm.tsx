@@ -1,55 +1,51 @@
 import React, { useState, useEffect } from 'react';
-import { useForm, Controller, useFieldArray } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { 
-  User as UserIcon, 
-  Calendar, 
-  Stethoscope, 
-  FileText, 
-  Pill, 
-  Save, 
-  ArrowLeft, 
-  Plus, 
-  Trash2, 
-  CheckCircle, 
-  AlertTriangle, 
-  Clock,
-  FlaskRound as Flask,
-  Microscope,
-  ArrowUpRight,
-  FileBarChart2,
-  Building2
-} from 'lucide-react';
+import { User as UserIcon, Calendar, Stethoscope, FileText, Pill, Save, ArrowLeft, Plus, Trash2, CheckCircle, AlertTriangle, ClipboardList, FileCheck, ArrowUpRight, FlaskRound as Flask, Microscope, DollarSign, Printer, Activity, Heart, Thermometer, Settings as Lungs, Droplets, Scale, Ruler, Calculator, Clock, Brain, Building2 } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 
 interface ConsultationFormData {
   chiefComplaint: string;
+  history: string;
+  examination: string;
   diagnosis: string;
   treatmentPlan: string;
   notes: string;
+  followUpDate: string;
+  followUpNotes: string;
   medicalCertificate: boolean;
-  prescriptions: {
+  certificateType: string;
+  certificateDays: number;
+  certificateNotes: string;
+  medications: {
+    id: string;
     medication: string;
     dosage: string;
     frequency: string;
     duration: string;
     instructions: string;
+    quantity: number;
+    price: number;
   }[];
   labTests: {
-    testName: string;
+    id: string;
+    name: string;
+    instructions: string;
     price: number;
-    urgent: boolean;
   }[];
   radiologyTests: {
-    testName: string;
+    id: string;
+    name: string;
+    instructions: string;
     price: number;
-    urgent: boolean;
   }[];
   referral: {
     departmentId: string;
     reason: string;
     notes: string;
+    urgency: 'routine' | 'urgent' | 'emergency';
   } | null;
 }
 
@@ -78,28 +74,79 @@ interface Department {
   name: string;
 }
 
-interface LabTest {
-  id: string;
-  name: string;
-  price: number;
-  department: string;
+interface VitalSigns {
+  temperature: number | null;
+  heartRate: number | null;
+  respiratoryRate: number | null;
+  bloodPressureSystolic: number | null;
+  bloodPressureDiastolic: number | null;
+  oxygenSaturation: number | null;
+  weight: number | null;
+  height: number | null;
+  bmi: number | null;
+  painLevel: number | null;
 }
 
-interface RadiologyTest {
-  id: string;
-  name: string;
-  price: number;
-  department: string;
-}
+// Mock data for medications with inventory status
+const availableMedications = [
+  { id: '1', name: 'Amoxicillin', dosages: ['250mg', '500mg'], inStock: true, price: 15.50 },
+  { id: '2', name: 'Paracetamol', dosages: ['500mg'], inStock: true, price: 5.25 },
+  { id: '3', name: 'Ibuprofen', dosages: ['200mg', '400mg'], inStock: true, price: 7.80 },
+  { id: '4', name: 'Omeprazole', dosages: ['20mg'], inStock: true, price: 12.40 },
+  { id: '5', name: 'Metformin', dosages: ['500mg', '850mg'], inStock: true, price: 9.60 },
+  { id: '6', name: 'Atorvastatin', dosages: ['10mg', '20mg'], inStock: false, price: 18.75 },
+  { id: '7', name: 'Lisinopril', dosages: ['5mg', '10mg'], inStock: true, price: 11.30 },
+  { id: '8', name: 'Salbutamol', dosages: ['100mcg'], inStock: true, price: 14.20 },
+  { id: '9', name: 'Prednisolone', dosages: ['5mg'], inStock: false, price: 16.90 },
+  { id: '10', name: 'Azithromycin', dosages: ['250mg', '500mg'], inStock: true, price: 22.50 },
+];
 
-interface Medication {
-  id: string;
-  name: string;
-  dosage: string[];
-  price: number;
-  inStock: boolean;
-  quantity: number;
-}
+// Mock data for lab tests with prices
+const availableLabTests = [
+  { id: '1', name: 'Complete Blood Count (CBC)', category: 'Hematology', price: 25.00 },
+  { id: '2', name: 'Basic Metabolic Panel', category: 'Chemistry', price: 35.50 },
+  { id: '3', name: 'Comprehensive Metabolic Panel', category: 'Chemistry', price: 45.75 },
+  { id: '4', name: 'Lipid Panel', category: 'Chemistry', price: 30.25 },
+  { id: '5', name: 'Liver Function Tests', category: 'Chemistry', price: 40.00 },
+  { id: '6', name: 'Thyroid Function Tests', category: 'Endocrinology', price: 55.50 },
+  { id: '7', name: 'Hemoglobin A1C', category: 'Endocrinology', price: 35.00 },
+  { id: '8', name: 'Urinalysis', category: 'Urine Studies', price: 20.00 },
+  { id: '9', name: 'Urine Culture', category: 'Microbiology', price: 45.00 },
+  { id: '10', name: 'Blood Culture', category: 'Microbiology', price: 65.00 },
+  { id: '11', name: 'COVID-19 PCR Test', category: 'Virology', price: 85.00 },
+  { id: '12', name: 'Rapid Strep Test', category: 'Microbiology', price: 30.00 },
+  { id: '13', name: 'Pregnancy Test (Blood)', category: 'Endocrinology', price: 40.00 },
+  { id: '14', name: 'Ferritin', category: 'Hematology', price: 35.00 },
+  { id: '15', name: 'Vitamin D', category: 'Chemistry', price: 60.00 },
+];
+
+// Mock data for radiology tests with prices
+const availableRadiologyTests = [
+  { id: '1', name: 'Chest X-Ray', category: 'X-Ray', price: 75.00 },
+  { id: '2', name: 'Abdominal X-Ray', category: 'X-Ray', price: 85.00 },
+  { id: '3', name: 'CT Scan - Head', category: 'CT Scan', price: 350.00 },
+  { id: '4', name: 'CT Scan - Chest', category: 'CT Scan', price: 450.00 },
+  { id: '5', name: 'CT Scan - Abdomen', category: 'CT Scan', price: 500.00 },
+  { id: '6', name: 'MRI - Brain', category: 'MRI', price: 750.00 },
+  { id: '7', name: 'MRI - Spine', category: 'MRI', price: 800.00 },
+  { id: '8', name: 'MRI - Knee', category: 'MRI', price: 650.00 },
+  { id: '9', name: 'Ultrasound - Abdomen', category: 'Ultrasound', price: 200.00 },
+  { id: '10', name: 'Ultrasound - Pelvis', category: 'Ultrasound', price: 225.00 },
+  { id: '11', name: 'Ultrasound - Thyroid', category: 'Ultrasound', price: 175.00 },
+  { id: '12', name: 'Mammogram', category: 'X-Ray', price: 250.00 },
+  { id: '13', name: 'Bone Density Scan', category: 'X-Ray', price: 175.00 },
+  { id: '14', name: 'Echocardiogram', category: 'Ultrasound', price: 350.00 },
+  { id: '15', name: 'PET Scan', category: 'Nuclear Medicine', price: 1200.00 },
+];
+
+// Certificate templates
+const certificateTemplates = [
+  { id: 'sick_leave', name: 'Sick Leave Certificate', days: 3 },
+  { id: 'fitness', name: 'Medical Fitness Certificate', days: 0 },
+  { id: 'travel', name: 'Fit to Travel Certificate', days: 0 },
+  { id: 'return_to_work', name: 'Return to Work Certificate', days: 0 },
+  { id: 'school_absence', name: 'School Absence Certificate', days: 3 },
+];
 
 const ConsultationForm: React.FC = () => {
   const { hospital, user } = useAuthStore();
@@ -110,59 +157,65 @@ const ConsultationForm: React.FC = () => {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [labTests, setLabTests] = useState<LabTest[]>([]);
-  const [radiologyTests, setRadiologyTests] = useState<RadiologyTest[]>([]);
-  const [medications, setMedications] = useState<Medication[]>([]);
-  const [showLabTests, setShowLabTests] = useState(false);
-  const [showRadiologyTests, setShowRadiologyTests] = useState(false);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('all');
+  const [activeTab, setActiveTab] = useState<'history' | 'examination' | 'diagnosis' | 'diagnostics' | 'medication' | 'certificate' | 'summary'>('history');
+  const [vitalSigns, setVitalSigns] = useState<VitalSigns | null>(null);
+  const [showLabTestsModal, setShowLabTestsModal] = useState(false);
+  const [showRadiologyTestsModal, setShowRadiologyTestsModal] = useState(false);
+  const [showReferralModal, setShowReferralModal] = useState(false);
+  const [filteredLabTests, setFilteredLabTests] = useState(availableLabTests);
+  const [filteredRadiologyTests, setFilteredRadiologyTests] = useState(availableRadiologyTests);
+  const [labTestSearchTerm, setLabTestSearchTerm] = useState('');
+  const [radiologyTestSearchTerm, setRadiologyTestSearchTerm] = useState('');
+  const [showCertificatePreview, setShowCertificatePreview] = useState(false);
   
-  const { register, handleSubmit, control, setValue, watch, formState: { errors } } = useForm<ConsultationFormData>({
+  const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<ConsultationFormData>({
     defaultValues: {
       chiefComplaint: '',
+      history: '',
+      examination: '',
       diagnosis: '',
       treatmentPlan: '',
       notes: '',
+      followUpDate: '',
+      followUpNotes: '',
       medicalCertificate: false,
-      prescriptions: [],
+      certificateType: 'sick_leave',
+      certificateDays: 3,
+      certificateNotes: '',
+      medications: [],
       labTests: [],
       radiologyTests: [],
       referral: null
     }
   });
 
-  const { fields: prescriptionFields, append: appendPrescription, remove: removePrescription } = useFieldArray({
-    control,
-    name: 'prescriptions'
-  });
-
-  const { fields: labTestFields, append: appendLabTest, remove: removeLabTest } = useFieldArray({
-    control,
-    name: 'labTests'
-  });
-
-  const { fields: radiologyTestFields, append: appendRadiologyTest, remove: removeRadiologyTest } = useFieldArray({
-    control,
-    name: 'radiologyTests'
-  });
-
   const medicalCertificate = watch('medicalCertificate');
+  const certificateType = watch('certificateType');
+  const medications = watch('medications');
+  const labTests = watch('labTests');
+  const radiologyTests = watch('radiologyTests');
   const referral = watch('referral');
   
   useEffect(() => {
     if (hospital) {
       fetchDepartments();
-      fetchLabTests();
-      fetchRadiologyTests();
-      fetchMedications();
     }
     
     if (patientId) {
       fetchPatient();
+      fetchLatestVitalSigns();
     } else {
       setIsLoading(false);
     }
   }, [hospital, patientId]);
+  
+  useEffect(() => {
+    // Update certificate days when template changes
+    const template = certificateTemplates.find(t => t.id === certificateType);
+    if (template) {
+      setValue('certificateDays', template.days);
+    }
+  }, [certificateType, setValue]);
   
   const fetchPatient = async () => {
     try {
@@ -242,73 +295,56 @@ const ConsultationForm: React.FC = () => {
       console.error('Error loading departments:', error);
     }
   };
-
-  const fetchLabTests = async () => {
+  
+  const fetchLatestVitalSigns = async () => {
     try {
-      // In a real app, we would fetch from Supabase
-      // For now, we'll use mock data
-      const mockLabTests: LabTest[] = [
-        { id: '1', name: 'Complete Blood Count (CBC)', price: 25.00, department: 'General Medicine' },
-        { id: '2', name: 'Basic Metabolic Panel', price: 30.00, department: 'General Medicine' },
-        { id: '3', name: 'Comprehensive Metabolic Panel', price: 45.00, department: 'General Medicine' },
-        { id: '4', name: 'Lipid Panel', price: 35.00, department: 'Cardiology' },
-        { id: '5', name: 'Liver Function Tests', price: 40.00, department: 'General Medicine' },
-        { id: '6', name: 'Thyroid Function Tests', price: 50.00, department: 'Endocrinology' },
-        { id: '7', name: 'Hemoglobin A1C', price: 30.00, department: 'Endocrinology' },
-        { id: '8', name: 'Urinalysis', price: 20.00, department: 'General Medicine' },
-        { id: '9', name: 'Stool Analysis', price: 25.00, department: 'Gastroenterology' },
-        { id: '10', name: 'Cardiac Enzymes', price: 60.00, department: 'Cardiology' }
-      ];
-      
-      setLabTests(mockLabTests);
-    } catch (error) {
-      console.error('Error loading lab tests:', error);
-    }
-  };
+      if (import.meta.env.DEV) {
+        // Use mock data in development
+        const mockVitalSigns: VitalSigns = {
+          temperature: 37.2,
+          heartRate: 72,
+          respiratoryRate: 16,
+          bloodPressureSystolic: 120,
+          bloodPressureDiastolic: 80,
+          oxygenSaturation: 98,
+          weight: 70,
+          height: 175,
+          bmi: 22.9,
+          painLevel: 0
+        };
+        setVitalSigns(mockVitalSigns);
+        return;
+      }
 
-  const fetchRadiologyTests = async () => {
-    try {
-      // In a real app, we would fetch from Supabase
-      // For now, we'll use mock data
-      const mockRadiologyTests: RadiologyTest[] = [
-        { id: '1', name: 'Chest X-Ray', price: 75.00, department: 'General Medicine' },
-        { id: '2', name: 'Abdominal X-Ray', price: 80.00, department: 'General Medicine' },
-        { id: '3', name: 'CT Scan - Head', price: 250.00, department: 'Neurology' },
-        { id: '4', name: 'CT Scan - Chest', price: 275.00, department: 'Pulmonology' },
-        { id: '5', name: 'CT Scan - Abdomen', price: 300.00, department: 'Gastroenterology' },
-        { id: '6', name: 'MRI - Brain', price: 400.00, department: 'Neurology' },
-        { id: '7', name: 'MRI - Spine', price: 425.00, department: 'Orthopedics' },
-        { id: '8', name: 'Ultrasound - Abdomen', price: 150.00, department: 'Gastroenterology' },
-        { id: '9', name: 'Ultrasound - Pelvis', price: 150.00, department: 'Gynecology' },
-        { id: '10', name: 'Mammogram', price: 175.00, department: 'Gynecology' }
-      ];
-      
-      setRadiologyTests(mockRadiologyTests);
-    } catch (error) {
-      console.error('Error loading radiology tests:', error);
-    }
-  };
+      const { data, error } = await supabase
+        .from('vital_signs')
+        .select('*')
+        .eq('patient_id', patientId)
+        .order('recorded_at', { ascending: false })
+        .limit(1)
+        .single();
 
-  const fetchMedications = async () => {
-    try {
-      // In a real app, we would fetch from Supabase
-      // For now, we'll use mock data
-      const mockMedications: Medication[] = [
-        { id: '1', name: 'Amoxicillin', dosage: ['250mg', '500mg'], price: 15.00, inStock: true, quantity: 100 },
-        { id: '2', name: 'Lisinopril', dosage: ['10mg', '20mg'], price: 20.00, inStock: true, quantity: 75 },
-        { id: '3', name: 'Atorvastatin', dosage: ['10mg', '20mg', '40mg'], price: 25.00, inStock: true, quantity: 50 },
-        { id: '4', name: 'Metformin', dosage: ['500mg', '850mg', '1000mg'], price: 18.00, inStock: true, quantity: 80 },
-        { id: '5', name: 'Omeprazole', dosage: ['20mg', '40mg'], price: 22.00, inStock: false, quantity: 0 },
-        { id: '6', name: 'Amlodipine', dosage: ['5mg', '10mg'], price: 15.00, inStock: true, quantity: 60 },
-        { id: '7', name: 'Albuterol Inhaler', dosage: ['90mcg'], price: 35.00, inStock: true, quantity: 25 },
-        { id: '8', name: 'Prednisone', dosage: ['5mg', '10mg', '20mg'], price: 12.00, inStock: true, quantity: 40 },
-        { id: '9', name: 'Levothyroxine', dosage: ['25mcg', '50mcg', '75mcg', '100mcg'], price: 18.00, inStock: true, quantity: 55 },
-        { id: '10', name: 'Ibuprofen', dosage: ['200mg', '400mg', '600mg'], price: 8.00, inStock: true, quantity: 120 }
-      ];
+      if (error) {
+        if (error.code !== 'PGRST116') { // No rows returned
+          throw error;
+        }
+        return;
+      }
       
-      setMedications(mockMedications);
+      setVitalSigns({
+        temperature: data.temperature,
+        heartRate: data.heart_rate,
+        respiratoryRate: data.respiratory_rate,
+        bloodPressureSystolic: data.blood_pressure_systolic,
+        bloodPressureDiastolic: data.blood_pressure_diastolic,
+        oxygenSaturation: data.oxygen_saturation,
+        weight: data.weight,
+        height: data.height,
+        bmi: data.bmi,
+        painLevel: data.pain_level
+      });
     } catch (error) {
-      console.error('Error loading medications:', error);
+      console.error('Error loading vital signs:', error);
     }
   };
 
@@ -324,6 +360,145 @@ const ConsultationForm: React.FC = () => {
     
     return age;
   };
+  
+  const handleAddMedication = () => {
+    const newMedication = {
+      id: uuidv4(),
+      medication: '',
+      dosage: '',
+      frequency: '',
+      duration: '',
+      instructions: '',
+      quantity: 1,
+      price: 0
+    };
+    
+    setValue('medications', [...medications, newMedication]);
+  };
+  
+  const handleRemoveMedication = (id: string) => {
+    setValue('medications', medications.filter(med => med.id !== id));
+  };
+  
+  const handleAddLabTest = (test: any) => {
+    const existingTest = labTests.find(t => t.name === test.name);
+    if (existingTest) {
+      addNotification({
+        message: `${test.name} is already added`,
+        type: 'warning'
+      });
+      return;
+    }
+    
+    const newTest = {
+      id: uuidv4(),
+      name: test.name,
+      instructions: '',
+      price: test.price
+    };
+    
+    setValue('labTests', [...labTests, newTest]);
+    addNotification({
+      message: `${test.name} added to lab tests`,
+      type: 'success',
+      duration: 2000
+    });
+  };
+  
+  const handleRemoveLabTest = (id: string) => {
+    setValue('labTests', labTests.filter(test => test.id !== id));
+  };
+  
+  const handleAddRadiologyTest = (test: any) => {
+    const existingTest = radiologyTests.find(t => t.name === test.name);
+    if (existingTest) {
+      addNotification({
+        message: `${test.name} is already added`,
+        type: 'warning'
+      });
+      return;
+    }
+    
+    const newTest = {
+      id: uuidv4(),
+      name: test.name,
+      instructions: '',
+      price: test.price
+    };
+    
+    setValue('radiologyTests', [...radiologyTests, newTest]);
+    addNotification({
+      message: `${test.name} added to radiology tests`,
+      type: 'success',
+      duration: 2000
+    });
+  };
+  
+  const handleRemoveRadiologyTest = (id: string) => {
+    setValue('radiologyTests', radiologyTests.filter(test => test.id !== id));
+  };
+  
+  const handleSearchLabTests = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const term = e.target.value;
+    setLabTestSearchTerm(term);
+    
+    if (term.trim() === '') {
+      setFilteredLabTests(availableLabTests);
+    } else {
+      setFilteredLabTests(
+        availableLabTests.filter(test => 
+          test.name.toLowerCase().includes(term.toLowerCase()) ||
+          test.category.toLowerCase().includes(term.toLowerCase())
+        )
+      );
+    }
+  };
+  
+  const handleSearchRadiologyTests = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const term = e.target.value;
+    setRadiologyTestSearchTerm(term);
+    
+    if (term.trim() === '') {
+      setFilteredRadiologyTests(availableRadiologyTests);
+    } else {
+      setFilteredRadiologyTests(
+        availableRadiologyTests.filter(test => 
+          test.name.toLowerCase().includes(term.toLowerCase()) ||
+          test.category.toLowerCase().includes(term.toLowerCase())
+        )
+      );
+    }
+  };
+  
+  const handleSaveReferral = (data: any) => {
+    setValue('referral', data);
+    setShowReferralModal(false);
+    addNotification({
+      message: `Referral to ${departments.find(d => d.id === data.departmentId)?.name} created`,
+      type: 'success'
+    });
+  };
+  
+  const handleCancelReferral = () => {
+    setShowReferralModal(false);
+  };
+  
+  const handleRemoveReferral = () => {
+    setValue('referral', null);
+  };
+  
+  const calculateTotalBill = () => {
+    const medicationTotal = medications.reduce((sum, med) => sum + (med.price * med.quantity), 0);
+    const labTestsTotal = labTests.reduce((sum, test) => sum + test.price, 0);
+    const radiologyTestsTotal = radiologyTests.reduce((sum, test) => sum + test.price, 0);
+    
+    return {
+      medicationTotal,
+      labTestsTotal,
+      radiologyTestsTotal,
+      total: medicationTotal + labTestsTotal + radiologyTestsTotal
+    };
+  };
 
   const onSubmit = async (data: ConsultationFormData) => {
     if (!hospital || !user || !patient) return;
@@ -336,13 +511,19 @@ const ConsultationForm: React.FC = () => {
         console.log('Consultation form submitted:', data);
         await new Promise(resolve => setTimeout(resolve, 1000));
         
-        // Show success notification
-        addNotification({
-          message: 'Consultation saved successfully',
-          type: 'success'
-        });
+        // Update patient flow step
+        if (data.referral) {
+          addNotification({
+            message: `Patient referred to ${departments.find(d => d.id === data.referral?.departmentId)?.name}`,
+            type: 'success'
+          });
+        } else {
+          addNotification({
+            message: 'Consultation completed successfully',
+            type: 'success'
+          });
+        }
         
-        // Navigate to patient list
         navigate('/patients');
         return;
       }
@@ -354,12 +535,20 @@ const ConsultationForm: React.FC = () => {
           patient_id: patient.id,
           doctor_id: user.id,
           hospital_id: hospital.id,
+          consultation_date: new Date().toISOString(),
           chief_complaint: data.chiefComplaint,
           diagnosis: data.diagnosis,
           treatment_plan: data.treatmentPlan,
           notes: data.notes,
           medical_certificate: data.medicalCertificate,
-          prescriptions: data.prescriptions,
+          prescriptions: data.medications.map(med => ({
+            medication: med.medication,
+            dosage: med.dosage,
+            frequency: med.frequency,
+            duration: med.duration,
+            instructions: med.instructions,
+            quantity: med.quantity
+          })),
           department_id: user.department_id || null
         })
         .select()
@@ -367,7 +556,7 @@ const ConsultationForm: React.FC = () => {
 
       if (consultationError) throw consultationError;
       
-      // If lab tests were ordered
+      // Create lab test orders if any
       if (data.labTests.length > 0) {
         const { error: labError } = await supabase
           .from('lab_results')
@@ -375,16 +564,16 @@ const ConsultationForm: React.FC = () => {
             data.labTests.map(test => ({
               patient_id: patient.id,
               hospital_id: hospital.id,
-              test_type: test.testName,
+              test_type: test.name,
               status: 'pending',
-              is_emergency: test.urgent
+              notes: test.instructions
             }))
           );
           
         if (labError) throw labError;
       }
       
-      // If radiology tests were ordered
+      // Create radiology test orders if any
       if (data.radiologyTests.length > 0) {
         const { error: radiologyError } = await supabase
           .from('radiology_results')
@@ -392,30 +581,30 @@ const ConsultationForm: React.FC = () => {
             data.radiologyTests.map(test => ({
               patient_id: patient.id,
               hospital_id: hospital.id,
-              scan_type: test.testName,
+              scan_type: test.name.toLowerCase().replace(/\s+/g, '_'),
               status: 'pending',
-              is_emergency: test.urgent
+              notes: test.instructions
             }))
           );
           
         if (radiologyError) throw radiologyError;
       }
       
-      // If prescriptions were added
-      if (data.prescriptions.length > 0) {
+      // Create pharmacy order if medications are prescribed
+      if (data.medications.length > 0) {
         const { error: pharmacyError } = await supabase
           .from('pharmacy')
           .insert({
             patient_id: patient.id,
             hospital_id: hospital.id,
             prescription_id: consultationData.id,
-            medications: data.prescriptions.map(prescription => ({
-              medication: prescription.medication,
-              dosage: prescription.dosage,
-              frequency: prescription.frequency,
-              duration: prescription.duration,
-              instructions: prescription.instructions,
-              quantity: 1,
+            medications: data.medications.map(med => ({
+              medication: med.medication,
+              dosage: med.dosage,
+              frequency: med.frequency,
+              duration: med.duration,
+              instructions: med.instructions,
+              quantity: med.quantity,
               dispensed: false
             })),
             status: 'pending',
@@ -425,53 +614,46 @@ const ConsultationForm: React.FC = () => {
         if (pharmacyError) throw pharmacyError;
       }
       
-      // If referral was added
-      if (data.referral && data.referral.departmentId) {
+      // Create referral if needed
+      if (data.referral) {
         const { error: referralError } = await supabase
           .from('referrals')
           .insert({
             patient_id: patient.id,
             hospital_id: hospital.id,
             referring_doctor_id: user.id,
+            specialist_id: null, // Will be assigned later
             referral_date: new Date().toISOString(),
             reason: data.referral.reason,
-            notes: data.referral.notes,
-            urgency: 'routine',
-            status: 'pending'
+            urgency: data.referral.urgency,
+            status: 'pending',
+            notes: data.referral.notes
           });
           
         if (referralError) throw referralError;
       }
       
       // Create billing record
-      const services = [
+      const billItems = [
+        ...data.medications.map(med => ({
+          name: `${med.medication} ${med.dosage}`,
+          amount: med.price,
+          quantity: med.quantity
+        })),
         ...data.labTests.map(test => ({
-          name: `Lab Test: ${test.testName}`,
+          name: test.name,
           amount: test.price,
           quantity: 1
         })),
         ...data.radiologyTests.map(test => ({
-          name: `Radiology: ${test.testName}`,
+          name: test.name,
           amount: test.price,
           quantity: 1
-        })),
-        ...data.prescriptions.map(prescription => {
-          const med = medications.find(m => m.name === prescription.medication);
-          return {
-            name: `Medication: ${prescription.medication} ${prescription.dosage}`,
-            amount: med?.price || 0,
-            quantity: 1
-          };
-        }),
-        {
-          name: 'Consultation Fee',
-          amount: 50.00, // Default consultation fee
-          quantity: 1
-        }
+        }))
       ];
       
-      if (services.length > 0) {
-        const totalAmount = services.reduce((sum, service) => sum + (service.amount * service.quantity), 0);
+      if (billItems.length > 0) {
+        const totalAmount = billItems.reduce((sum, item) => sum + (item.amount * item.quantity), 0);
         
         const { error: billingError } = await supabase
           .from('billing')
@@ -479,7 +661,7 @@ const ConsultationForm: React.FC = () => {
             patient_id: patient.id,
             hospital_id: hospital.id,
             consultation_id: consultationData.id,
-            services,
+            services: billItems,
             total_amount: totalAmount,
             paid_amount: 0,
             payment_status: 'pending'
@@ -488,28 +670,32 @@ const ConsultationForm: React.FC = () => {
         if (billingError) throw billingError;
       }
       
+      // Determine the next flow step based on tests, medications, and referrals
+      let nextStep = 'post_consultation';
+      
+      if (data.labTests.length > 0) {
+        nextStep = 'lab_tests';
+      } else if (data.radiologyTests.length > 0) {
+        nextStep = 'radiology';
+      } else if (data.medications.length > 0) {
+        nextStep = 'pharmacy';
+      } else if (billItems.length > 0) {
+        nextStep = 'billing';
+      }
+      
       // Update patient's current flow step
       const { error: patientError } = await supabase
         .from('patients')
         .update({
-          current_flow_step: 'post_consultation'
+          current_flow_step: nextStep
         })
         .eq('id', patient.id);
 
       if (patientError) throw patientError;
       
-      // Show success notification
-      addNotification({
-        message: 'Consultation saved successfully',
-        type: 'success'
-      });
-      
-      // Navigate to patient list
       navigate('/patients');
     } catch (error: any) {
       console.error('Error submitting consultation form:', error.message);
-      
-      // Show error notification
       addNotification({
         message: `Error: ${error.message}`,
         type: 'error'
@@ -518,96 +704,6 @@ const ConsultationForm: React.FC = () => {
       setIsSaving(false);
     }
   };
-
-  const handleAddPrescription = () => {
-    appendPrescription({
-      medication: '',
-      dosage: '',
-      frequency: '',
-      duration: '',
-      instructions: ''
-    });
-  };
-
-  const handleAddLabTest = (test: LabTest) => {
-    // Check if test is already added
-    const existingTest = labTestFields.find(field => 
-      (field as any).testName === test.name
-    );
-    
-    if (!existingTest) {
-      appendLabTest({
-        testName: test.name,
-        price: test.price,
-        urgent: false
-      });
-      
-      // Show notification
-      addNotification({
-        message: `Added lab test: ${test.name}`,
-        type: 'success',
-        duration: 2000
-      });
-    } else {
-      // Show notification that test is already added
-      addNotification({
-        message: `${test.name} is already added`,
-        type: 'info',
-        duration: 2000
-      });
-    }
-  };
-
-  const handleAddRadiologyTest = (test: RadiologyTest) => {
-    // Check if test is already added
-    const existingTest = radiologyTestFields.find(field => 
-      (field as any).testName === test.name
-    );
-    
-    if (!existingTest) {
-      appendRadiologyTest({
-        testName: test.name,
-        price: test.price,
-        urgent: false
-      });
-      
-      // Show notification
-      addNotification({
-        message: `Added radiology test: ${test.name}`,
-        type: 'success',
-        duration: 2000
-      });
-    } else {
-      // Show notification that test is already added
-      addNotification({
-        message: `${test.name} is already added`,
-        type: 'info',
-        duration: 2000
-      });
-    }
-  };
-
-  const handleReferPatient = () => {
-    if (referral) {
-      // If referral already exists, clear it
-      setValue('referral', null);
-    } else {
-      // Otherwise, create a new empty referral
-      setValue('referral', {
-        departmentId: '',
-        reason: '',
-        notes: ''
-      });
-    }
-  };
-
-  const filteredLabTests = selectedDepartment === 'all' 
-    ? labTests 
-    : labTests.filter(test => test.department === selectedDepartment);
-
-  const filteredRadiologyTests = selectedDepartment === 'all' 
-    ? radiologyTests 
-    : radiologyTests.filter(test => test.department === selectedDepartment);
 
   if (isLoading) {
     return (
@@ -651,426 +747,1076 @@ const ConsultationForm: React.FC = () => {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          {/* Left Column - Patient Info & Diagnostic Tests */}
-          <div className="md:col-span-1 space-y-3">
-            {/* Patient Information */}
+        <div className="flex flex-col md:flex-row gap-3">
+          {/* Left Column - Vital Signs and Medical History */}
+          <div className="w-full md:w-1/3 space-y-3">
+            {/* Vital Signs Card */}
             <div className="bg-white rounded-lg shadow-sm p-3">
-              <h3 className="text-md font-medium text-gray-900 mb-2">Patient Information</h3>
-              
-              {patient.medical_history?.allergies && patient.medical_history.allergies.length > 0 && (
-                <div className="mb-2">
-                  <div className="flex items-center text-error-600 mb-1">
-                    <AlertTriangle className="h-4 w-4 mr-1" />
-                    <span className="text-sm font-medium">Allergies</span>
-                  </div>
-                  <ul className="text-xs text-gray-600 ml-5 list-disc">
-                    {patient.medical_history.allergies.map((allergy: any, index: number) => (
-                      <li key={index}>
-                        {allergy.allergen} - {allergy.reaction} ({allergy.severity})
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              
-              {patient.medical_history?.chronicConditions && patient.medical_history.chronicConditions.length > 0 && (
-                <div className="mb-2">
-                  <div className="flex items-center text-warning-600 mb-1">
-                    <AlertTriangle className="h-4 w-4 mr-1" />
-                    <span className="text-sm font-medium">Chronic Conditions</span>
-                  </div>
-                  <ul className="text-xs text-gray-600 ml-5 list-disc">
-                    {patient.medical_history.chronicConditions.map((condition: string, index: number) => (
-                      <li key={index}>{condition}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-              
-              {patient.medical_history?.currentMedications && patient.medical_history.currentMedications.length > 0 && (
-                <div>
-                  <div className="flex items-center text-primary-600 mb-1">
-                    <Pill className="h-4 w-4 mr-1" />
-                    <span className="text-sm font-medium">Current Medications</span>
-                  </div>
-                  <ul className="text-xs text-gray-600 ml-5 list-disc">
-                    {patient.medical_history.currentMedications.map((medication: any, index: number) => (
-                      <li key={index}>
-                        {medication.name} {medication.dosage && `- ${medication.dosage}`} {medication.frequency && `(${medication.frequency})`}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-
-            {/* Diagnostic Tests */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <h3 className="text-md font-medium text-gray-900 mb-2">Diagnostic Tests</h3>
-              
-              <div className="flex space-x-2 mb-3">
-                <button
-                  type="button"
-                  onClick={() => setShowLabTests(!showLabTests)}
-                  className="flex-1 btn btn-outline flex items-center justify-center text-sm py-1.5"
-                >
-                  <Flask className="h-4 w-4 mr-1.5" />
-                  Lab Tests
-                </button>
-                
-                <button
-                  type="button"
-                  onClick={() => setShowRadiologyTests(!showRadiologyTests)}
-                  className="flex-1 btn btn-outline flex items-center justify-center text-sm py-1.5"
-                >
-                  <Microscope className="h-4 w-4 mr-1.5" />
-                  Radiology
-                </button>
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-md font-medium text-gray-900 flex items-center">
+                  <Activity className="h-4 w-4 text-primary-500 mr-1" />
+                  Vital Signs
+                </h3>
+                <span className="text-xs text-gray-500">Latest</span>
               </div>
               
-              {/* Lab Tests Selection */}
-              {showLabTests && (
-                <div className="mb-3 border rounded-md p-2">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-sm font-medium text-gray-900">Select Lab Tests</h4>
-                    <select 
-                      className="form-input text-xs py-1 px-2"
-                      value={selectedDepartment}
-                      onChange={(e) => setSelectedDepartment(e.target.value)}
-                    >
-                      <option value="all">All Departments</option>
-                      <option value="General Medicine">General Medicine</option>
-                      <option value="Cardiology">Cardiology</option>
-                      <option value="Endocrinology">Endocrinology</option>
-                      <option value="Gastroenterology">Gastroenterology</option>
-                    </select>
-                  </div>
-                  
-                  <div className="max-h-40 overflow-y-auto">
-                    {filteredLabTests.map(test => (
-                      <div 
-                        key={test.id} 
-                        className="flex justify-between items-center p-1.5 hover:bg-gray-50 rounded cursor-pointer"
-                        onClick={() => handleAddLabTest(test)}
-                      >
-                        <div className="flex items-center">
-                          <Flask className="h-3.5 w-3.5 text-primary-500 mr-1.5" />
-                          <span className="text-xs">{test.name}</span>
-                        </div>
-                        <span className="text-xs font-medium">${test.price.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Radiology Tests Selection */}
-              {showRadiologyTests && (
-                <div className="mb-3 border rounded-md p-2">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-sm font-medium text-gray-900">Select Radiology Tests</h4>
-                    <select 
-                      className="form-input text-xs py-1 px-2"
-                      value={selectedDepartment}
-                      onChange={(e) => setSelectedDepartment(e.target.value)}
-                    >
-                      <option value="all">All Departments</option>
-                      <option value="General Medicine">General Medicine</option>
-                      <option value="Neurology">Neurology</option>
-                      <option value="Orthopedics">Orthopedics</option>
-                      <option value="Pulmonology">Pulmonology</option>
-                      <option value="Gastroenterology">Gastroenterology</option>
-                      <option value="Gynecology">Gynecology</option>
-                    </select>
-                  </div>
-                  
-                  <div className="max-h-40 overflow-y-auto">
-                    {filteredRadiologyTests.map(test => (
-                      <div 
-                        key={test.id} 
-                        className="flex justify-between items-center p-1.5 hover:bg-gray-50 rounded cursor-pointer"
-                        onClick={() => handleAddRadiologyTest(test)}
-                      >
-                        <div className="flex items-center">
-                          <Microscope className="h-3.5 w-3.5 text-primary-500 mr-1.5" />
-                          <span className="text-xs">{test.name}</span>
-                        </div>
-                        <span className="text-xs font-medium">${test.price.toFixed(2)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Selected Lab Tests */}
-              {labTestFields.length > 0 && (
-                <div className="mb-3">
-                  <h4 className="text-sm font-medium text-gray-900 mb-1">Selected Lab Tests</h4>
-                  {labTestFields.map((field, index) => (
-                    <div key={field.id} className="flex justify-between items-center bg-gray-50 p-2 rounded mb-1">
-                      <div className="flex items-center">
-                        <Flask className="h-3.5 w-3.5 text-primary-500 mr-1.5" />
-                        <div>
-                          <span className="text-xs font-medium">{(field as any).testName}</span>
-                          <div className="flex items-center mt-0.5">
-                            <input
-                              type="checkbox"
-                              id={`lab-urgent-${index}`}
-                              {...register(`labTests.${index}.urgent`)}
-                              className="h-3 w-3 text-error-600 focus:ring-error-500 border-gray-300 rounded"
-                            />
-                            <label htmlFor={`lab-urgent-${index}`} className="ml-1 text-xs text-error-600">
-                              Urgent
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center">
-                        <span className="text-xs font-medium mr-2">${(field as any).price.toFixed(2)}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeLabTest(index)}
-                          className="text-gray-400 hover:text-error-500"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+              {vitalSigns ? (
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  {vitalSigns.temperature && (
+                    <div className="flex items-center">
+                      <Thermometer className="h-3 w-3 text-gray-400 mr-1" />
+                      <span className="text-gray-500 mr-1">Temp:</span>
+                      <span className={`font-medium ${vitalSigns.temperature > 38 ? 'text-error-600' : 'text-gray-900'}`}>
+                        {vitalSigns.temperature}°C
+                      </span>
                     </div>
-                  ))}
-                </div>
-              )}
-              
-              {/* Selected Radiology Tests */}
-              {radiologyTestFields.length > 0 && (
-                <div>
-                  <h4 className="text-sm font-medium text-gray-900 mb-1">Selected Radiology Tests</h4>
-                  {radiologyTestFields.map((field, index) => (
-                    <div key={field.id} className="flex justify-between items-center bg-gray-50 p-2 rounded mb-1">
-                      <div className="flex items-center">
-                        <Microscope className="h-3.5 w-3.5 text-primary-500 mr-1.5" />
-                        <div>
-                          <span className="text-xs font-medium">{(field as any).testName}</span>
-                          <div className="flex items-center mt-0.5">
-                            <input
-                              type="checkbox"
-                              id={`radiology-urgent-${index}`}
-                              {...register(`radiologyTests.${index}.urgent`)}
-                              className="h-3 w-3 text-error-600 focus:ring-error-500 border-gray-300 rounded"
-                            />
-                            <label htmlFor={`radiology-urgent-${index}`} className="ml-1 text-xs text-error-600">
-                              Urgent
-                            </label>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center">
-                        <span className="text-xs font-medium mr-2">${(field as any).price.toFixed(2)}</span>
-                        <button
-                          type="button"
-                          onClick={() => removeRadiologyTest(index)}
-                          className="text-gray-400 hover:text-error-500"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                  )}
+                  
+                  {vitalSigns.heartRate && (
+                    <div className="flex items-center">
+                      <Heart className="h-3 w-3 text-gray-400 mr-1" />
+                      <span className="text-gray-500 mr-1">HR:</span>
+                      <span className={`font-medium ${vitalSigns.heartRate > 100 || vitalSigns.heartRate < 60 ? 'text-error-600' : 'text-gray-900'}`}>
+                        {vitalSigns.heartRate} bpm
+                      </span>
                     </div>
-                  ))}
+                  )}
+                  
+                  {vitalSigns.respiratoryRate && (
+                    <div className="flex items-center">
+                      <Lungs className="h-3 w-3 text-gray-400 mr-1" />
+                      <span className="text-gray-500 mr-1">RR:</span>
+                      <span className={`font-medium ${vitalSigns.respiratoryRate > 20 ? 'text-error-600' : 'text-gray-900'}`}>
+                        {vitalSigns.respiratoryRate} /min
+                      </span>
+                    </div>
+                  )}
+                  
+                  {(vitalSigns.bloodPressureSystolic && vitalSigns.bloodPressureDiastolic) && (
+                    <div className="flex items-center">
+                      <Activity className="h-3 w-3 text-gray-400 mr-1" />
+                      <span className="text-gray-500 mr-1">BP:</span>
+                      <span className={`font-medium ${vitalSigns.bloodPressureSystolic > 140 || vitalSigns.bloodPressureDiastolic > 90 ? 'text-error-600' : 'text-gray-900'}`}>
+                        {vitalSigns.bloodPressureSystolic}/{vitalSigns.bloodPressureDiastolic}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {vitalSigns.oxygenSaturation && (
+                    <div className="flex items-center">
+                      <Droplets className="h-3 w-3 text-gray-400 mr-1" />
+                      <span className="text-gray-500 mr-1">O₂:</span>
+                      <span className={`font-medium ${vitalSigns.oxygenSaturation < 95 ? 'text-error-600' : 'text-gray-900'}`}>
+                        {vitalSigns.oxygenSaturation}%
+                      </span>
+                    </div>
+                  )}
+                  
+                  {vitalSigns.weight && (
+                    <div className="flex items-center">
+                      <Scale className="h-3 w-3 text-gray-400 mr-1" />
+                      <span className="text-gray-500 mr-1">Weight:</span>
+                      <span className="font-medium text-gray-900">{vitalSigns.weight} kg</span>
+                    </div>
+                  )}
+                  
+                  {vitalSigns.height && (
+                    <div className="flex items-center">
+                      <Ruler className="h-3 w-3 text-gray-400 mr-1" />
+                      <span className="text-gray-500 mr-1">Height:</span>
+                      <span className="font-medium text-gray-900">{vitalSigns.height} cm</span>
+                    </div>
+                  )}
+                  
+                  {vitalSigns.bmi && (
+                    <div className="flex items-center">
+                      <Calculator className="h-3 w-3 text-gray-400 mr-1" />
+                      <span className="text-gray-500 mr-1">BMI:</span>
+                      <span className={`font-medium ${vitalSigns.bmi > 30 || vitalSigns.bmi < 18.5 ? 'text-warning-600' : 'text-gray-900'}`}>
+                        {vitalSigns.bmi.toFixed(1)}
+                      </span>
+                    </div>
+                  )}
+                  
+                  {vitalSigns.painLevel !== null && (
+                    <div className="flex items-center">
+                      <Activity className="h-3 w-3 text-gray-400 mr-1" />
+                      <span className="text-gray-500 mr-1">Pain:</span>
+                      <span className={`font-medium ${vitalSigns.painLevel > 5 ? 'text-error-600' : 'text-gray-900'}`}>
+                        {vitalSigns.painLevel}/10
+                      </span>
+                    </div>
+                  )}
                 </div>
+              ) : (
+                <p className="text-sm text-gray-500">No vital signs recorded</p>
               )}
             </div>
-
+            
+            {/* Medical History Card */}
+            <div className="bg-white rounded-lg shadow-sm p-3">
+              <h3 className="text-md font-medium text-gray-900 mb-2">Medical History</h3>
+              
+              {patient.medical_history ? (
+                <div className="space-y-3">
+                  {patient.medical_history.allergies && patient.medical_history.allergies.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-error-600 flex items-center">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Allergies
+                      </h4>
+                      <ul className="mt-1 text-sm">
+                        {patient.medical_history.allergies.map((allergy: any, index: number) => (
+                          <li key={index} className="text-gray-700">
+                            {allergy.allergen} - {allergy.reaction} ({allergy.severity})
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {patient.medical_history.chronicConditions && patient.medical_history.chronicConditions.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700">Chronic Conditions</h4>
+                      <ul className="mt-1 text-sm">
+                        {patient.medical_history.chronicConditions.map((condition: string, index: number) => (
+                          <li key={index} className="text-gray-700">{condition}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {patient.medical_history.currentMedications && patient.medical_history.currentMedications.length > 0 && (
+                    <div>
+                      <h4 className="text-sm font-medium text-gray-700">Current Medications</h4>
+                      <ul className="mt-1 text-sm">
+                        {patient.medical_history.currentMedications.map((medication: any, index: number) => (
+                          <li key={index} className="text-gray-700">
+                            {medication.name} {medication.dosage && `- ${medication.dosage}`} {medication.frequency && `(${medication.frequency})`}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No medical history recorded</p>
+              )}
+            </div>
+            
             {/* Referral Section */}
             <div className="bg-white rounded-lg shadow-sm p-3">
               <div className="flex justify-between items-center mb-2">
                 <h3 className="text-md font-medium text-gray-900">Referral</h3>
                 <button
                   type="button"
-                  onClick={handleReferPatient}
-                  className={`btn ${referral ? 'btn-error' : 'btn-outline'} btn-sm flex items-center text-xs py-1 px-2`}
+                  onClick={() => setShowReferralModal(true)}
+                  className="btn btn-sm btn-outline flex items-center text-xs"
                 >
-                  {referral ? (
-                    <>Cancel Referral</>
-                  ) : (
-                    <><ArrowUpRight className="h-3.5 w-3.5 mr-1" /> Refer Patient</>
-                  )}
+                  <ArrowUpRight className="h-3 w-3 mr-1" />
+                  Refer Patient
                 </button>
               </div>
               
-              {referral && (
-                <div className="space-y-2">
-                  <div>
-                    <label className="form-label text-xs">Department</label>
-                    <select
-                      {...register('referral.departmentId', { required: 'Department is required' })}
-                      className="form-input py-1.5 text-sm"
-                    >
-                      <option value="">Select department</option>
-                      {departments.map(dept => (
-                        <option key={dept.id} value={dept.id}>{dept.name}</option>
-                      ))}
-                    </select>
-                    {errors.referral?.departmentId && (
-                      <p className="form-error text-xs">{errors.referral.departmentId.message}</p>
-                    )}
+              {referral ? (
+                <div className="p-2 bg-gray-50 rounded-md">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {departments.find(d => d.id === referral.departmentId)?.name}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Reason: {referral.reason}</p>
+                      {referral.notes && <p className="text-xs text-gray-500 mt-1">Notes: {referral.notes}</p>}
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      referral.urgency === 'emergency' ? 'bg-error-100 text-error-800' :
+                      referral.urgency === 'urgent' ? 'bg-warning-100 text-warning-800' :
+                      'bg-success-100 text-success-800'
+                    }`}>
+                      {referral.urgency.charAt(0).toUpperCase() + referral.urgency.slice(1)}
+                    </span>
                   </div>
-                  
-                  <div>
-                    <label className="form-label text-xs">Reason for Referral</label>
-                    <input
-                      type="text"
-                      {...register('referral.reason', { required: 'Reason is required' })}
-                      className="form-input py-1.5 text-sm"
-                      placeholder="Reason for referral"
-                    />
-                    {errors.referral?.reason && (
-                      <p className="form-error text-xs">{errors.referral.reason.message}</p>
-                    )}
-                  </div>
-                  
-                  <div>
-                    <label className="form-label text-xs">Notes (Optional)</label>
-                    <textarea
-                      {...register('referral.notes')}
-                      className="form-input py-1.5 text-sm"
-                      rows={2}
-                      placeholder="Additional notes for the specialist"
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleRemoveReferral}
+                    className="mt-2 text-xs text-error-600 hover:text-error-800"
+                  >
+                    Remove Referral
+                  </button>
                 </div>
-              )}
-              
-              {!referral && (
-                <p className="text-xs text-gray-500">
-                  Refer this patient to another department or specialist if needed.
-                </p>
+              ) : (
+                <p className="text-sm text-gray-500">No referral created</p>
               )}
             </div>
-          </div>
-
-          {/* Middle Column - Main Consultation Form */}
-          <div className="md:col-span-1 space-y-3">
-            {/* Chief Complaint */}
+            
+            {/* Diagnostic Tests Section */}
             <div className="bg-white rounded-lg shadow-sm p-3">
-              <label className="form-label required">Chief Complaint</label>
-              <textarea
-                {...register('chiefComplaint', { required: 'Chief complaint is required' })}
-                className="form-input"
-                rows={3}
-                placeholder="Enter the patient's main complaint"
-              />
-              {errors.chiefComplaint && (
-                <p className="form-error">{errors.chiefComplaint.message}</p>
-              )}
-            </div>
-
-            {/* Diagnosis */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <label className="form-label required">Diagnosis</label>
-              <textarea
-                {...register('diagnosis', { required: 'Diagnosis is required' })}
-                className="form-input"
-                rows={3}
-                placeholder="Enter your diagnosis"
-              />
-              {errors.diagnosis && (
-                <p className="form-error">{errors.diagnosis.message}</p>
-              )}
-            </div>
-
-            {/* Treatment Plan */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <label className="form-label required">Treatment Plan</label>
-              <textarea
-                {...register('treatmentPlan', { required: 'Treatment plan is required' })}
-                className="form-input"
-                rows={3}
-                placeholder="Enter the treatment plan"
-              />
-              {errors.treatmentPlan && (
-                <p className="form-error">{errors.treatmentPlan.message}</p>
-              )}
-            </div>
-
-            {/* Additional Notes */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <label className="form-label">Additional Notes</label>
-              <textarea
-                {...register('notes')}
-                className="form-input"
-                rows={3}
-                placeholder="Enter any additional notes (optional)"
-              />
-            </div>
-
-            {/* Medical Certificate */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="flex items-center justify-between mb-2">
-                <label className="form-label mb-0">Medical Certificate</label>
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="medicalCertificate"
-                    {...register('medicalCertificate')}
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="medicalCertificate" className="ml-2 block text-sm text-gray-900">
-                    Issue Medical Certificate
-                  </label>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-md font-medium text-gray-900">Diagnostic Tests</h3>
+                <div className="flex space-x-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowLabTestsModal(true)}
+                    className="btn btn-sm btn-outline flex items-center text-xs"
+                  >
+                    <Flask className="h-3 w-3 mr-1" />
+                    Lab Tests
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowRadiologyTestsModal(true)}
+                    className="btn btn-sm btn-outline flex items-center text-xs"
+                  >
+                    <Microscope className="h-3 w-3 mr-1" />
+                    Radiology
+                  </button>
                 </div>
               </div>
               
-              {medicalCertificate && (
-                <div className="border rounded-md p-3 bg-gray-50">
-                  <div className="flex justify-between items-center mb-2">
-                    <h4 className="text-sm font-medium text-gray-900">Certificate Preview</h4>
+              {labTests.length > 0 || radiologyTests.length > 0 ? (
+                <div className="space-y-2">
+                  {labTests.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-medium text-gray-700 flex items-center">
+                        <Flask className="h-3 w-3 mr-1 text-primary-500" />
+                        Lab Tests
+                      </h4>
+                      <ul className="mt-1">
+                        {labTests.map((test) => (
+                          <li key={test.id} className="text-sm flex justify-between items-center py-1 border-b border-gray-100">
+                            <span>{test.name}</span>
+                            <div className="flex items-center">
+                              <span className="text-xs text-gray-500 mr-2">${test.price.toFixed(2)}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveLabTest(test.id)}
+                                className="text-error-500 hover:text-error-700"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                  
+                  {radiologyTests.length > 0 && (
+                    <div>
+                      <h4 className="text-xs font-medium text-gray-700 flex items-center">
+                        <Microscope className="h-3 w-3 mr-1 text-primary-500" />
+                        Radiology Tests
+                      </h4>
+                      <ul className="mt-1">
+                        {radiologyTests.map((test) => (
+                          <li key={test.id} className="text-sm flex justify-between items-center py-1 border-b border-gray-100">
+                            <span>{test.name}</span>
+                            <div className="flex items-center">
+                              <span className="text-xs text-gray-500 mr-2">${test.price.toFixed(2)}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveRadiologyTest(test.id)}
+                                className="text-error-500 hover:text-error-700"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </button>
+                            </div>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No diagnostic tests ordered</p>
+              )}
+            </div>
+          </div>
+          
+          {/* Right Column - Main Form */}
+          <div className="w-full md:w-2/3">
+            {/* Tabs */}
+            <div className="bg-white rounded-lg shadow-sm mb-3">
+              <div className="flex overflow-x-auto">
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'history'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('history')}
+                >
+                  <FileText className="h-3 w-3 inline mr-1" />
+                  History
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'examination'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('examination')}
+                >
+                  <Stethoscope className="h-3 w-3 inline mr-1" />
+                  Examination
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'diagnosis'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('diagnosis')}
+                >
+                  <Brain className="h-3 w-3 inline mr-1" />
+                  Diagnosis
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'diagnostics'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('diagnostics')}
+                >
+                  <Flask className="h-3 w-3 inline mr-1" />
+                  Diagnostics
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'medication'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('medication')}
+                >
+                  <Pill className="h-3 w-3 inline mr-1" />
+                  Medication
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'certificate'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('certificate')}
+                >
+                  <FileCheck className="h-3 w-3 inline mr-1" />
+                  Certificate
+                </button>
+                <button
+                  type="button"
+                  className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+                    activeTab === 'summary'
+                      ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                      : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  }`}
+                  onClick={() => setActiveTab('summary')}
+                >
+                  <ClipboardList className="h-3 w-3 inline mr-1" />
+                  Summary
+                </button>
+              </div>
+            </div>
+
+            {/* Tab Content */}
+            <div className="bg-white rounded-lg shadow-sm p-4 mb-3 min-h-[400px] overflow-y-auto">
+              {activeTab === 'history' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="form-label required">Chief Complaint</label>
+                    <textarea
+                      {...register('chiefComplaint', { required: 'Chief complaint is required' })}
+                      className="form-input"
+                      rows={2}
+                      placeholder="Enter the patient's main complaint"
+                    />
+                    {errors.chiefComplaint && (
+                      <p className="form-error">{errors.chiefComplaint.message}</p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="form-label">History of Present Illness</label>
+                    <textarea
+                      {...register('history')}
+                      className="form-input"
+                      rows={5}
+                      placeholder="Enter detailed history of the present illness"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label">Follow-up Information</label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="form-label text-sm">Follow-up Date</label>
+                        <input
+                          type="date"
+                          {...register('followUpDate')}
+                          className="form-input"
+                          min={new Date().toISOString().split('T')[0]}
+                        />
+                      </div>
+                      <div>
+                        <label className="form-label text-sm">Follow-up Notes</label>
+                        <input
+                          type="text"
+                          {...register('followUpNotes')}
+                          className="form-input"
+                          placeholder="E.g., 'Return if symptoms worsen'"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {activeTab === 'examination' && (
+                <div>
+                  <label className="form-label">Physical Examination</label>
+                  <textarea
+                    {...register('examination')}
+                    className="form-input"
+                    rows={10}
+                    placeholder="Enter physical examination findings"
+                  />
+                </div>
+              )}
+              
+              {activeTab === 'diagnosis' && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="form-label required">Diagnosis</label>
+                    <textarea
+                      {...register('diagnosis', { required: 'Diagnosis is required' })}
+                      className="form-input"
+                      rows={4}
+                      placeholder="Enter diagnosis"
+                    />
+                    {errors.diagnosis && (
+                      <p className="form-error">{errors.diagnosis.message}</p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="form-label required">Treatment Plan</label>
+                    <textarea
+                      {...register('treatmentPlan', { required: 'Treatment plan is required' })}
+                      className="form-input"
+                      rows={4}
+                      placeholder="Enter treatment plan"
+                    />
+                    {errors.treatmentPlan && (
+                      <p className="form-error">{errors.treatmentPlan.message}</p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="form-label">Additional Notes</label>
+                    <textarea
+                      {...register('notes')}
+                      className="form-input"
+                      rows={3}
+                      placeholder="Enter any additional notes"
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {activeTab === 'diagnostics' && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-md font-medium text-gray-900">Diagnostic Tests</h3>
+                    <div className="flex space-x-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowLabTestsModal(true)}
+                        className="btn btn-sm btn-outline flex items-center"
+                      >
+                        <Flask className="h-4 w-4 mr-1" />
+                        Add Lab Tests
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowRadiologyTestsModal(true)}
+                        className="btn btn-sm btn-outline flex items-center"
+                      >
+                        <Microscope className="h-4 w-4 mr-1" />
+                        Add Radiology
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Lab Tests Section */}
+                  <div className="border rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-gray-900 flex items-center mb-2">
+                      <Flask className="h-4 w-4 text-primary-500 mr-1" />
+                      Laboratory Tests
+                    </h4>
+                    
+                    {labTests.length > 0 ? (
+                      <div className="space-y-2">
+                        {labTests.map((test, index) => (
+                          <div key={test.id} className="border-b pb-2">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{test.name}</p>
+                                <div className="mt-1">
+                                  <label className="block text-xs text-gray-500">Instructions</label>
+                                  <input
+                                    type="text"
+                                    className="form-input py-1 text-sm mt-1"
+                                    placeholder="Special instructions"
+                                    value={test.instructions}
+                                    onChange={(e) => {
+                                      const updatedTests = [...labTests];
+                                      updatedTests[index].instructions = e.target.value;
+                                      setValue('labTests', updatedTests);
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center">
+                                <span className="text-sm font-medium text-gray-900 mr-2">${test.price.toFixed(2)}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveLabTest(test.id)}
+                                  className="text-error-500 hover:text-error-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">No lab tests ordered</p>
+                    )}
+                  </div>
+                  
+                  {/* Radiology Tests Section */}
+                  <div className="border rounded-lg p-4">
+                    <h4 className="text-sm font-medium text-gray-900 flex items-center mb-2">
+                      <Microscope className="h-4 w-4 text-primary-500 mr-1" />
+                      Radiology Tests
+                    </h4>
+                    
+                    {radiologyTests.length > 0 ? (
+                      <div className="space-y-2">
+                        {radiologyTests.map((test, index) => (
+                          <div key={test.id} className="border-b pb-2">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{test.name}</p>
+                                <div className="mt-1">
+                                  <label className="block text-xs text-gray-500">Instructions</label>
+                                  <input
+                                    type="text"
+                                    className="form-input py-1 text-sm mt-1"
+                                    placeholder="Special instructions"
+                                    value={test.instructions}
+                                    onChange={(e) => {
+                                      const updatedTests = [...radiologyTests];
+                                      updatedTests[index].instructions = e.target.value;
+                                      setValue('radiologyTests', updatedTests);
+                                    }}
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex items-center">
+                                <span className="text-sm font-medium text-gray-900 mr-2">${test.price.toFixed(2)}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleRemoveRadiologyTest(test.id)}
+                                  className="text-error-500 hover:text-error-700"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">No radiology tests ordered</p>
+                    )}
+                  </div>
+                </div>
+              )}
+              
+              {activeTab === 'medication' && (
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-md font-medium text-gray-900">Medications</h3>
                     <button
                       type="button"
-                      className="text-primary-600 hover:text-primary-800 text-xs"
+                      onClick={handleAddMedication}
+                      className="btn btn-sm btn-outline flex items-center"
                     >
-                      Print Certificate
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Medication
                     </button>
                   </div>
                   
-                  <div className="border bg-white p-3 rounded-md">
-                    <div className="flex justify-between items-center border-b pb-2 mb-2">
-                      <div className="flex items-center">
-                        <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm mr-2">
-                          <Stethoscope className="h-4 w-4" />
+                  {medications.length > 0 ? (
+                    <div className="space-y-4">
+                      {medications.map((medication, index) => (
+                        <div key={medication.id} className="border rounded-lg p-4">
+                          <div className="flex justify-between items-start">
+                            <h4 className="text-sm font-medium text-gray-900">Medication #{index + 1}</h4>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveMedication(medication.id)}
+                              className="text-error-500 hover:text-error-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                          
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+                            <div>
+                              <label className="form-label text-sm">Medication</label>
+                              <select
+                                className="form-input"
+                                value={medication.medication}
+                                onChange={(e) => {
+                                  const updatedMedications = [...medications];
+                                  const selectedMed = availableMedications.find(m => m.name === e.target.value);
+                                  updatedMedications[index].medication = e.target.value;
+                                  updatedMedications[index].price = selectedMed?.price || 0;
+                                  setValue('medications', updatedMedications);
+                                }}
+                              >
+                                <option value="">Select medication</option>
+                                {availableMedications.map((med) => (
+                                  <option 
+                                    key={med.id} 
+                                    value={med.name}
+                                    disabled={!med.inStock}
+                                  >
+                                    {med.name} {!med.inStock && '(Out of Stock)'}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            
+                            <div>
+                              <label className="form-label text-sm">Dosage</label>
+                              <select
+                                className="form-input"
+                                value={medication.dosage}
+                                onChange={(e) => {
+                                  const updatedMedications = [...medications];
+                                  updatedMedications[index].dosage = e.target.value;
+                                  setValue('medications', updatedMedications);
+                                }}
+                              >
+                                <option value="">Select dosage</option>
+                                {availableMedications.find(m => m.name === medication.medication)?.dosages.map((dosage) => (
+                                  <option key={dosage} value={dosage}>{dosage}</option>
+                                )) || []}
+                              </select>
+                            </div>
+                            
+                            <div>
+                              <label className="form-label text-sm">Frequency</label>
+                              <select
+                                className="form-input"
+                                value={medication.frequency}
+                                onChange={(e) => {
+                                  const updatedMedications = [...medications];
+                                  updatedMedications[index].frequency = e.target.value;
+                                  setValue('medications', updatedMedications);
+                                }}
+                              >
+                                <option value="">Select frequency</option>
+                                <option value="Once daily">Once daily</option>
+                                <option value="Twice daily">Twice daily</option>
+                                <option value="Three times daily">Three times daily</option>
+                                <option value="Four times daily">Four times daily</option>
+                                <option value="Every 4 hours">Every 4 hours</option>
+                                <option value="Every 6 hours">Every 6 hours</option>
+                                <option value="Every 8 hours">Every 8 hours</option>
+                                <option value="Every 12 hours">Every 12 hours</option>
+                                <option value="As needed">As needed</option>
+                                <option value="Before meals">Before meals</option>
+                                <option value="After meals">After meals</option>
+                                <option value="At bedtime">At bedtime</option>
+                              </select>
+                            </div>
+                            
+                            <div>
+                              <label className="form-label text-sm">Duration</label>
+                              <select
+                                className="form-input"
+                                value={medication.duration}
+                                onChange={(e) => {
+                                  const updatedMedications = [...medications];
+                                  updatedMedications[index].duration = e.target.value;
+                                  setValue('medications', updatedMedications);
+                                }}
+                              >
+                                <option value="">Select duration</option>
+                                <option value="3 days">3 days</option>
+                                <option value="5 days">5 days</option>
+                                <option value="7 days">7 days</option>
+                                <option value="10 days">10 days</option>
+                                <option value="14 days">14 days</option>
+                                <option value="1 month">1 month</option>
+                                <option value="2 months">2 months</option>
+                                <option value="3 months">3 months</option>
+                                <option value="6 months">6 months</option>
+                                <option value="Indefinite">Indefinite</option>
+                                <option value="As directed">As directed</option>
+                              </select>
+                            </div>
+                            
+                            <div>
+                              <label className="form-label text-sm">Quantity</label>
+                              <input
+                                type="number"
+                                className="form-input"
+                                min="1"
+                                value={medication.quantity}
+                                onChange={(e) => {
+                                  const updatedMedications = [...medications];
+                                  updatedMedications[index].quantity = parseInt(e.target.value);
+                                  setValue('medications', updatedMedications);
+                                }}
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="form-label text-sm">Price per Unit</label>
+                              <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                  <DollarSign className="h-4 w-4 text-gray-400" />
+                                </div>
+                                <input
+                                  type="number"
+                                  className="form-input pl-8"
+                                  step="0.01"
+                                  min="0"
+                                  value={medication.price}
+                                  onChange={(e) => {
+                                    const updatedMedications = [...medications];
+                                    updatedMedications[index].price = parseFloat(e.target.value);
+                                    setValue('medications', updatedMedications);
+                                  }}
+                                  readOnly
+                                />
+                              </div>
+                            </div>
+                          </div>
+                          
+                          <div className="mt-2">
+                            <label className="form-label text-sm">Special Instructions</label>
+                            <textarea
+                              className="form-input"
+                              rows={2}
+                              value={medication.instructions}
+                              onChange={(e) => {
+                                const updatedMedications = [...medications];
+                                updatedMedications[index].instructions = e.target.value;
+                                setValue('medications', updatedMedications);
+                              }}
+                              placeholder="E.g., 'Take with food', 'Avoid alcohol', etc."
+                            />
+                          </div>
+                          
+                          {/* Inventory Status */}
+                          {medication.medication && (
+                            <div className="mt-2 flex items-center">
+                              <div className={`w-2 h-2 rounded-full ${
+                                availableMedications.find(m => m.name === medication.medication)?.inStock
+                                  ? 'bg-success-500'
+                                  : 'bg-error-500'
+                              } mr-1`}></div>
+                              <span className="text-xs text-gray-500">
+                                {availableMedications.find(m => m.name === medication.medication)?.inStock
+                                  ? 'In Stock'
+                                  : 'Out of Stock'
+                                }
+                              </span>
+                            </div>
+                          )}
                         </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-gray-500">No medications prescribed</p>
+                  )}
+                </div>
+              )}
+              
+              {activeTab === 'certificate' && (
+                <div className="space-y-4">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="medicalCertificate"
+                      {...register('medicalCertificate')}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="medicalCertificate" className="ml-2 block text-sm text-gray-900">
+                      Issue Medical Certificate
+                    </label>
+                  </div>
+                  
+                  {medicalCertificate && (
+                    <div className="border rounded-lg p-4 space-y-4">
+                      <div>
+                        <label className="form-label text-sm">Certificate Type</label>
+                        <select
+                          {...register('certificateType')}
+                          className="form-input"
+                        >
+                          {certificateTemplates.map((template) => (
+                            <option key={template.id} value={template.id}>
+                              {template.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {certificateType === 'sick_leave' || certificateType === 'school_absence' ? (
                         <div>
-                          <h5 className="text-sm font-bold text-gray-900">{hospital?.name || 'Hospital'}</h5>
-                          <p className="text-xs text-gray-500">{hospital?.address || 'Address'}</p>
+                          <label className="form-label text-sm">Number of Days</label>
+                          <input
+                            type="number"
+                            {...register('certificateDays')}
+                            className="form-input"
+                            min="1"
+                          />
                         </div>
+                      ) : null}
+                      
+                      <div>
+                        <label className="form-label text-sm">Additional Notes</label>
+                        <textarea
+                          {...register('certificateNotes')}
+                          className="form-input"
+                          rows={3}
+                          placeholder="Enter any additional information for the certificate"
+                        />
                       </div>
-                      <div className="text-right">
-                        <h5 className="text-sm font-bold text-gray-900">MEDICAL CERTIFICATE</h5>
-                        <p className="text-xs text-gray-500">Date: {new Date().toLocaleDateString()}</p>
-                      </div>
-                    </div>
-                    
-                    <div className="mb-2">
-                      <p className="text-xs">This is to certify that</p>
-                      <p className="text-sm font-medium">{patient.first_name} {patient.last_name}</p>
-                      <p className="text-xs">has been examined and diagnosed with</p>
-                      <p className="text-sm font-medium">{watch('diagnosis') || '[Diagnosis will appear here]'}</p>
-                    </div>
-                    
-                    <div className="text-xs">
-                      <p>Treatment plan includes: {watch('treatmentPlan') || '[Treatment plan will appear here]'}</p>
-                      <p className="mt-1">Patient is advised to:</p>
-                      <ul className="list-disc ml-4 mt-1">
-                        <li>Follow the prescribed medication</li>
-                        <li>Rest for [X] days</li>
-                        <li>Return for follow-up on [Date]</li>
-                      </ul>
-                    </div>
-                    
-                    <div className="mt-4 pt-4 border-t">
+                      
                       <div className="flex justify-end">
-                        <div className="text-right">
-                          <p className="text-sm font-medium">Dr. {user?.first_name} {user?.last_name}</p>
-                          <p className="text-xs text-gray-500">License #: [License Number]</p>
+                        <button
+                          type="button"
+                          onClick={() => setShowCertificatePreview(true)}
+                          className="btn btn-sm btn-outline flex items-center"
+                        >
+                          <Printer className="h-4 w-4 mr-1" />
+                          Preview Certificate
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              
+              {activeTab === 'summary' && (
+                <div className="space-y-6">
+                  <div className="border-b pb-4">
+                    <h3 className="text-md font-medium text-gray-900 mb-2">Consultation Summary</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700">Chief Complaint</h4>
+                        <p className="text-sm text-gray-600">{watch('chiefComplaint') || 'Not specified'}</p>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700">Diagnosis</h4>
+                        <p className="text-sm text-gray-600">{watch('diagnosis') || 'Not specified'}</p>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700">Treatment Plan</h4>
+                        <p className="text-sm text-gray-600">{watch('treatmentPlan') || 'Not specified'}</p>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700">Follow-up</h4>
+                        <p className="text-sm text-gray-600">
+                          {watch('followUpDate') 
+                            ? `${new Date(watch('followUpDate')).toLocaleDateString()} - ${watch('followUpNotes') || 'No notes'}`
+                            : 'No follow-up scheduled'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="border-b pb-4">
+                    <h3 className="text-md font-medium text-gray-900 mb-2">Diagnostic Tests</h3>
+                    
+                    {labTests.length > 0 || radiologyTests.length > 0 ? (
+                      <div className="space-y-2">
+                        {labTests.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 flex items-center">
+                              <Flask className="h-3 w-3 mr-1 text-primary-500" />
+                              Lab Tests ({labTests.length})
+                            </h4>
+                            <ul className="mt-1 text-sm text-gray-600">
+                              {labTests.map((test) => (
+                                <li key={test.id}>{test.name}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                        
+                        {radiologyTests.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700 flex items-center">
+                              <Microscope className="h-3 w-3 mr-1 text-primary-500" />
+                              Radiology Tests ({radiologyTests.length})
+                            </h4>
+                            <ul className="mt-1 text-sm text-gray-600">
+                              {radiologyTests.map((test) => (
+                                <li key={test.id}>{test.name}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-gray-500">No diagnostic tests ordered</p>
+                    )}
+                  </div>
+                  
+                  <div className="border-b pb-4">
+                    <h3 className="text-md font-medium text-gray-900 mb-2">Medications</h3>
+                    
+                    {medications.length > 0 ? (
+                      <ul className="space-y-2">
+                        {medications.map((med) => (
+                          <li key={med.id} className="text-sm text-gray-600">
+                            <span className="font-medium">{med.medication} {med.dosage}</span> - {med.frequency}, {med.duration}
+                            {med.instructions && <span className="block text-xs text-gray-500">Instructions: {med.instructions}</span>}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      <p className="text-sm text-gray-500">No medications prescribed</p>
+                    )}
+                  </div>
+                  
+                  {referral && (
+                    <div className="border-b pb-4">
+                      <h3 className="text-md font-medium text-gray-900 mb-2">Referral</h3>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">Department:</span> {departments.find(d => d.id === referral.departmentId)?.name}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">Reason:</span> {referral.reason}
+                      </p>
+                      {referral.notes && (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Notes:</span> {referral.notes}
+                        </p>
+                      )}
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">Urgency:</span> {referral.urgency}
+                      </p>
+                    </div>
+                  )}
+                  
+                  {medicalCertificate && (
+                    <div className="border-b pb-4">
+                      <h3 className="text-md font-medium text-gray-900 mb-2">Medical Certificate</h3>
+                      <p className="text-sm text-gray-600">
+                        <span className="font-medium">Type:</span> {certificateTemplates.find(t => t.id === certificateType)?.name}
+                      </p>
+                      {(certificateType === 'sick_leave' || certificateType === 'school_absence') && (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Duration:</span> {watch('certificateDays')} days
+                        </p>
+                      )}
+                      {watch('certificateNotes') && (
+                        <p className="text-sm text-gray-600">
+                          <span className="font-medium">Notes:</span> {watch('certificateNotes')}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div>
+                    <h3 className="text-md font-medium text-gray-900 mb-2 flex items-center">
+                      <DollarSign className="h-4 w-4 mr-1 text-success-500" />
+                      Billing Summary
+                    </h3>
+                    
+                    <div className="bg-gray-50 rounded-lg p-4">
+                      <div className="space-y-2">
+                        {medications.length > 0 && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-700">Medications</h4>
+                            <ul className="mt-1">
+                              {medications.map((med) => (
+                                <li key={med.id} className="flex justify-between text-sm">
+                                  <span>{med.medication} {med.dosage} x{med.quantity}</span>
+                                  <span>${(med.price * med.quantity).toFixed(2)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            <div className="flex justify-between text-sm font-medium mt-1">
+                              <span>Subtotal</span>
+                              <span>${calculateTotalBill().medicationTotal.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {labTests.length > 0 && (
+                          <div className="pt-2 border-t border-gray-200 mt-2">
+                            <h4 className="text-sm font-medium text-gray-700">Laboratory Tests</h4>
+                            <ul className="mt-1">
+                              {labTests.map((test) => (
+                                <li key={test.id} className="flex justify-between text-sm">
+                                  <span>{test.name}</span>
+                                  <span>${test.price.toFixed(2)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            <div className="flex justify-between text-sm font-medium mt-1">
+                              <span>Subtotal</span>
+                              <span>${calculateTotalBill().labTestsTotal.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {radiologyTests.length > 0 && (
+                          <div className="pt-2 border-t border-gray-200 mt-2">
+                            <h4 className="text-sm font-medium text-gray-700">Radiology Tests</h4>
+                            <ul className="mt-1">
+                              {radiologyTests.map((test) => (
+                                <li key={test.id} className="flex justify-between text-sm">
+                                  <span>{test.name}</span>
+                                  <span>${test.price.toFixed(2)}</span>
+                                </li>
+                              ))}
+                            </ul>
+                            <div className="flex justify-between text-sm font-medium mt-1">
+                              <span>Subtotal</span>
+                              <span>${calculateTotalBill().radiologyTestsTotal.toFixed(2)}</span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        <div className="pt-2 border-t border-gray-200 mt-2">
+                          <div className="flex justify-between text-base font-bold">
+                            <span>Total</span>
+                            <span>${calculateTotalBill().total.toFixed(2)}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1078,289 +1824,417 @@ const ConsultationForm: React.FC = () => {
                 </div>
               )}
             </div>
-          </div>
 
-          {/* Right Column - Prescriptions & Billing */}
-          <div className="md:col-span-1 space-y-3">
-            {/* Prescriptions */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-md font-medium text-gray-900">Prescriptions</h3>
-                <button
-                  type="button"
-                  onClick={handleAddPrescription}
-                  className="btn btn-outline btn-sm flex items-center text-xs py-1 px-2"
-                >
-                  <Plus className="h-3.5 w-3.5 mr-1" />
-                  Add Medication
-                </button>
-              </div>
-              
-              {prescriptionFields.length === 0 ? (
-                <div className="text-center py-4">
-                  <Pill className="h-8 w-8 text-gray-300 mx-auto mb-2" />
-                  <p className="text-sm text-gray-500">No medications added yet</p>
-                  <p className="text-xs text-gray-400">Click "Add Medication" to prescribe</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {prescriptionFields.map((field, index) => (
-                    <div key={field.id} className="border rounded-md p-3">
-                      <div className="flex justify-between items-start">
-                        <label className="form-label text-xs required">Medication</label>
-                        <button
-                          type="button"
-                          onClick={() => removePrescription(index)}
-                          className="text-gray-400 hover:text-error-500"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                      
-                      <select
-                        {...register(`prescriptions.${index}.medication`, { required: 'Medication is required' })}
-                        className="form-input py-1.5 text-sm mb-2"
-                      >
-                        <option value="">Select medication</option>
-                        {medications.map(med => (
-                          <option 
-                            key={med.id} 
-                            value={med.name}
-                            disabled={!med.inStock}
+            {/* Action Buttons */}
+            <div className="flex justify-between">
+              <button
+                type="button"
+                onClick={() => navigate('/patients')}
+                className="btn btn-outline flex items-center"
+              >
+                <ArrowLeft className="h-4 w-4 mr-1" />
+                Back
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="btn btn-primary flex items-center"
+              >
+                {isSaving ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-1"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-1" />
+                    Complete Consultation
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+
+      {/* Lab Tests Modal */}
+      {showLabTestsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-lg font-medium text-gray-900">Select Lab Tests</h3>
+              <button
+                type="button"
+                onClick={() => setShowLabTestsModal(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 border-b border-gray-200">
+              <input
+                type="text"
+                className="form-input w-full"
+                placeholder="Search lab tests..."
+                value={labTestSearchTerm}
+                onChange={handleSearchLabTests}
+              />
+            </div>
+            
+            <div className="overflow-y-auto flex-1 p-4">
+              {filteredLabTests.length > 0 ? (
+                <div className="space-y-2">
+                  {Object.entries(filteredLabTests.reduce((acc: any, test) => {
+                    if (!acc[test.category]) acc[test.category] = [];
+                    acc[test.category].push(test);
+                    return acc;
+                  }, {})).map(([category, tests]: [string, any]) => (
+                    <div key={category} className="mb-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">{category}</h4>
+                      <div className="space-y-2">
+                        {tests.map((test: any) => (
+                          <div 
+                            key={test.id} 
+                            className="flex justify-between items-center p-2 hover:bg-gray-50 rounded-md cursor-pointer"
+                            onClick={() => handleAddLabTest(test)}
                           >
-                            {med.name} {!med.inStock && '(Out of Stock)'}
-                          </option>
-                        ))}
-                      </select>
-                      
-                      <div className="grid grid-cols-2 gap-2 mb-2">
-                        <div>
-                          <label className="form-label text-xs required">Dosage</label>
-                          <select
-                            {...register(`prescriptions.${index}.dosage`, { required: 'Dosage is required' })}
-                            className="form-input py-1.5 text-sm"
-                          >
-                            <option value="">Select dosage</option>
-                            {medications
-                              .find(med => med.name === watch(`prescriptions.${index}.medication`))
-                              ?.dosage.map((dose, i) => (
-                                <option key={i} value={dose}>{dose}</option>
-                              )) || []}
-                          </select>
-                        </div>
-                        
-                        <div>
-                          <label className="form-label text-xs required">Frequency</label>
-                          <select
-                            {...register(`prescriptions.${index}.frequency`, { required: 'Frequency is required' })}
-                            className="form-input py-1.5 text-sm"
-                          >
-                            <option value="">Select frequency</option>
-                            <option value="Once daily">Once daily</option>
-                            <option value="Twice daily">Twice daily</option>
-                            <option value="Three times daily">Three times daily</option>
-                            <option value="Four times daily">Four times daily</option>
-                            <option value="Every 4 hours">Every 4 hours</option>
-                            <option value="Every 6 hours">Every 6 hours</option>
-                            <option value="Every 8 hours">Every 8 hours</option>
-                            <option value="Every 12 hours">Every 12 hours</option>
-                            <option value="As needed">As needed</option>
-                          </select>
-                        </div>
-                      </div>
-                      
-                      <div className="mb-2">
-                        <label className="form-label text-xs required">Duration</label>
-                        <select
-                          {...register(`prescriptions.${index}.duration`, { required: 'Duration is required' })}
-                          className="form-input py-1.5 text-sm"
-                        >
-                          <option value="">Select duration</option>
-                          <option value="3 days">3 days</option>
-                          <option value="5 days">5 days</option>
-                          <option value="7 days">7 days</option>
-                          <option value="10 days">10 days</option>
-                          <option value="14 days">14 days</option>
-                          <option value="1 month">1 month</option>
-                          <option value="2 months">2 months</option>
-                          <option value="3 months">3 months</option>
-                          <option value="6 months">6 months</option>
-                          <option value="Indefinite">Indefinite</option>
-                        </select>
-                      </div>
-                      
-                      <div>
-                        <label className="form-label text-xs">Instructions</label>
-                        <textarea
-                          {...register(`prescriptions.${index}.instructions`)}
-                          className="form-input py-1.5 text-sm"
-                          rows={2}
-                          placeholder="Special instructions (e.g., take with food)"
-                        />
-                      </div>
-                      
-                      {/* Medication Status */}
-                      {watch(`prescriptions.${index}.medication`) && (
-                        <div className="mt-2 pt-2 border-t border-gray-100">
-                          <div className="flex justify-between items-center">
                             <div className="flex items-center">
-                              {(() => {
-                                const selectedMed = medications.find(med => med.name === watch(`prescriptions.${index}.medication`));
-                                return selectedMed?.inStock ? (
-                                  <span className="flex items-center text-xs text-success-600">
-                                    <CheckCircle className="h-3 w-3 mr-1" />
-                                    In Stock ({selectedMed.quantity} available)
-                                  </span>
-                                ) : (
-                                  <span className="flex items-center text-xs text-error-600">
-                                    <AlertTriangle className="h-3 w-3 mr-1" />
-                                    Out of Stock
-                                  </span>
-                                );
-                              })()}
+                              <Flask className="h-4 w-4 text-primary-500 mr-2" />
+                              <span className="text-sm">{test.name}</span>
                             </div>
-                            <div className="text-xs font-medium">
-                              {(() => {
-                                const selectedMed = medications.find(med => med.name === watch(`prescriptions.${index}.medication`));
-                                return selectedMed ? `$${selectedMed.price.toFixed(2)}` : '';
-                              })()}
-                            </div>
+                            <span className="text-sm font-medium">${test.price.toFixed(2)}</span>
                           </div>
-                        </div>
-                      )}
+                        ))}
+                      </div>
                     </div>
                   ))}
                 </div>
+              ) : (
+                <p className="text-center text-gray-500">No lab tests found</p>
               )}
             </div>
-
-            {/* Billing Summary */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <h3 className="text-md font-medium text-gray-900 mb-3">Billing Summary</h3>
-              
-              <div className="space-y-2 mb-3">
-                <div className="flex justify-between items-center py-1 border-b border-gray-100">
-                  <span className="text-sm">Consultation Fee</span>
-                  <span className="text-sm font-medium">$50.00</span>
-                </div>
-                
-                {labTestFields.length > 0 && (
-                  <>
-                    <div className="flex justify-between items-center py-1 border-b border-gray-100">
-                      <span className="text-sm">Lab Tests ({labTestFields.length})</span>
-                      <span className="text-sm font-medium">
-                        ${labTestFields.reduce((sum, field) => sum + (field as any).price, 0).toFixed(2)}
-                      </span>
-                    </div>
-                    
-                    <div className="pl-4 space-y-1">
-                      {labTestFields.map((field, index) => (
-                        <div key={index} className="flex justify-between items-center text-xs text-gray-500">
-                          <span>{(field as any).testName}</span>
-                          <span>${(field as any).price.toFixed(2)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-                
-                {radiologyTestFields.length > 0 && (
-                  <>
-                    <div className="flex justify-between items-center py-1 border-b border-gray-100">
-                      <span className="text-sm">Radiology Tests ({radiologyTestFields.length})</span>
-                      <span className="text-sm font-medium">
-                        ${radiologyTestFields.reduce((sum, field) => sum + (field as any).price, 0).toFixed(2)}
-                      </span>
-                    </div>
-                    
-                    <div className="pl-4 space-y-1">
-                      {radiologyTestFields.map((field, index) => (
-                        <div key={index} className="flex justify-between items-center text-xs text-gray-500">
-                          <span>{(field as any).testName}</span>
-                          <span>${(field as any).price.toFixed(2)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-                
-                {prescriptionFields.length > 0 && (
-                  <>
-                    <div className="flex justify-between items-center py-1 border-b border-gray-100">
-                      <span className="text-sm">Medications ({prescriptionFields.length})</span>
-                      <span className="text-sm font-medium">
-                        ${prescriptionFields.reduce((sum, field, index) => {
-                          const medName = watch(`prescriptions.${index}.medication`);
-                          const med = medications.find(m => m.name === medName);
-                          return sum + (med?.price || 0);
-                        }, 0).toFixed(2)}
-                      </span>
-                    </div>
-                    
-                    <div className="pl-4 space-y-1">
-                      {prescriptionFields.map((field, index) => {
-                        const medName = watch(`prescriptions.${index}.medication`);
-                        const med = medications.find(m => m.name === medName);
-                        return medName ? (
-                          <div key={index} className="flex justify-between items-center text-xs text-gray-500">
-                            <span>{medName} {watch(`prescriptions.${index}.dosage`)}</span>
-                            <span>${med?.price.toFixed(2) || '0.00'}</span>
-                          </div>
-                        ) : null;
-                      })}
-                    </div>
-                  </>
-                )}
-              </div>
-              
-              <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                <span className="text-sm font-medium">Total</span>
-                <span className="text-lg font-bold text-primary-600">
-                  ${(
-                    50 + // Consultation fee
-                    labTestFields.reduce((sum, field) => sum + (field as any).price, 0) +
-                    radiologyTestFields.reduce((sum, field) => sum + (field as any).price, 0) +
-                    prescriptionFields.reduce((sum, field, index) => {
-                      const medName = watch(`prescriptions.${index}.medication`);
-                      const med = medications.find(m => m.name === medName);
-                      return sum + (med?.price || 0);
-                    }, 0)
-                  ).toFixed(2)}
-                </span>
-              </div>
+            
+            <div className="p-4 border-t border-gray-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowLabTestsModal(false)}
+                className="btn btn-primary"
+              >
+                Done
+              </button>
             </div>
           </div>
         </div>
+      )}
 
-        {/* Action Buttons */}
-        <div className="flex justify-between mt-4">
-          <button
-            type="button"
-            onClick={() => navigate('/patients')}
-            className="btn btn-outline flex items-center"
-          >
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Back to Patients
-          </button>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="btn btn-primary flex items-center"
-          >
-            {isSaving ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-5 w-5 mr-2" />
-                Save Consultation
-              </>
-            )}
-          </button>
+      {/* Radiology Tests Modal */}
+      {showRadiologyTestsModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] flex flex-col">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-lg font-medium text-gray-900">Select Radiology Tests</h3>
+              <button
+                type="button"
+                onClick={() => setShowRadiologyTestsModal(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-4 border-b border-gray-200">
+              <input
+                type="text"
+                className="form-input w-full"
+                placeholder="Search radiology tests..."
+                value={radiologyTestSearchTerm}
+                onChange={handleSearchRadiologyTests}
+              />
+            </div>
+            
+            <div className="overflow-y-auto flex-1 p-4">
+              {filteredRadiologyTests.length > 0 ? (
+                <div className="space-y-2">
+                  {Object.entries(filteredRadiologyTests.reduce((acc: any, test) => {
+                    if (!acc[test.category]) acc[test.category] = [];
+                    acc[test.category].push(test);
+                    return acc;
+                  }, {})).map(([category, tests]: [string, any]) => (
+                    <div key={category} className="mb-4">
+                      <h4 className="text-sm font-medium text-gray-700 mb-2">{category}</h4>
+                      <div className="space-y-2">
+                        {tests.map((test: any) => (
+                          <div 
+                            key={test.id} 
+                            className="flex justify-between items-center p-2 hover:bg-gray-50 rounded-md cursor-pointer"
+                            onClick={() => handleAddRadiologyTest(test)}
+                          >
+                            <div className="flex items-center">
+                              <Microscope className="h-4 w-4 text-primary-500 mr-2" />
+                              <span className="text-sm">{test.name}</span>
+                            </div>
+                            <span className="text-sm font-medium">${test.price.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-center text-gray-500">No radiology tests found</p>
+              )}
+            </div>
+            
+            <div className="p-4 border-t border-gray-200 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowRadiologyTestsModal(false)}
+                className="btn btn-primary"
+              >
+                Done
+              </button>
+            </div>
+          </div>
         </div>
-      </form>
+      )}
+
+      {/* Referral Modal */}
+      {showReferralModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="text-lg font-medium text-gray-900">Refer Patient</h3>
+            </div>
+            
+            <div className="p-4 space-y-4">
+              <div>
+                <label className="form-label">Department</label>
+                <select
+                  className="form-input"
+                  value={referral?.departmentId || ''}
+                  onChange={(e) => setValue('referral', { 
+                    ...referral || { reason: '', notes: '', urgency: 'routine' }, 
+                    departmentId: e.target.value 
+                  })}
+                >
+                  <option value="">Select department</option>
+                  {departments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>{dept.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label className="form-label">Reason for Referral</label>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="E.g., 'Specialized evaluation needed'"
+                  value={referral?.reason || ''}
+                  onChange={(e) => setValue('referral', { 
+                    ...referral || { departmentId: '', notes: '', urgency: 'routine' }, 
+                    reason: e.target.value 
+                  })}
+                />
+              </div>
+              
+              <div>
+                <label className="form-label">Notes</label>
+                <textarea
+                  className="form-input"
+                  rows={3}
+                  placeholder="Additional information for the specialist"
+                  value={referral?.notes || ''}
+                  onChange={(e) => setValue('referral', { 
+                    ...referral || { departmentId: '', reason: '', urgency: 'routine' }, 
+                    notes: e.target.value 
+                  })}
+                />
+              </div>
+              
+              <div>
+                <label className="form-label">Urgency</label>
+                <select
+                  className="form-input"
+                  value={referral?.urgency || 'routine'}
+                  onChange={(e) => setValue('referral', { 
+                    ...referral || { departmentId: '', reason: '', notes: '' }, 
+                    urgency: e.target.value as 'routine' | 'urgent' | 'emergency'
+                  })}
+                >
+                  <option value="routine">Routine</option>
+                  <option value="urgent">Urgent</option>
+                  <option value="emergency">Emergency</option>
+                </select>
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-gray-200 flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={handleCancelReferral}
+                className="btn btn-outline"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSaveReferral(referral)}
+                className="btn btn-primary"
+                disabled={!referral?.departmentId || !referral?.reason}
+              >
+                Create Referral
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Certificate Preview Modal */}
+      {showCertificatePreview && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-lg font-medium text-gray-900">Certificate Preview</h3>
+              <button
+                type="button"
+                onClick={() => setShowCertificatePreview(false)}
+                className="text-gray-400 hover:text-gray-500"
+              >
+                <Trash2 className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto max-h-[70vh]">
+              <div className="border rounded-lg p-8 bg-white">
+                {/* Hospital Header */}
+                <div className="flex justify-between items-center border-b pb-4 mb-6">
+                  <div className="flex items-center">
+                    <div className="bg-primary-100 p-2 rounded-full">
+                      <Building2 className="h-8 w-8 text-primary-600" />
+                    </div>
+                    <div className="ml-3">
+                      <h2 className="text-xl font-bold text-gray-900">{hospital?.name || 'Hospital Name'}</h2>
+                      <p className="text-sm text-gray-500">{hospital?.address || 'Hospital Address'}</p>
+                      <p className="text-sm text-gray-500">{hospital?.phone || 'Phone Number'}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <h3 className="text-lg font-bold text-primary-600">
+                      {certificateTemplates.find(t => t.id === certificateType)?.name}
+                    </h3>
+                    <p className="text-sm text-gray-500">Date: {new Date().toLocaleDateString()}</p>
+                  </div>
+                </div>
+                
+                {/* Certificate Content */}
+                <div className="space-y-6">
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500">PATIENT INFORMATION</h4>
+                    <p className="text-base font-medium">
+                      {patient.first_name} {patient.last_name}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      Date of Birth: {new Date(patient.date_of_birth).toLocaleDateString()}
+                    </p>
+                    <p className="text-sm text-gray-700">
+                      Gender: {patient.gender}
+                    </p>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-500">CERTIFICATE DETAILS</h4>
+                    
+                    {certificateType === 'sick_leave' && (
+                      <div className="mt-2">
+                        <p className="text-base">
+                          This is to certify that <span className="font-medium">{patient.first_name} {patient.last_name}</span> has been examined by me on <span className="font-medium">{new Date().toLocaleDateString()}</span> and is advised to take leave from work/school for a period of <span className="font-medium">{watch('certificateDays')} day(s)</span> from <span className="font-medium">{new Date().toLocaleDateString()}</span> to <span className="font-medium">{new Date(new Date().setDate(new Date().getDate() + watch('certificateDays'))).toLocaleDateString()}</span>.
+                        </p>
+                        
+                        {watch('certificateNotes') && (
+                          <p className="mt-4 text-base">
+                            Additional Notes: {watch('certificateNotes')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    
+                    {certificateType === 'fitness' && (
+                      <div className="mt-2">
+                        <p className="text-base">
+                          This is to certify that <span className="font-medium">{patient.first_name} {patient.last_name}</span> has been examined by me on <span className="font-medium">{new Date().toLocaleDateString()}</span> and is found to be in good health and fit for {watch('certificateNotes') || 'normal activities'}.
+                        </p>
+                      </div>
+                    )}
+                    
+                    {certificateType === 'travel' && (
+                      <div className="mt-2">
+                        <p className="text-base">
+                          This is to certify that <span className="font-medium">{patient.first_name} {patient.last_name}</span> has been examined by me on <span className="font-medium">{new Date().toLocaleDateString()}</span> and is found to be fit for travel. {watch('certificateNotes') && `Additional Notes: ${watch('certificateNotes')}`}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {certificateType === 'return_to_work' && (
+                      <div className="mt-2">
+                        <p className="text-base">
+                          This is to certify that <span className="font-medium">{patient.first_name} {patient.last_name}</span> has been examined by me on <span className="font-medium">{new Date().toLocaleDateString()}</span> and is fit to return to work/school. {watch('certificateNotes') && `Additional Notes: ${watch('certificateNotes')}`}
+                        </p>
+                      </div>
+                    )}
+                    
+                    {certificateType === 'school_absence' && (
+                      <div className="mt-2">
+                        <p className="text-base">
+                          This is to certify that <span className="font-medium">{patient.first_name} {patient.last_name}</span> has been examined by me on <span className="font-medium">{new Date().toLocaleDateString()}</span> and is advised to be absent from school for a period of <span className="font-medium">{watch('certificateDays')} day(s)</span> from <span className="font-medium">{new Date().toLocaleDateString()}</span> to <span className="font-medium">{new Date(new Date().setDate(new Date().getDate() + watch('certificateDays'))).toLocaleDateString()}</span>.
+                        </p>
+                        
+                        {watch('certificateNotes') && (
+                          <p className="mt-4 text-base">
+                            Additional Notes: {watch('certificateNotes')}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="pt-10">
+                    <div className="border-t border-gray-300 w-48 mx-auto mb-2"></div>
+                    <p className="text-center font-medium">Doctor's Signature</p>
+                    <p className="text-center text-sm text-gray-700">
+                      Dr. {user?.first_name} {user?.last_name}
+                    </p>
+                    {user?.specialization && (
+                      <p className="text-center text-sm text-gray-700">
+                        {user.specialization}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-gray-200 flex justify-end space-x-2">
+              <button
+                type="button"
+                onClick={() => setShowCertificatePreview(false)}
+                className="btn btn-outline"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="btn btn-primary flex items-center"
+              >
+                <Printer className="h-4 w-4 mr-1" />
+                Print Certificate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
