@@ -1,68 +1,89 @@
 import React, { useState, useEffect } from 'react';
-import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { User, Calendar, FileText, Pill, Save, ArrowLeft, ChevronDown, ChevronUp, Plus, Trash2, CheckCircle, Stethoscope, Clipboard, ClipboardCheck, Heart, Settings as Lungs, Brain, Bone, Activity, FileImage, Microscope, Scan } from 'lucide-react';
+import { 
+  Save, 
+  ArrowLeft, 
+  User, 
+  Calendar, 
+  FileText, 
+  Pill, 
+  CheckCircle, 
+  AlertTriangle, 
+  Stethoscope, 
+  Activity, 
+  Microscope, 
+  FileImage, 
+  DollarSign,
+  Plus,
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  ClipboardList,
+  Heart,
+  Lungs,
+  Brain,
+  Bone,
+  Thermometer,
+  Droplets,
+  Clipboard,
+  Layers,
+  Scroll
+} from 'lucide-react';
 
 interface ConsultationFormData {
+  patientId: string;
   chiefComplaint: string;
   historyOfPresentingIllness: string;
   pastMedicalHistory: string;
   pastSurgicalHistory: string;
   familyHistory: string;
   socialHistory: string;
+  medications: string;
   allergies: string;
-  currentMedications: string;
   gynecologicalHistory: string;
   generalExamination: string;
   vitalSigns: {
-    temperature: number | null;
-    heartRate: number | null;
-    respiratoryRate: number | null;
-    bloodPressureSystolic: number | null;
-    bloodPressureDiastolic: number | null;
-    oxygenSaturation: number | null;
-    weight: number | null;
-    height: number | null;
-    bmi: number | null;
-    painLevel: number | null;
+    temperature: string;
+    heartRate: string;
+    respiratoryRate: string;
+    bloodPressure: string;
+    oxygenSaturation: string;
   };
   systemicExamination: {
     cardiovascular: string;
     respiratory: string;
     gastrointestinal: string;
-    genitourinary: string;
     neurological: string;
     musculoskeletal: string;
+    genitourinary: string;
     other: string;
-    breast: string;
   };
   diagnosis: string;
   differentialDiagnosis: string;
+  investigations: {
+    laboratory: {
+      name: string;
+      details: string;
+    }[];
+    radiology: {
+      name: string;
+      details: string;
+    }[];
+    other: {
+      name: string;
+      details: string;
+    }[];
+  };
   treatmentPlan: string;
-  prescriptions: {
+  medications_prescribed: {
     medication: string;
     dosage: string;
     frequency: string;
     duration: string;
     instructions: string;
-  }[];
-  labOrders: {
-    testName: string;
-    instructions: string;
-    urgency: string;
-  }[];
-  radiologyOrders: {
-    scanType: string;
-    bodyPart: string;
-    instructions: string;
-    urgency: string;
-  }[];
-  referrals: {
-    specialtyDepartment: string;
-    reason: string;
-    urgency: string;
   }[];
   followUp: string;
   notes: string;
@@ -79,146 +100,76 @@ interface Patient {
   medical_history: any;
 }
 
-interface Department {
-  id: string;
-  name: string;
-}
-
 const ConsultationForm: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
   const { hospital, user } = useAuthStore();
   const { addNotification } = useNotificationStore();
   const [patient, setPatient] = useState<Patient | null>(null);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [activeTab, setActiveTab] = useState<'assessment' | 'orders' | 'prescriptions' | 'notes'>('assessment');
+  const [activeTab, setActiveTab] = useState('history');
   const [expandedSections, setExpandedSections] = useState<{[key: string]: boolean}>({
     patientHistory: true,
-    familyHistory: false,
+    familySocial: true,
     examination: true,
-    systemicExamination: true
+    assessment: true,
+    plan: true
   });
   
-  const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<ConsultationFormData>({
-    defaultValues: {
-      chiefComplaint: '',
-      historyOfPresentingIllness: '',
-      pastMedicalHistory: '',
-      pastSurgicalHistory: '',
-      familyHistory: '',
-      socialHistory: '',
-      allergies: '',
-      currentMedications: '',
-      gynecologicalHistory: '',
-      generalExamination: '',
-      vitalSigns: {
-        temperature: null,
-        heartRate: null,
-        respiratoryRate: null,
-        bloodPressureSystolic: null,
-        bloodPressureDiastolic: null,
-        oxygenSaturation: null,
-        weight: null,
-        height: null,
-        bmi: null,
-        painLevel: null
-      },
-      systemicExamination: {
-        cardiovascular: '',
-        respiratory: '',
-        gastrointestinal: '',
-        genitourinary: '',
-        neurological: '',
-        musculoskeletal: '',
-        other: '',
-        breast: ''
-      },
-      diagnosis: '',
-      differentialDiagnosis: '',
-      treatmentPlan: '',
-      prescriptions: [],
-      labOrders: [],
-      radiologyOrders: [],
-      referrals: [],
-      followUp: '',
-      notes: '',
-      medicalCertificate: false,
-      medicalCertificateDays: 0
-    }
+  const [formData, setFormData] = useState<ConsultationFormData>({
+    patientId: patientId || '',
+    chiefComplaint: '',
+    historyOfPresentingIllness: '',
+    pastMedicalHistory: '',
+    pastSurgicalHistory: '',
+    familyHistory: '',
+    socialHistory: '',
+    medications: '',
+    allergies: '',
+    gynecologicalHistory: '',
+    generalExamination: '',
+    vitalSigns: {
+      temperature: '',
+      heartRate: '',
+      respiratoryRate: '',
+      bloodPressure: '',
+      oxygenSaturation: ''
+    },
+    systemicExamination: {
+      cardiovascular: '',
+      respiratory: '',
+      gastrointestinal: '',
+      neurological: '',
+      musculoskeletal: '',
+      genitourinary: '',
+      other: ''
+    },
+    diagnosis: '',
+    differentialDiagnosis: '',
+    investigations: {
+      laboratory: [],
+      radiology: [],
+      other: []
+    },
+    treatmentPlan: '',
+    medications_prescribed: [],
+    followUp: '',
+    notes: '',
+    medicalCertificate: false,
+    medicalCertificateDays: 0
   });
 
-  const vitalSigns = watch('vitalSigns');
-  const prescriptions = watch('prescriptions');
-  const labOrders = watch('labOrders');
-  const radiologyOrders = watch('radiologyOrders');
-  const referrals = watch('referrals');
-  const medicalCertificate = watch('medicalCertificate');
-  
   useEffect(() => {
-    if (hospital) {
-      fetchDepartments();
-    }
-    
     if (patientId) {
       fetchPatient();
     } else {
       setIsLoading(false);
     }
-  }, [hospital, patientId]);
-  
-  useEffect(() => {
-    // Calculate BMI if height and weight are available
-    if (vitalSigns.height && vitalSigns.weight) {
-      const heightInMeters = vitalSigns.height / 100;
-      const bmi = vitalSigns.weight / (heightInMeters * heightInMeters);
-      setValue('vitalSigns.bmi', parseFloat(bmi.toFixed(1)));
-    }
-  }, [vitalSigns.height, vitalSigns.weight, setValue]);
+  }, [patientId]);
 
   const fetchPatient = async () => {
     try {
-      if (import.meta.env.DEV) {
-        // Use mock data in development
-        const mockPatient: Patient = {
-          id: patientId || '00000000-0000-0000-0000-000000000001',
-          first_name: 'John',
-          last_name: 'Doe',
-          date_of_birth: '1980-05-15',
-          gender: 'Male',
-          medical_history: {
-            allergies: [
-              { allergen: 'Penicillin', reaction: 'Rash', severity: 'moderate' }
-            ],
-            chronicConditions: ['Hypertension'],
-            currentMedications: [
-              { name: 'Lisinopril', dosage: '10mg', frequency: 'Daily' }
-            ]
-          }
-        };
-        setPatient(mockPatient);
-        
-        // Pre-fill form with patient data
-        if (mockPatient.medical_history) {
-          if (mockPatient.medical_history.allergies) {
-            setValue('allergies', mockPatient.medical_history.allergies.map(a => 
-              `${a.allergen} (${a.reaction}, ${a.severity})`
-            ).join('\n'));
-          }
-          
-          if (mockPatient.medical_history.currentMedications) {
-            setValue('currentMedications', mockPatient.medical_history.currentMedications.map(m => 
-              `${m.name} ${m.dosage} ${m.frequency}`
-            ).join('\n'));
-          }
-        }
-        
-        setIsLoading(false);
-        return;
-      }
-
       const { data, error } = await supabase
         .from('patients')
         .select('*')
@@ -228,22 +179,30 @@ const ConsultationForm: React.FC = () => {
       if (error) throw error;
       setPatient(data);
       
-      // Pre-fill form with patient data
+      // Pre-fill allergies and medications from patient's medical history if available
       if (data.medical_history) {
-        if (data.medical_history.allergies) {
-          setValue('allergies', data.medical_history.allergies.map((a: any) => 
-            `${a.allergen} (${a.reaction}, ${a.severity})`
-          ).join('\n'));
+        let allergiesText = '';
+        if (data.medical_history.allergies && data.medical_history.allergies.length > 0) {
+          allergiesText = data.medical_history.allergies.map((a: any) => 
+            typeof a === 'string' ? a : a.allergen || a
+          ).join(', ');
         }
         
-        if (data.medical_history.currentMedications) {
-          setValue('currentMedications', data.medical_history.currentMedications.map((m: any) => 
-            `${m.name} ${m.dosage || ''} ${m.frequency || ''}`
-          ).join('\n'));
+        let medicationsText = '';
+        if (data.medical_history.currentMedications && data.medical_history.currentMedications.length > 0) {
+          medicationsText = data.medical_history.currentMedications.map((m: any) => 
+            typeof m === 'string' ? m : m.name || m
+          ).join(', ');
         }
+        
+        setFormData(prev => ({
+          ...prev,
+          allergies: allergiesText,
+          medications: medicationsText
+        }));
       }
     } catch (error) {
-      console.error('Error loading patient:', error);
+      console.error('Error fetching patient:', error);
       addNotification({
         message: 'Failed to load patient information',
         type: 'error'
@@ -253,39 +212,198 @@ const ConsultationForm: React.FC = () => {
     }
   };
 
-  const fetchDepartments = async () => {
-    try {
-      if (import.meta.env.DEV) {
-        // Use mock data in development
-        const mockDepartments: Department[] = [
-          { id: '1', name: 'General Medicine' },
-          { id: '2', name: 'Cardiology' },
-          { id: '3', name: 'Pediatrics' },
-          { id: '4', name: 'Orthopedics' },
-          { id: '5', name: 'Gynecology' }
-        ];
-        setDepartments(mockDepartments);
-        setSelectedDepartment(mockDepartments[0].id);
-        return;
-      }
+  const handleInputChange = (field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
 
-      const { data, error } = await supabase
-        .from('departments')
-        .select('id, name')
-        .eq('hospital_id', hospital?.id)
-        .order('name');
-
-      if (error) throw error;
-      setDepartments(data || []);
-      if (data && data.length > 0) {
-        setSelectedDepartment(data[0].id);
+  const handleVitalSignsChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      vitalSigns: {
+        ...prev.vitalSigns,
+        [field]: value
       }
-    } catch (error) {
-      console.error('Error loading departments:', error);
+    }));
+  };
+
+  const handleSystemicExaminationChange = (field: string, value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      systemicExamination: {
+        ...prev.systemicExamination,
+        [field]: value
+      }
+    }));
+  };
+
+  const handleAddInvestigation = (type: 'laboratory' | 'radiology' | 'other') => {
+    setFormData(prev => ({
+      ...prev,
+      investigations: {
+        ...prev.investigations,
+        [type]: [
+          ...prev.investigations[type],
+          { name: '', details: '' }
+        ]
+      }
+    }));
+  };
+
+  const handleRemoveInvestigation = (type: 'laboratory' | 'radiology' | 'other', index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      investigations: {
+        ...prev.investigations,
+        [type]: prev.investigations[type].filter((_, i) => i !== index)
+      }
+    }));
+  };
+
+  const handleInvestigationChange = (type: 'laboratory' | 'radiology' | 'other', index: number, field: string, value: string) => {
+    setFormData(prev => {
+      const updatedInvestigations = [...prev.investigations[type]];
+      updatedInvestigations[index] = {
+        ...updatedInvestigations[index],
+        [field]: value
+      };
+      
+      return {
+        ...prev,
+        investigations: {
+          ...prev.investigations,
+          [type]: updatedInvestigations
+        }
+      };
+    });
+  };
+
+  const handleAddMedication = () => {
+    setFormData(prev => ({
+      ...prev,
+      medications_prescribed: [
+        ...prev.medications_prescribed,
+        { medication: '', dosage: '', frequency: '', duration: '', instructions: '' }
+      ]
+    }));
+  };
+
+  const handleRemoveMedication = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      medications_prescribed: prev.medications_prescribed.filter((_, i) => i !== index)
+    }));
+  };
+
+  const handleMedicationChange = (index: number, field: string, value: string) => {
+    setFormData(prev => {
+      const updatedMedications = [...prev.medications_prescribed];
+      updatedMedications[index] = {
+        ...updatedMedications[index],
+        [field]: value
+      };
+      
+      return {
+        ...prev,
+        medications_prescribed: updatedMedications
+      };
+    });
+  };
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!hospital || !user || !patient) {
       addNotification({
-        message: 'Failed to load departments',
+        message: 'Missing required information',
         type: 'error'
       });
+      return;
+    }
+    
+    try {
+      setIsSaving(true);
+      
+      // Validate required fields
+      if (!formData.chiefComplaint || !formData.diagnosis) {
+        addNotification({
+          message: 'Please fill in all required fields',
+          type: 'warning'
+        });
+        setIsSaving(false);
+        return;
+      }
+      
+      // Create consultation record
+      const { data, error } = await supabase
+        .from('consultations')
+        .insert({
+          patient_id: patient.id,
+          doctor_id: user.id,
+          hospital_id: hospital.id,
+          consultation_date: new Date().toISOString(),
+          chief_complaint: formData.chiefComplaint,
+          diagnosis: formData.diagnosis,
+          treatment_plan: formData.treatmentPlan,
+          notes: JSON.stringify({
+            historyOfPresentingIllness: formData.historyOfPresentingIllness,
+            pastMedicalHistory: formData.pastMedicalHistory,
+            pastSurgicalHistory: formData.pastSurgicalHistory,
+            familyHistory: formData.familyHistory,
+            socialHistory: formData.socialHistory,
+            medications: formData.medications,
+            allergies: formData.allergies,
+            gynecologicalHistory: formData.gynecologicalHistory,
+            generalExamination: formData.generalExamination,
+            vitalSigns: formData.vitalSigns,
+            systemicExamination: formData.systemicExamination,
+            differentialDiagnosis: formData.differentialDiagnosis,
+            investigations: formData.investigations,
+            followUp: formData.followUp,
+            notes: formData.notes
+          }),
+          prescriptions: formData.medications_prescribed.length > 0 ? formData.medications_prescribed : null,
+          medical_certificate: formData.medicalCertificate,
+          department_id: user.department_id || null
+        })
+        .select()
+        .single();
+      
+      if (error) throw error;
+      
+      // Update patient's current flow step
+      const { error: updateError } = await supabase
+        .from('patients')
+        .update({
+          current_flow_step: 'post_consultation'
+        })
+        .eq('id', patient.id);
+      
+      if (updateError) throw updateError;
+      
+      addNotification({
+        message: 'Consultation saved successfully',
+        type: 'success'
+      });
+      
+      navigate('/patients');
+    } catch (error: any) {
+      console.error('Error saving consultation:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -302,350 +420,178 @@ const ConsultationForm: React.FC = () => {
     return age;
   };
 
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => ({
-      ...prev,
-      [section]: !prev[section]
-    }));
-  };
-
-  const addPrescription = () => {
-    setValue('prescriptions', [
-      ...prescriptions,
-      { medication: '', dosage: '', frequency: '', duration: '', instructions: '' }
-    ]);
-  };
-
-  const removePrescription = (index: number) => {
-    setValue('prescriptions', prescriptions.filter((_, i) => i !== index));
-  };
-
-  const addLabOrder = () => {
-    setValue('labOrders', [
-      ...labOrders,
-      { testName: '', instructions: '', urgency: 'routine' }
-    ]);
-  };
-
-  const removeLabOrder = (index: number) => {
-    setValue('labOrders', labOrders.filter((_, i) => i !== index));
-  };
-
-  const addRadiologyOrder = () => {
-    setValue('radiologyOrders', [
-      ...radiologyOrders,
-      { scanType: '', bodyPart: '', instructions: '', urgency: 'routine' }
-    ]);
-  };
-
-  const removeRadiologyOrder = (index: number) => {
-    setValue('radiologyOrders', radiologyOrders.filter((_, i) => i !== index));
-  };
-
-  const addReferral = () => {
-    setValue('referrals', [
-      ...referrals,
-      { specialtyDepartment: '', reason: '', urgency: 'routine' }
-    ]);
-  };
-
-  const removeReferral = (index: number) => {
-    setValue('referrals', referrals.filter((_, i) => i !== index));
-  };
-
-  const onSubmit = async (data: ConsultationFormData) => {
-    if (!hospital || !user || !patient || !selectedDepartment) {
-      addNotification({
-        message: 'Missing required information',
-        type: 'error'
-      });
-      return;
-    }
-    
-    try {
-      setIsSaving(true);
-      
-      if (import.meta.env.DEV) {
-        // Simulate successful submission in development
-        console.log('Consultation form submitted:', data);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        addNotification({
-          message: 'Consultation saved successfully',
-          type: 'success'
-        });
-        
-        navigate('/consultations');
-        return;
-      }
-      
-      // Create consultation record
-      const { data: consultationData, error: consultationError } = await supabase
-        .from('consultations')
-        .insert({
-          patient_id: patient.id,
-          doctor_id: user.id,
-          hospital_id: hospital.id,
-          department_id: selectedDepartment,
-          consultation_date: new Date().toISOString(),
-          chief_complaint: data.chiefComplaint,
-          diagnosis: data.diagnosis,
-          treatment_plan: data.treatmentPlan,
-          notes: data.notes,
-          medical_certificate: data.medicalCertificate,
-          prescriptions: data.prescriptions.length > 0 ? data.prescriptions : null
-        })
-        .select()
-        .single();
-
-      if (consultationError) throw consultationError;
-      
-      // Update patient's current flow step
-      const { error: patientError } = await supabase
-        .from('patients')
-        .update({
-          current_flow_step: 'post_consultation',
-          medical_history: {
-            ...patient.medical_history,
-            pastMedicalHistory: data.pastMedicalHistory,
-            pastSurgicalHistory: data.pastSurgicalHistory,
-            familyHistory: data.familyHistory,
-            socialHistory: data.socialHistory
-          }
-        })
-        .eq('id', patient.id);
-
-      if (patientError) throw patientError;
-      
-      // Create lab orders if any
-      if (data.labOrders.length > 0) {
-        for (const order of data.labOrders) {
-          const { error: labError } = await supabase
-            .from('lab_results')
-            .insert({
-              patient_id: patient.id,
-              hospital_id: hospital.id,
-              test_type: order.testName.toLowerCase().replace(/\s+/g, '_'),
-              test_date: new Date().toISOString(),
-              status: 'pending',
-              is_emergency: order.urgency === 'emergency',
-              notes: order.instructions
-            });
-            
-          if (labError) throw labError;
-        }
-      }
-      
-      // Create radiology orders if any
-      if (data.radiologyOrders.length > 0) {
-        for (const order of data.radiologyOrders) {
-          const { error: radiologyError } = await supabase
-            .from('radiology_results')
-            .insert({
-              patient_id: patient.id,
-              hospital_id: hospital.id,
-              scan_type: order.scanType.toLowerCase().replace(/\s+/g, '_'),
-              scan_date: new Date().toISOString(),
-              status: 'pending',
-              is_emergency: order.urgency === 'emergency',
-              notes: order.instructions
-            });
-            
-          if (radiologyError) throw radiologyError;
-        }
-      }
-      
-      // Create pharmacy order if prescriptions exist
-      if (data.prescriptions.length > 0) {
-        const { error: pharmacyError } = await supabase
-          .from('pharmacy')
-          .insert({
-            patient_id: patient.id,
-            hospital_id: hospital.id,
-            prescription_id: consultationData.id,
-            medications: data.prescriptions.map(p => ({
-              medication: p.medication,
-              dosage: p.dosage,
-              frequency: p.frequency,
-              duration: p.duration,
-              instructions: p.instructions,
-              quantity: parseInt(p.duration.split(' ')[0]) || 1,
-              dispensed: false
-            })),
-            status: 'pending',
-            payment_status: 'pending',
-            is_emergency: data.prescriptions.some(p => p.instructions.toLowerCase().includes('emergency'))
-          });
-          
-        if (pharmacyError) throw pharmacyError;
-      }
-      
-      // Create referrals if any
-      if (data.referrals.length > 0) {
-        for (const referral of data.referrals) {
-          const { error: referralError } = await supabase
-            .from('referrals')
-            .insert({
-              patient_id: patient.id,
-              hospital_id: hospital.id,
-              referring_doctor_id: user.id,
-              referral_date: new Date().toISOString(),
-              reason: referral.reason,
-              urgency: referral.urgency,
-              status: 'pending'
-            });
-            
-          if (referralError) throw referralError;
-        }
-      }
-      
-      addNotification({
-        message: 'Consultation saved successfully',
-        type: 'success'
-      });
-      
-      navigate('/consultations');
-    } catch (error: any) {
-      console.error('Error submitting consultation form:', error.message);
-      addNotification({
-        message: `Error: ${error.message}`,
-        type: 'error'
-      });
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   if (isLoading) {
     return (
-      <div className="flex justify-center p-4">
-        <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
+      <div className="flex justify-center p-8">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
       </div>
     );
   }
 
   if (!patient) {
     return (
-      <div className="text-center p-4">
+      <div className="text-center p-8">
         <p className="text-gray-500">Patient not found</p>
       </div>
     );
   }
 
   return (
-    <div className="max-w-6xl mx-auto">
-      <form onSubmit={handleSubmit(onSubmit)}>
-        {/* Patient Header */}
-        <div className="bg-gradient-to-r from-primary-700 to-primary-600 rounded-lg shadow-sm p-3 mb-3">
-          <div className="flex items-center">
-            <div className="h-10 w-10 rounded-full bg-white text-primary-600 flex items-center justify-center text-lg font-bold shadow-sm">
-              {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
-            </div>
-            <div className="ml-3">
-              <h2 className="text-lg font-bold text-white">
-                {patient.first_name} {patient.last_name}
-              </h2>
-              <div className="flex items-center text-primary-100 text-xs">
-                <User className="h-3 w-3 mr-1" />
-                <span>{calculateAge(patient.date_of_birth)} years • {patient.gender}</span>
-                <span className="mx-1">•</span>
-                <Calendar className="h-3 w-3 mr-1" />
-                <span className="bg-black bg-opacity-20 px-1.5 py-0.5 rounded">
-                  {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                </span>
+    <div className="max-w-5xl mx-auto">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {/* Header */}
+        <div className="bg-white rounded-lg shadow-sm p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <button 
+                type="button"
+                onClick={() => navigate(-1)}
+                className="mr-3 p-2 rounded-full hover:bg-gray-100"
+              >
+                <ArrowLeft className="h-5 w-5 text-gray-500" />
+              </button>
+              <div>
+                <h1 className="text-xl font-bold text-gray-900">Patient Consultation</h1>
+                <div className="flex items-center text-sm text-gray-500">
+                  <User className="h-4 w-4 mr-1" />
+                  <span>{patient.first_name} {patient.last_name}</span>
+                  <span className="mx-1">•</span>
+                  <span>{calculateAge(patient.date_of_birth)} years</span>
+                  <span className="mx-1">•</span>
+                  <span>{patient.gender}</span>
+                </div>
               </div>
+            </div>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={() => navigate(`/patients/${patient.id}`)}
+                className="btn btn-outline text-sm"
+              >
+                View Patient Record
+              </button>
+              <button
+                type="submit"
+                disabled={isSaving}
+                className="btn btn-primary text-sm"
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    Save Consultation
+                  </>
+                )}
+              </button>
             </div>
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-3">
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="flex border-b border-gray-200">
             <button
               type="button"
-              className={`flex-1 py-2.5 px-3 text-center text-xs font-medium ${
+              className={`flex-1 py-2 px-4 text-center text-sm font-medium ${
+                activeTab === 'history'
+                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab('history')}
+            >
+              <FileText className="h-4 w-4 inline mr-1" />
+              History
+            </button>
+            <button
+              type="button"
+              className={`flex-1 py-2 px-4 text-center text-sm font-medium ${
+                activeTab === 'examination'
+                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+              onClick={() => setActiveTab('examination')}
+            >
+              <Stethoscope className="h-4 w-4 inline mr-1" />
+              Examination
+            </button>
+            <button
+              type="button"
+              className={`flex-1 py-2 px-4 text-center text-sm font-medium ${
                 activeTab === 'assessment'
                   ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
               onClick={() => setActiveTab('assessment')}
             >
-              <Stethoscope className="h-3.5 w-3.5 inline mr-1" />
+              <ClipboardList className="h-4 w-4 inline mr-1" />
               Assessment
             </button>
             <button
               type="button"
-              className={`flex-1 py-2.5 px-3 text-center text-xs font-medium ${
+              className={`flex-1 py-2 px-4 text-center text-sm font-medium ${
                 activeTab === 'orders'
                   ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
               onClick={() => setActiveTab('orders')}
             >
-              <FileImage className="h-3.5 w-3.5 inline mr-1" />
+              <Clipboard className="h-4 w-4 inline mr-1" />
               Orders
             </button>
             <button
               type="button"
-              className={`flex-1 py-2.5 px-3 text-center text-xs font-medium ${
-                activeTab === 'prescriptions'
+              className={`flex-1 py-2 px-4 text-center text-sm font-medium ${
+                activeTab === 'prescription'
                   ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
-              onClick={() => setActiveTab('prescriptions')}
+              onClick={() => setActiveTab('prescription')}
             >
-              <Pill className="h-3.5 w-3.5 inline mr-1" />
-              Prescriptions
+              <Pill className="h-4 w-4 inline mr-1" />
+              Prescription
             </button>
             <button
               type="button"
-              className={`flex-1 py-2.5 px-3 text-center text-xs font-medium ${
-                activeTab === 'notes'
+              className={`flex-1 py-2 px-4 text-center text-sm font-medium ${
+                activeTab === 'plan'
                   ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
               }`}
-              onClick={() => setActiveTab('notes')}
+              onClick={() => setActiveTab('plan')}
             >
-              <FileText className="h-3.5 w-3.5 inline mr-1" />
-              Notes
+              <Scroll className="h-4 w-4 inline mr-1" />
+              Plan
             </button>
           </div>
         </div>
 
-        {/* Assessment Tab */}
-        {activeTab === 'assessment' && (
-          <div className="space-y-3">
+        {/* History Tab */}
+        {activeTab === 'history' && (
+          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
             {/* Chief Complaint */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="mb-3">
-                <label className="form-label text-xs required">Chief Complaint</label>
-                <textarea
-                  {...register('chiefComplaint', { required: 'Chief complaint is required' })}
-                  className="form-input py-1.5 text-sm"
-                  rows={2}
-                  placeholder="Patient's main complaint"
-                />
-                {errors.chiefComplaint && (
-                  <p className="form-error text-xs">{errors.chiefComplaint.message}</p>
-                )}
-              </div>
-              
-              <div className="mb-3">
-                <label className="form-label text-xs">History of Presenting Illness</label>
-                <textarea
-                  {...register('historyOfPresentingIllness')}
-                  className="form-input py-1.5 text-sm"
-                  rows={3}
-                  placeholder="Detailed description of the current illness"
-                />
-              </div>
+            <div>
+              <label className="form-label required text-sm">Chief Complaint</label>
+              <textarea
+                value={formData.chiefComplaint}
+                onChange={(e) => handleInputChange('chiefComplaint', e.target.value)}
+                className="form-input text-sm"
+                rows={2}
+                placeholder="Enter patient's main complaint"
+              />
             </div>
             
             {/* Patient History Section */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('patientHistory')}>
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div 
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                onClick={() => toggleSection('patientHistory')}
+              >
                 <h3 className="text-sm font-medium text-gray-900 flex items-center">
-                  <Clipboard className="h-4 w-4 mr-1.5 text-primary-500" />
+                  <FileText className="h-4 w-4 mr-1.5 text-primary-500" />
                   Patient History
                 </h3>
                 {expandedSections.patientHistory ? (
@@ -656,57 +602,69 @@ const ConsultationForm: React.FC = () => {
               </div>
               
               {expandedSections.patientHistory && (
-                <div className="mt-2 space-y-3">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="form-label text-xs">Past Medical History</label>
-                      <textarea
-                        {...register('pastMedicalHistory')}
-                        className="form-input py-1.5 text-sm"
-                        rows={2}
-                        placeholder="Previous medical conditions"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs">Past Surgical History</label>
-                      <textarea
-                        {...register('pastSurgicalHistory')}
-                        className="form-input py-1.5 text-sm"
-                        rows={2}
-                        placeholder="Previous surgeries"
-                      />
-                    </div>
+                <div className="p-3 space-y-3">
+                  <div>
+                    <label className="form-label text-xs">History of Presenting Illness</label>
+                    <textarea
+                      value={formData.historyOfPresentingIllness}
+                      onChange={(e) => handleInputChange('historyOfPresentingIllness', e.target.value)}
+                      className="form-input text-sm"
+                      rows={3}
+                      placeholder="Describe the history of the current illness"
+                    />
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="form-label text-xs">Allergies</label>
-                      <textarea
-                        {...register('allergies')}
-                        className="form-input py-1.5 text-sm"
-                        rows={2}
-                        placeholder="Known allergies and reactions"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs">Current Medications</label>
-                      <textarea
-                        {...register('currentMedications')}
-                        className="form-input py-1.5 text-sm"
-                        rows={2}
-                        placeholder="Current medications and dosages"
-                      />
-                    </div>
+                  <div>
+                    <label className="form-label text-xs">Past Medical History</label>
+                    <textarea
+                      value={formData.pastMedicalHistory}
+                      onChange={(e) => handleInputChange('pastMedicalHistory', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="List previous medical conditions"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-xs">Past Surgical History</label>
+                    <textarea
+                      value={formData.pastSurgicalHistory}
+                      onChange={(e) => handleInputChange('pastSurgicalHistory', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="List previous surgeries"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-xs">Current Medications</label>
+                    <textarea
+                      value={formData.medications}
+                      onChange={(e) => handleInputChange('medications', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="List current medications"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-xs">Allergies</label>
+                    <textarea
+                      value={formData.allergies}
+                      onChange={(e) => handleInputChange('allergies', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="List known allergies"
+                    />
                   </div>
                   
                   {patient.gender === 'Female' && (
                     <div>
                       <label className="form-label text-xs">Gynecological/Obstetric History</label>
                       <textarea
-                        {...register('gynecologicalHistory')}
-                        className="form-input py-1.5 text-sm"
+                        value={formData.gynecologicalHistory}
+                        onChange={(e) => handleInputChange('gynecologicalHistory', e.target.value)}
+                        className="form-input text-sm"
                         rows={2}
                         placeholder="Gynecological and obstetric history"
                       />
@@ -717,26 +675,30 @@ const ConsultationForm: React.FC = () => {
             </div>
             
             {/* Family and Social History */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('familyHistory')}>
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div 
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                onClick={() => toggleSection('familySocial')}
+              >
                 <h3 className="text-sm font-medium text-gray-900 flex items-center">
-                  <Clipboard className="h-4 w-4 mr-1.5 text-primary-500" />
+                  <Users className="h-4 w-4 mr-1.5 text-primary-500" />
                   Family and Socioeconomic History
                 </h3>
-                {expandedSections.familyHistory ? (
+                {expandedSections.familySocial ? (
                   <ChevronUp className="h-4 w-4 text-gray-500" />
                 ) : (
                   <ChevronDown className="h-4 w-4 text-gray-500" />
                 )}
               </div>
               
-              {expandedSections.familyHistory && (
-                <div className="mt-2 space-y-3">
+              {expandedSections.familySocial && (
+                <div className="p-3 space-y-3">
                   <div>
                     <label className="form-label text-xs">Family History</label>
                     <textarea
-                      {...register('familyHistory')}
-                      className="form-input py-1.5 text-sm"
+                      value={formData.familyHistory}
+                      onChange={(e) => handleInputChange('familyHistory', e.target.value)}
+                      className="form-input text-sm"
                       rows={2}
                       placeholder="Family medical history"
                     />
@@ -745,22 +707,116 @@ const ConsultationForm: React.FC = () => {
                   <div>
                     <label className="form-label text-xs">Social History</label>
                     <textarea
-                      {...register('socialHistory')}
-                      className="form-input py-1.5 text-sm"
+                      value={formData.socialHistory}
+                      onChange={(e) => handleInputChange('socialHistory', e.target.value)}
+                      className="form-input text-sm"
                       rows={2}
-                      placeholder="Social, occupational, and lifestyle factors"
+                      placeholder="Social and occupational history"
                     />
                   </div>
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {/* Examination Tab */}
+        {activeTab === 'examination' && (
+          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
+            {/* Vital Signs */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="form-label text-sm">Temperature (°C)</label>
+                <div className="flex items-center">
+                  <Thermometer className="h-4 w-4 text-gray-400 mr-1" />
+                  <input
+                    type="text"
+                    value={formData.vitalSigns.temperature}
+                    onChange={(e) => handleVitalSignsChange('temperature', e.target.value)}
+                    className="form-input text-sm"
+                    placeholder="36.5"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="form-label text-sm">Heart Rate (bpm)</label>
+                <div className="flex items-center">
+                  <Heart className="h-4 w-4 text-gray-400 mr-1" />
+                  <input
+                    type="text"
+                    value={formData.vitalSigns.heartRate}
+                    onChange={(e) => handleVitalSignsChange('heartRate', e.target.value)}
+                    className="form-input text-sm"
+                    placeholder="75"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="form-label text-sm">Respiratory Rate (breaths/min)</label>
+                <div className="flex items-center">
+                  <Lungs className="h-4 w-4 text-gray-400 mr-1" />
+                  <input
+                    type="text"
+                    value={formData.vitalSigns.respiratoryRate}
+                    onChange={(e) => handleVitalSignsChange('respiratoryRate', e.target.value)}
+                    className="form-input text-sm"
+                    placeholder="16"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="form-label text-sm">Blood Pressure (mmHg)</label>
+                <div className="flex items-center">
+                  <Activity className="h-4 w-4 text-gray-400 mr-1" />
+                  <input
+                    type="text"
+                    value={formData.vitalSigns.bloodPressure}
+                    onChange={(e) => handleVitalSignsChange('bloodPressure', e.target.value)}
+                    className="form-input text-sm"
+                    placeholder="120/80"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="form-label text-sm">Oxygen Saturation (%)</label>
+                <div className="flex items-center">
+                  <Droplets className="h-4 w-4 text-gray-400 mr-1" />
+                  <input
+                    type="text"
+                    value={formData.vitalSigns.oxygenSaturation}
+                    onChange={(e) => handleVitalSignsChange('oxygenSaturation', e.target.value)}
+                    className="form-input text-sm"
+                    placeholder="98"
+                  />
+                </div>
+              </div>
+            </div>
             
-            {/* Examination Section */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('examination')}>
+            {/* General Examination */}
+            <div>
+              <label className="form-label text-sm">General Examination</label>
+              <textarea
+                value={formData.generalExamination}
+                onChange={(e) => handleInputChange('generalExamination', e.target.value)}
+                className="form-input text-sm"
+                rows={3}
+                placeholder="General appearance, level of consciousness, etc."
+              />
+            </div>
+            
+            {/* Systemic Examination */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div 
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                onClick={() => toggleSection('examination')}
+              >
                 <h3 className="text-sm font-medium text-gray-900 flex items-center">
                   <Stethoscope className="h-4 w-4 mr-1.5 text-primary-500" />
-                  General Examination
+                  Systemic Examination
                 </h3>
                 {expandedSections.examination ? (
                   <ChevronUp className="h-4 w-4 text-gray-500" />
@@ -770,533 +826,338 @@ const ConsultationForm: React.FC = () => {
               </div>
               
               {expandedSections.examination && (
-                <div className="mt-2 space-y-3">
+                <div className="p-3 space-y-3 max-h-96 overflow-y-auto">
                   <div>
-                    <label className="form-label text-xs">General Examination</label>
+                    <label className="form-label text-xs flex items-center">
+                      <Heart className="h-3.5 w-3.5 mr-1 text-error-500" />
+                      Cardiovascular System
+                    </label>
                     <textarea
-                      {...register('generalExamination')}
-                      className="form-input py-1.5 text-sm"
+                      value={formData.systemicExamination.cardiovascular}
+                      onChange={(e) => handleSystemicExaminationChange('cardiovascular', e.target.value)}
+                      className="form-input text-sm"
                       rows={2}
-                      placeholder="General physical examination findings"
+                      placeholder="Heart sounds, murmurs, etc."
                     />
                   </div>
                   
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    <div>
-                      <label className="form-label text-xs">Temperature (°C)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        {...register('vitalSigns.temperature')}
-                        className="form-input py-1.5 text-sm"
-                        placeholder="36.5"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs">Heart Rate (bpm)</label>
-                      <input
-                        type="number"
-                        {...register('vitalSigns.heartRate')}
-                        className="form-input py-1.5 text-sm"
-                        placeholder="75"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs">Respiratory Rate</label>
-                      <input
-                        type="number"
-                        {...register('vitalSigns.respiratoryRate')}
-                        className="form-input py-1.5 text-sm"
-                        placeholder="16"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs">Blood Pressure</label>
-                      <div className="flex items-center space-x-1">
-                        <input
-                          type="number"
-                          {...register('vitalSigns.bloodPressureSystolic')}
-                          className="form-input py-1.5 text-sm w-1/2"
-                          placeholder="120"
-                        />
-                        <span className="text-gray-500">/</span>
-                        <input
-                          type="number"
-                          {...register('vitalSigns.bloodPressureDiastolic')}
-                          className="form-input py-1.5 text-sm w-1/2"
-                          placeholder="80"
-                        />
-                      </div>
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs">O₂ Saturation (%)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        {...register('vitalSigns.oxygenSaturation')}
-                        className="form-input py-1.5 text-sm"
-                        placeholder="98"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs">Weight (kg)</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        {...register('vitalSigns.weight')}
-                        className="form-input py-1.5 text-sm"
-                        placeholder="70"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs">Height (cm)</label>
-                      <input
-                        type="number"
-                        {...register('vitalSigns.height')}
-                        className="form-input py-1.5 text-sm"
-                        placeholder="170"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs">BMI</label>
-                      <input
-                        type="number"
-                        step="0.1"
-                        {...register('vitalSigns.bmi')}
-                        className="form-input py-1.5 text-sm bg-gray-50"
-                        placeholder="Calculated"
-                        readOnly
-                      />
-                    </div>
+                  <div>
+                    <label className="form-label text-xs flex items-center">
+                      <Lungs className="h-3.5 w-3.5 mr-1 text-primary-500" />
+                      Respiratory System
+                    </label>
+                    <textarea
+                      value={formData.systemicExamination.respiratory}
+                      onChange={(e) => handleSystemicExaminationChange('respiratory', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="Breath sounds, respiratory effort, etc."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-xs flex items-center">
+                      <Activity className="h-3.5 w-3.5 mr-1 text-warning-500" />
+                      Gastrointestinal System
+                    </label>
+                    <textarea
+                      value={formData.systemicExamination.gastrointestinal}
+                      onChange={(e) => handleSystemicExaminationChange('gastrointestinal', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="Abdomen, bowel sounds, etc."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-xs flex items-center">
+                      <Brain className="h-3.5 w-3.5 mr-1 text-secondary-500" />
+                      Central Nervous System
+                    </label>
+                    <textarea
+                      value={formData.systemicExamination.neurological}
+                      onChange={(e) => handleSystemicExaminationChange('neurological', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="Mental status, cranial nerves, motor, sensory, etc."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-xs flex items-center">
+                      <Bone className="h-3.5 w-3.5 mr-1 text-accent-500" />
+                      Musculoskeletal
+                    </label>
+                    <textarea
+                      value={formData.systemicExamination.musculoskeletal}
+                      onChange={(e) => handleSystemicExaminationChange('musculoskeletal', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="Joints, muscles, range of motion, etc."
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-xs">Genitourinary System</label>
+                    <textarea
+                      value={formData.systemicExamination.genitourinary}
+                      onChange={(e) => handleSystemicExaminationChange('genitourinary', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="Genitourinary findings"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-xs">Other Systems/Examination</label>
+                    <textarea
+                      value={formData.systemicExamination.other}
+                      onChange={(e) => handleSystemicExaminationChange('other', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="Other examination findings"
+                    />
                   </div>
                 </div>
               )}
             </div>
-            
-            {/* Systemic Examination */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="flex justify-between items-center cursor-pointer" onClick={() => toggleSection('systemicExamination')}>
+          </div>
+        )}
+
+        {/* Assessment Tab */}
+        {activeTab === 'assessment' && (
+          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div 
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                onClick={() => toggleSection('assessment')}
+              >
                 <h3 className="text-sm font-medium text-gray-900 flex items-center">
-                  <ClipboardCheck className="h-4 w-4 mr-1.5 text-primary-500" />
-                  Systemic Examination
+                  <ClipboardList className="h-4 w-4 mr-1.5 text-primary-500" />
+                  Assessment
                 </h3>
-                {expandedSections.systemicExamination ? (
+                {expandedSections.assessment ? (
                   <ChevronUp className="h-4 w-4 text-gray-500" />
                 ) : (
                   <ChevronDown className="h-4 w-4 text-gray-500" />
                 )}
               </div>
               
-              {expandedSections.systemicExamination && (
-                <div className="mt-2 space-y-3 max-h-96 overflow-y-auto pr-1">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="form-label text-xs flex items-center">
-                        <Heart className="h-3.5 w-3.5 mr-1 text-error-500" />
-                        Cardiovascular System
-                      </label>
-                      <textarea
-                        {...register('systemicExamination.cardiovascular')}
-                        className="form-input py-1.5 text-sm"
-                        rows={2}
-                        placeholder="Heart sounds, murmurs, pulses, etc."
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs flex items-center">
-                        <Lungs className="h-3.5 w-3.5 mr-1 text-blue-500" />
-                        Respiratory System
-                      </label>
-                      <textarea
-                        {...register('systemicExamination.respiratory')}
-                        className="form-input py-1.5 text-sm"
-                        rows={2}
-                        placeholder="Breath sounds, respiratory rate, etc."
-                      />
-                    </div>
+              {expandedSections.assessment && (
+                <div className="p-3 space-y-3">
+                  <div>
+                    <label className="form-label required text-sm">Diagnosis</label>
+                    <textarea
+                      value={formData.diagnosis}
+                      onChange={(e) => handleInputChange('diagnosis', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="Primary diagnosis"
+                    />
                   </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="form-label text-xs">Gastrointestinal System</label>
-                      <textarea
-                        {...register('systemicExamination.gastrointestinal')}
-                        className="form-input py-1.5 text-sm"
-                        rows={2}
-                        placeholder="Abdomen, bowel sounds, liver, spleen, etc."
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs">Genitourinary System</label>
-                      <textarea
-                        {...register('systemicExamination.genitourinary')}
-                        className="form-input py-1.5 text-sm"
-                        rows={2}
-                        placeholder="Genitourinary findings if examined"
-                      />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="form-label text-xs flex items-center">
-                        <Brain className="h-3.5 w-3.5 mr-1 text-purple-500" />
-                        Central Nervous System
-                      </label>
-                      <textarea
-                        {...register('systemicExamination.neurological')}
-                        className="form-input py-1.5 text-sm"
-                        rows={2}
-                        placeholder="Mental status, cranial nerves, motor, sensory, reflexes, etc."
-                      />
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs flex items-center">
-                        <Bone className="h-3.5 w-3.5 mr-1 text-amber-500" />
-                        Musculoskeletal
-                      </label>
-                      <textarea
-                        {...register('systemicExamination.musculoskeletal')}
-                        className="form-input py-1.5 text-sm"
-                        rows={2}
-                        placeholder="Joints, muscles, bones, etc."
-                      />
-                    </div>
-                  </div>
-                  
-                  {patient.gender === 'Female' && (
-                    <div>
-                      <label className="form-label text-xs">Breast Examination</label>
-                      <textarea
-                        {...register('systemicExamination.breast')}
-                        className="form-input py-1.5 text-sm"
-                        rows={2}
-                        placeholder="Breast examination findings if performed"
-                      />
-                    </div>
-                  )}
                   
                   <div>
-                    <label className="form-label text-xs">Other Systems/Examination</label>
+                    <label className="form-label text-sm">Differential Diagnosis</label>
                     <textarea
-                      {...register('systemicExamination.other')}
-                      className="form-input py-1.5 text-sm"
+                      value={formData.differentialDiagnosis}
+                      onChange={(e) => handleInputChange('differentialDiagnosis', e.target.value)}
+                      className="form-input text-sm"
                       rows={2}
-                      placeholder="Any other examination findings"
+                      placeholder="Alternative diagnoses to consider"
                     />
                   </div>
                 </div>
               )}
             </div>
-            
-            {/* Diagnosis and Treatment */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="mb-3">
-                <label className="form-label text-xs required">Diagnosis</label>
-                <textarea
-                  {...register('diagnosis', { required: 'Diagnosis is required' })}
-                  className="form-input py-1.5 text-sm"
-                  rows={2}
-                  placeholder="Primary diagnosis"
-                />
-                {errors.diagnosis && (
-                  <p className="form-error text-xs">{errors.diagnosis.message}</p>
-                )}
-              </div>
-              
-              <div className="mb-3">
-                <label className="form-label text-xs">Differential Diagnosis</label>
-                <textarea
-                  {...register('differentialDiagnosis')}
-                  className="form-input py-1.5 text-sm"
-                  rows={2}
-                  placeholder="Alternative diagnoses to consider"
-                />
-              </div>
-              
-              <div>
-                <label className="form-label text-xs required">Treatment Plan</label>
-                <textarea
-                  {...register('treatmentPlan', { required: 'Treatment plan is required' })}
-                  className="form-input py-1.5 text-sm"
-                  rows={3}
-                  placeholder="Detailed treatment plan"
-                />
-                {errors.treatmentPlan && (
-                  <p className="form-error text-xs">{errors.treatmentPlan.message}</p>
-                )}
-              </div>
-            </div>
           </div>
         )}
-        
+
         {/* Orders Tab */}
         {activeTab === 'orders' && (
-          <div className="space-y-3">
-            {/* Lab Orders */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-medium text-gray-900 flex items-center">
-                  <Microscope className="h-4 w-4 mr-1.5 text-primary-500" />
-                  Laboratory Orders
-                </h3>
+          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
+            {/* Laboratory Tests */}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="form-label text-sm flex items-center">
+                  <Flask className="h-4 w-4 mr-1.5 text-primary-500" />
+                  Laboratory Tests
+                </label>
                 <button
                   type="button"
-                  onClick={addLabOrder}
-                  className="btn btn-sm btn-outline py-1 px-2 text-xs"
+                  onClick={() => handleAddInvestigation('laboratory')}
+                  className="text-xs text-primary-600 hover:text-primary-800 flex items-center"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" />
                   Add Test
                 </button>
               </div>
               
-              {labOrders.length === 0 ? (
-                <div className="text-center py-4 text-gray-500 text-sm">
-                  No laboratory tests ordered
+              {formData.investigations.laboratory.length === 0 ? (
+                <div className="text-center py-4 border border-dashed border-gray-300 rounded-lg">
+                  <p className="text-sm text-gray-500">No laboratory tests ordered</p>
+                  <button
+                    type="button"
+                    onClick={() => handleAddInvestigation('laboratory')}
+                    className="mt-2 text-xs text-primary-600 hover:text-primary-800"
+                  >
+                    Add Laboratory Test
+                  </button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {labOrders.map((_, index) => (
-                    <div key={index} className="border rounded-lg p-3 relative">
+                <div className="space-y-2">
+                  {formData.investigations.laboratory.map((test, index) => (
+                    <div key={index} className="flex space-x-2">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={test.name}
+                          onChange={(e) => handleInvestigationChange('laboratory', index, 'name', e.target.value)}
+                          className="form-input text-sm"
+                          placeholder="Test name"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={test.details}
+                          onChange={(e) => handleInvestigationChange('laboratory', index, 'details', e.target.value)}
+                          className="form-input text-sm"
+                          placeholder="Details/Notes"
+                        />
+                      </div>
                       <button
                         type="button"
-                        onClick={() => removeLabOrder(index)}
-                        className="absolute top-2 right-2 text-gray-400 hover:text-error-500"
+                        onClick={() => handleRemoveInvestigation('laboratory', index)}
+                        className="p-2 text-gray-400 hover:text-error-500"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                        <div>
-                          <label className="form-label text-xs required">Test Name</label>
-                          <select
-                            {...register(`labOrders.${index}.testName` as const, { required: true })}
-                            className="form-input py-1.5 text-sm"
-                          >
-                            <option value="">Select Test</option>
-                            <option value="Complete Blood Count">Complete Blood Count (CBC)</option>
-                            <option value="Liver Function Test">Liver Function Test (LFT)</option>
-                            <option value="Kidney Function Test">Kidney Function Test</option>
-                            <option value="Lipid Profile">Lipid Profile</option>
-                            <option value="Blood Glucose">Blood Glucose</option>
-                            <option value="Urinalysis">Urinalysis</option>
-                            <option value="Thyroid Function Test">Thyroid Function Test</option>
-                            <option value="Electrolytes Panel">Electrolytes Panel</option>
-                            <option value="HbA1c">HbA1c</option>
-                            <option value="Coagulation Profile">Coagulation Profile</option>
-                          </select>
-                        </div>
-                        
-                        <div>
-                          <label className="form-label text-xs">Urgency</label>
-                          <select
-                            {...register(`labOrders.${index}.urgency` as const)}
-                            className="form-input py-1.5 text-sm"
-                          >
-                            <option value="routine">Routine</option>
-                            <option value="urgent">Urgent</option>
-                            <option value="emergency">Emergency</option>
-                          </select>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-3">
-                        <label className="form-label text-xs">Instructions</label>
-                        <textarea
-                          {...register(`labOrders.${index}.instructions` as const)}
-                          className="form-input py-1.5 text-sm"
-                          rows={2}
-                          placeholder="Special instructions for this test"
-                        />
-                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
             
-            {/* Radiology Orders */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-medium text-gray-900 flex items-center">
-                  <Scan className="h-4 w-4 mr-1.5 text-secondary-500" />
-                  Radiology Orders
-                </h3>
+            {/* Radiology Tests */}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="form-label text-sm flex items-center">
+                  <FileImage className="h-4 w-4 mr-1.5 text-secondary-500" />
+                  Radiology Tests
+                </label>
                 <button
                   type="button"
-                  onClick={addRadiologyOrder}
-                  className="btn btn-sm btn-outline py-1 px-2 text-xs"
+                  onClick={() => handleAddInvestigation('radiology')}
+                  className="text-xs text-primary-600 hover:text-primary-800 flex items-center"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" />
-                  Add Scan
+                  Add Test
                 </button>
               </div>
               
-              {radiologyOrders.length === 0 ? (
-                <div className="text-center py-4 text-gray-500 text-sm">
-                  No radiology scans ordered
+              {formData.investigations.radiology.length === 0 ? (
+                <div className="text-center py-4 border border-dashed border-gray-300 rounded-lg">
+                  <p className="text-sm text-gray-500">No radiology tests ordered</p>
+                  <button
+                    type="button"
+                    onClick={() => handleAddInvestigation('radiology')}
+                    className="mt-2 text-xs text-primary-600 hover:text-primary-800"
+                  >
+                    Add Radiology Test
+                  </button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {radiologyOrders.map((_, index) => (
-                    <div key={index} className="border rounded-lg p-3 relative">
+                <div className="space-y-2">
+                  {formData.investigations.radiology.map((test, index) => (
+                    <div key={index} className="flex space-x-2">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={test.name}
+                          onChange={(e) => handleInvestigationChange('radiology', index, 'name', e.target.value)}
+                          className="form-input text-sm"
+                          placeholder="Test name"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={test.details}
+                          onChange={(e) => handleInvestigationChange('radiology', index, 'details', e.target.value)}
+                          className="form-input text-sm"
+                          placeholder="Details/Notes"
+                        />
+                      </div>
                       <button
                         type="button"
-                        onClick={() => removeRadiologyOrder(index)}
-                        className="absolute top-2 right-2 text-gray-400 hover:text-error-500"
+                        onClick={() => handleRemoveInvestigation('radiology', index)}
+                        className="p-2 text-gray-400 hover:text-error-500"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                        <div>
-                          <label className="form-label text-xs required">Scan Type</label>
-                          <select
-                            {...register(`radiologyOrders.${index}.scanType` as const, { required: true })}
-                            className="form-input py-1.5 text-sm"
-                          >
-                            <option value="">Select Scan Type</option>
-                            <option value="X-Ray">X-Ray</option>
-                            <option value="CT Scan">CT Scan</option>
-                            <option value="MRI">MRI</option>
-                            <option value="Ultrasound">Ultrasound</option>
-                            <option value="Mammogram">Mammogram</option>
-                            <option value="PET Scan">PET Scan</option>
-                            <option value="DEXA Scan">DEXA Scan</option>
-                            <option value="Fluoroscopy">Fluoroscopy</option>
-                          </select>
-                        </div>
-                        
-                        <div>
-                          <label className="form-label text-xs required">Body Part</label>
-                          <input
-                            type="text"
-                            {...register(`radiologyOrders.${index}.bodyPart` as const, { required: true })}
-                            className="form-input py-1.5 text-sm"
-                            placeholder="e.g., Chest, Abdomen, Left Knee"
-                          />
-                        </div>
-                      </div>
-                      
-                      <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <label className="form-label text-xs">Instructions</label>
-                          <textarea
-                            {...register(`radiologyOrders.${index}.instructions` as const)}
-                            className="form-input py-1.5 text-sm"
-                            rows={2}
-                            placeholder="Special instructions for this scan"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="form-label text-xs">Urgency</label>
-                          <select
-                            {...register(`radiologyOrders.${index}.urgency` as const)}
-                            className="form-input py-1.5 text-sm"
-                          >
-                            <option value="routine">Routine</option>
-                            <option value="urgent">Urgent</option>
-                            <option value="emergency">Emergency</option>
-                          </select>
-                        </div>
-                      </div>
                     </div>
                   ))}
                 </div>
               )}
             </div>
             
-            {/* Referrals */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="flex justify-between items-center mb-3">
-                <h3 className="text-sm font-medium text-gray-900 flex items-center">
-                  <User className="h-4 w-4 mr-1.5 text-accent-500" />
-                  Referrals
-                </h3>
+            {/* Other Tests */}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <label className="form-label text-sm flex items-center">
+                  <Microscope className="h-4 w-4 mr-1.5 text-accent-500" />
+                  Other Tests/Procedures
+                </label>
                 <button
                   type="button"
-                  onClick={addReferral}
-                  className="btn btn-sm btn-outline py-1 px-2 text-xs"
+                  onClick={() => handleAddInvestigation('other')}
+                  className="text-xs text-primary-600 hover:text-primary-800 flex items-center"
                 >
                   <Plus className="h-3.5 w-3.5 mr-1" />
-                  Add Referral
+                  Add Test
                 </button>
               </div>
               
-              {referrals.length === 0 ? (
-                <div className="text-center py-4 text-gray-500 text-sm">
-                  No referrals added
+              {formData.investigations.other.length === 0 ? (
+                <div className="text-center py-4 border border-dashed border-gray-300 rounded-lg">
+                  <p className="text-sm text-gray-500">No other tests ordered</p>
+                  <button
+                    type="button"
+                    onClick={() => handleAddInvestigation('other')}
+                    className="mt-2 text-xs text-primary-600 hover:text-primary-800"
+                  >
+                    Add Other Test
+                  </button>
                 </div>
               ) : (
-                <div className="space-y-3">
-                  {referrals.map((_, index) => (
-                    <div key={index} className="border rounded-lg p-3 relative">
+                <div className="space-y-2">
+                  {formData.investigations.other.map((test, index) => (
+                    <div key={index} className="flex space-x-2">
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={test.name}
+                          onChange={(e) => handleInvestigationChange('other', index, 'name', e.target.value)}
+                          className="form-input text-sm"
+                          placeholder="Test name"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <input
+                          type="text"
+                          value={test.details}
+                          onChange={(e) => handleInvestigationChange('other', index, 'details', e.target.value)}
+                          className="form-input text-sm"
+                          placeholder="Details/Notes"
+                        />
+                      </div>
                       <button
                         type="button"
-                        onClick={() => removeReferral(index)}
-                        className="absolute top-2 right-2 text-gray-400 hover:text-error-500"
+                        onClick={() => handleRemoveInvestigation('other', index)}
+                        className="p-2 text-gray-400 hover:text-error-500"
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
-                        <div>
-                          <label className="form-label text-xs required">Specialty/Department</label>
-                          <select
-                            {...register(`referrals.${index}.specialtyDepartment` as const, { required: true })}
-                            className="form-input py-1.5 text-sm"
-                          >
-                            <option value="">Select Specialty</option>
-                            {departments.map(dept => (
-                              <option key={dept.id} value={dept.name}>{dept.name}</option>
-                            ))}
-                            <option value="Cardiology">Cardiology</option>
-                            <option value="Neurology">Neurology</option>
-                            <option value="Orthopedics">Orthopedics</option>
-                            <option value="Dermatology">Dermatology</option>
-                            <option value="Ophthalmology">Ophthalmology</option>
-                            <option value="ENT">ENT</option>
-                            <option value="Psychiatry">Psychiatry</option>
-                            <option value="Urology">Urology</option>
-                            <option value="Gastroenterology">Gastroenterology</option>
-                            <option value="Endocrinology">Endocrinology</option>
-                          </select>
-                        </div>
-                        
-                        <div>
-                          <label className="form-label text-xs">Urgency</label>
-                          <select
-                            {...register(`referrals.${index}.urgency` as const)}
-                            className="form-input py-1.5 text-sm"
-                          >
-                            <option value="routine">Routine</option>
-                            <option value="urgent">Urgent</option>
-                            <option value="emergency">Emergency</option>
-                          </select>
-                        </div>
-                      </div>
-                      
-                      <div className="mt-3">
-                        <label className="form-label text-xs required">Reason for Referral</label>
-                        <textarea
-                          {...register(`referrals.${index}.reason` as const, { required: true })}
-                          className="form-input py-1.5 text-sm"
-                          rows={2}
-                          placeholder="Reason for referral"
-                        />
-                      </div>
                     </div>
                   ))}
                 </div>
@@ -1304,93 +1165,107 @@ const ConsultationForm: React.FC = () => {
             </div>
           </div>
         )}
-        
-        {/* Prescriptions Tab */}
-        {activeTab === 'prescriptions' && (
-          <div className="bg-white rounded-lg shadow-sm p-3">
-            <div className="flex justify-between items-center mb-3">
+
+        {/* Prescription Tab */}
+        {activeTab === 'prescription' && (
+          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
+            <div className="flex justify-between items-center mb-2">
               <h3 className="text-sm font-medium text-gray-900 flex items-center">
                 <Pill className="h-4 w-4 mr-1.5 text-primary-500" />
-                Prescriptions
+                Medications
               </h3>
               <button
                 type="button"
-                onClick={addPrescription}
-                className="btn btn-sm btn-outline py-1 px-2 text-xs"
+                onClick={handleAddMedication}
+                className="text-xs text-primary-600 hover:text-primary-800 flex items-center"
               >
                 <Plus className="h-3.5 w-3.5 mr-1" />
                 Add Medication
               </button>
             </div>
             
-            {prescriptions.length === 0 ? (
-              <div className="text-center py-4 text-gray-500 text-sm">
-                No medications prescribed
+            {formData.medications_prescribed.length === 0 ? (
+              <div className="text-center py-6 border border-dashed border-gray-300 rounded-lg">
+                <Pill className="h-8 w-8 mx-auto text-gray-400 mb-2" />
+                <p className="text-sm text-gray-500">No medications prescribed</p>
+                <button
+                  type="button"
+                  onClick={handleAddMedication}
+                  className="mt-2 text-xs text-primary-600 hover:text-primary-800"
+                >
+                  Add Medication
+                </button>
               </div>
             ) : (
-              <div className="space-y-3">
-                {prescriptions.map((_, index) => (
-                  <div key={index} className="border rounded-lg p-3 relative">
-                    <button
-                      type="button"
-                      onClick={() => removePrescription(index)}
-                      className="absolute top-2 right-2 text-gray-400 hover:text-error-500"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+              <div className="space-y-4">
+                {formData.medications_prescribed.map((medication, index) => (
+                  <div key={index} className="border border-gray-200 rounded-lg p-3 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <h4 className="text-sm font-medium text-gray-900">Medication #{index + 1}</h4>
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveMedication(index)}
+                        className="p-1 text-gray-400 hover:text-error-500"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div>
-                        <label className="form-label text-xs required">Medication</label>
+                        <label className="form-label text-xs">Medication Name</label>
                         <input
                           type="text"
-                          {...register(`prescriptions.${index}.medication` as const, { required: true })}
-                          className="form-input py-1.5 text-sm"
+                          value={medication.medication}
+                          onChange={(e) => handleMedicationChange(index, 'medication', e.target.value)}
+                          className="form-input text-sm"
                           placeholder="Medication name"
                         />
                       </div>
                       
                       <div>
-                        <label className="form-label text-xs required">Dosage</label>
+                        <label className="form-label text-xs">Dosage</label>
                         <input
                           type="text"
-                          {...register(`prescriptions.${index}.dosage` as const, { required: true })}
-                          className="form-input py-1.5 text-sm"
+                          value={medication.dosage}
+                          onChange={(e) => handleMedicationChange(index, 'dosage', e.target.value)}
+                          className="form-input text-sm"
                           placeholder="e.g., 500mg"
                         />
                       </div>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3">
+                      
                       <div>
-                        <label className="form-label text-xs required">Frequency</label>
+                        <label className="form-label text-xs">Frequency</label>
                         <input
                           type="text"
-                          {...register(`prescriptions.${index}.frequency` as const, { required: true })}
-                          className="form-input py-1.5 text-sm"
+                          value={medication.frequency}
+                          onChange={(e) => handleMedicationChange(index, 'frequency', e.target.value)}
+                          className="form-input text-sm"
                           placeholder="e.g., Twice daily"
                         />
                       </div>
                       
                       <div>
-                        <label className="form-label text-xs required">Duration</label>
+                        <label className="form-label text-xs">Duration</label>
                         <input
                           type="text"
-                          {...register(`prescriptions.${index}.duration` as const, { required: true })}
-                          className="form-input py-1.5 text-sm"
+                          value={medication.duration}
+                          onChange={(e) => handleMedicationChange(index, 'duration', e.target.value)}
+                          className="form-input text-sm"
                           placeholder="e.g., 7 days"
                         />
                       </div>
-                    </div>
-                    
-                    <div className="mt-3">
-                      <label className="form-label text-xs">Instructions</label>
-                      <textarea
-                        {...register(`prescriptions.${index}.instructions` as const)}
-                        className="form-input py-1.5 text-sm"
-                        rows={2}
-                        placeholder="Special instructions (e.g., take with food)"
-                      />
+                      
+                      <div className="md:col-span-2">
+                        <label className="form-label text-xs">Instructions</label>
+                        <input
+                          type="text"
+                          value={medication.instructions}
+                          onChange={(e) => handleMedicationChange(index, 'instructions', e.target.value)}
+                          className="form-input text-sm"
+                          placeholder="e.g., Take with food"
+                        />
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -1398,71 +1273,87 @@ const ConsultationForm: React.FC = () => {
             )}
           </div>
         )}
-        
-        {/* Notes Tab */}
-        {activeTab === 'notes' && (
-          <div className="space-y-3">
-            {/* Department Selection */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <label className="form-label text-xs required">Department</label>
-              <select
-                value={selectedDepartment}
-                onChange={(e) => setSelectedDepartment(e.target.value)}
-                className="form-input py-1.5 text-sm"
+
+        {/* Plan Tab */}
+        {activeTab === 'plan' && (
+          <div className="bg-white rounded-lg shadow-sm p-4 space-y-4">
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div 
+                className="bg-gray-50 p-3 flex justify-between items-center cursor-pointer"
+                onClick={() => toggleSection('plan')}
               >
-                {departments.map(dept => (
-                  <option key={dept.id} value={dept.id}>{dept.name}</option>
-                ))}
-              </select>
-            </div>
-            
-            {/* Follow-up and Notes */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="mb-3">
-                <label className="form-label text-xs">Follow-up Instructions</label>
-                <textarea
-                  {...register('followUp')}
-                  className="form-input py-1.5 text-sm"
-                  rows={2}
-                  placeholder="Follow-up instructions for the patient"
-                />
+                <h3 className="text-sm font-medium text-gray-900 flex items-center">
+                  <Scroll className="h-4 w-4 mr-1.5 text-primary-500" />
+                  Treatment Plan
+                </h3>
+                {expandedSections.plan ? (
+                  <ChevronUp className="h-4 w-4 text-gray-500" />
+                ) : (
+                  <ChevronDown className="h-4 w-4 text-gray-500" />
+                )}
               </div>
               
-              <div>
-                <label className="form-label text-xs">Additional Notes</label>
-                <textarea
-                  {...register('notes')}
-                  className="form-input py-1.5 text-sm"
-                  rows={3}
-                  placeholder="Any additional notes or comments"
-                />
-              </div>
-            </div>
-            
-            {/* Medical Certificate */}
-            <div className="bg-white rounded-lg shadow-sm p-3">
-              <div className="flex items-center mb-3">
-                <input
-                  type="checkbox"
-                  id="medicalCertificate"
-                  {...register('medicalCertificate')}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                />
-                <label htmlFor="medicalCertificate" className="ml-2 block text-sm text-gray-900">
-                  Issue Medical Certificate
-                </label>
-              </div>
-              
-              {medicalCertificate && (
-                <div>
-                  <label className="form-label text-xs">Number of Days</label>
-                  <input
-                    type="number"
-                    min="1"
-                    {...register('medicalCertificateDays')}
-                    className="form-input py-1.5 text-sm w-24"
-                    placeholder="Days"
-                  />
+              {expandedSections.plan && (
+                <div className="p-3 space-y-3">
+                  <div>
+                    <label className="form-label text-sm">Treatment Plan</label>
+                    <textarea
+                      value={formData.treatmentPlan}
+                      onChange={(e) => handleInputChange('treatmentPlan', e.target.value)}
+                      className="form-input text-sm"
+                      rows={3}
+                      placeholder="Describe the treatment plan"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-sm">Follow-up Instructions</label>
+                    <textarea
+                      value={formData.followUp}
+                      onChange={(e) => handleInputChange('followUp', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="Follow-up instructions and timeline"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-sm">Additional Notes</label>
+                    <textarea
+                      value={formData.notes}
+                      onChange={(e) => handleInputChange('notes', e.target.value)}
+                      className="form-input text-sm"
+                      rows={2}
+                      placeholder="Any additional notes"
+                    />
+                  </div>
+                  
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      id="medicalCertificate"
+                      checked={formData.medicalCertificate}
+                      onChange={(e) => handleInputChange('medicalCertificate', e.target.checked)}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="medicalCertificate" className="ml-2 block text-sm text-gray-900">
+                      Issue Medical Certificate
+                    </label>
+                  </div>
+                  
+                  {formData.medicalCertificate && (
+                    <div>
+                      <label className="form-label text-sm">Days of Leave</label>
+                      <input
+                        type="number"
+                        value={formData.medicalCertificateDays}
+                        onChange={(e) => handleInputChange('medicalCertificateDays', parseInt(e.target.value))}
+                        min="1"
+                        className="form-input text-sm"
+                        placeholder="Number of days"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1470,11 +1361,11 @@ const ConsultationForm: React.FC = () => {
         )}
 
         {/* Action Buttons */}
-        <div className="flex justify-between mt-3">
+        <div className="flex justify-between">
           <button
             type="button"
-            onClick={() => navigate('/patients')}
-            className="btn btn-sm btn-outline flex items-center"
+            onClick={() => navigate(-1)}
+            className="btn btn-outline text-sm"
           >
             <ArrowLeft className="h-4 w-4 mr-1" />
             Back
@@ -1482,16 +1373,16 @@ const ConsultationForm: React.FC = () => {
           <button
             type="submit"
             disabled={isSaving}
-            className="btn btn-sm btn-primary flex items-center"
+            className="btn btn-primary text-sm"
           >
             {isSaving ? (
               <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-1"></div>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                 Saving...
               </>
             ) : (
               <>
-                <Save className="h-4 w-4 mr-1" />
+                <Save className="h-4 w-4 mr-2" />
                 Save Consultation
               </>
             )}
