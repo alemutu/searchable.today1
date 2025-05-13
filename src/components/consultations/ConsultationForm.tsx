@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { User, Calendar, FileText, Save, ArrowLeft, ChevronDown, ChevronRight, CheckCircle, AlertTriangle, Stethoscope, Heart, Settings as Lungs, Pill, Activity, Brain, Microscope, FileImage, Search, Plus, Trash2, Clock, CalendarClock, FileCheck, Send, Printer, Loader2, X, Check, ArrowRight, Clipboard, ClipboardCheck, Bone, Thermometer, Droplets, Scale, Ruler, Calculator, Bell, FlaskConical as Flask, Info, UserRound, Home, Briefcase, Users, Scroll, Layers, Dna, Lungs as LungsIcon, Skull, Stethoscope as StethoscopeIcon, Utensils, Kidney, Baby } from 'lucide-react';
+import { User, Calendar, FileText, Save, ArrowLeft, ChevronDown, ChevronRight, CheckCircle, AlertTriangle, Stethoscope, Heart, Settings as Lungs, Pill, Activity, Brain, Microscope, FileImage, Search, Plus, Trash2, Clock, CalendarClock, FileCheck, Send, Printer, Loader2, X, Check, ArrowRight, Clipboard, ClipboardCheck, Bone, Thermometer, Droplets, Scale, Ruler, Calculator, Bell, FlaskConical as Flask, Info, UserRound, Home, Briefcase, Users, Scroll, Layers, Dna, Settings as LungsIcon, Skull, Stethoscope as StethoscopeIcon, Utensils, LucideKey as Kidney, Baby } from 'lucide-react';
 
 interface Patient {
   id: string;
