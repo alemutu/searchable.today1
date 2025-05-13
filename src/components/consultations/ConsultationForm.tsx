@@ -3,37 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { 
-  User as UserIcon, 
-  Calendar, 
-  Stethoscope, 
-  FileText, 
-  Pill, 
-  Save, 
-  ArrowLeft, 
-  Plus, 
-  Trash2, 
-  CheckCircle, 
-  AlertTriangle, 
-  ClipboardList, 
-  FileCheck, 
-  ArrowUpRight,
-  Flask,
-  Microscope,
-  DollarSign,
-  Printer,
-  Activity,
-  Heart,
-  Thermometer,
-  Settings as Lungs,
-  Droplets,
-  Scale,
-  Ruler,
-  Calculator,
-  Clock,
-  Brain,
-  Building2
-} from 'lucide-react';
+import { User as UserIcon, Calendar, Stethoscope, FileText, Pill, Save, ArrowLeft, Plus, Trash2, CheckCircle, AlertTriangle, ClipboardList, FileCheck, ArrowUpRight, FlaskRound as Flask, Microscope, DollarSign, Printer, Activity, Heart, Thermometer, Settings as Lungs, Droplets, Scale, Ruler, Calculator, Clock, Brain, Building2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface ConsultationFormData {
