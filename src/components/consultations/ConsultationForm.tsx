@@ -2,33 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { 
-  User, 
-  Activity, 
-  FileText, 
-  Pill, 
-  Save, 
-  ArrowLeft, 
-  Plus, 
-  Trash2, 
-  Calendar, 
-  Clock, 
-  CheckCircle, 
-  AlertTriangle,
-  Heart,
-  Thermometer,
-  Lungs,
-  Droplets,
-  Stethoscope,
-  FileBarChart2,
-  Syringe,
-  AlarmClock,
-  Microscope,
-  FileImage,
-  Clipboard,
-  ClipboardList,
-  Layers
-} from 'lucide-react';
+import { User, Activity, FileText, Pill, Save, ArrowLeft, Plus, Trash2, Calendar, Clock, CheckCircle, AlertTriangle, Heart, Thermometer, Settings as Lungs, Droplets, Stethoscope, FileBarChart2, Syringe, AlarmClock, Microscope, FileImage, Clipboard, ClipboardList, Layers } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
