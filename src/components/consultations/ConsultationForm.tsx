@@ -1513,13 +1513,13 @@ const ConsultationForm: React.FC = () => {
                       <div className="space-y-3">
                         {diagnosticTests.map((test, index) => (
                           <div key={test.id} className="bg-white p-4 rounded-lg border border-gray-200">
+                            
                             <div className="flex justify-between items-start">
                               <div className="space-y-3 flex-grow">
                                 <div>
                                   <label className="form-label required">Test Name</label>
                                   <input
                                     type="text"
-                
                                     value={test.testName}
                                     onChange={(e) => {
                                       const updatedTests = [...diagnosticTests];
@@ -1820,5 +1820,3 @@ const ConsultationForm: React.FC = () => {
 };
 
 export default ConsultationForm;
-
-export default ConsultationForm
