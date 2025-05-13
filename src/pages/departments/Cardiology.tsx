@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { useAuthStore } from '../../lib/store';
+import { useAuthStore, useNotificationStore } from '../../lib/store';
 import { 
   Search, 
   Filter, 
@@ -14,7 +14,9 @@ import {
   ChevronDown,
   Activity,
   AlertTriangle,
-  Heart
+  Heart,
+  Layers,
+  XCircle
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -27,6 +29,9 @@ interface Patient {
   priority_level: string;
   arrival_time?: string;
   wait_time?: string;
+  assigned_to?: string;
+  last_updated?: string;
+  chief_complaint?: string;
 }
 
 const Cardiology: React.FC = () => {
@@ -34,8 +39,10 @@ const Cardiology: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPriority, setFilterPriority] = useState('all');
-  const { hospital } = useAuthStore();
+  const { hospital, user } = useAuthStore();
+  const { addNotification } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'waiting' | 'in_progress'>('waiting');
+  const [assignedToMe, setAssignedToMe] = useState(false);
 
   useEffect(() => {
     fetchPatients();
@@ -54,7 +61,9 @@ const Cardiology: React.FC = () => {
           current_flow_step: 'waiting_consultation',
           priority_level: 'normal',
           arrival_time: '09:15 AM',
-          wait_time: '15 min'
+          wait_time: '15 min',
+          last_updated: '2025-05-15T09:15:00Z',
+          chief_complaint: 'Chest pain on exertion'
         },
         {
           id: '00000000-0000-0000-0000-000000000002',
@@ -64,7 +73,10 @@ const Cardiology: React.FC = () => {
           current_flow_step: 'consultation',
           priority_level: 'urgent',
           arrival_time: '09:30 AM',
-          wait_time: '0 min'
+          wait_time: '0 min',
+          assigned_to: user?.id,
+          last_updated: '2025-05-15T09:30:00Z',
+          chief_complaint: 'Palpitations and shortness of breath'
         },
         {
           id: '00000000-0000-0000-0000-000000000003',
@@ -74,7 +86,9 @@ const Cardiology: React.FC = () => {
           current_flow_step: 'waiting_consultation',
           priority_level: 'normal',
           arrival_time: '08:45 AM',
-          wait_time: '45 min'
+          wait_time: '45 min',
+          last_updated: '2025-05-15T08:45:00Z',
+          chief_complaint: 'Hypertension follow-up'
         },
         {
           id: '00000000-0000-0000-0000-000000000004',
@@ -84,7 +98,9 @@ const Cardiology: React.FC = () => {
           current_flow_step: 'waiting_consultation',
           priority_level: 'normal',
           arrival_time: '10:00 AM',
-          wait_time: '5 min'
+          wait_time: '5 min',
+          last_updated: '2025-05-15T10:00:00Z',
+          chief_complaint: 'Routine cardiac check-up'
         },
         {
           id: '00000000-0000-0000-0000-000000000005',
@@ -94,11 +110,51 @@ const Cardiology: React.FC = () => {
           current_flow_step: 'consultation',
           priority_level: 'critical',
           arrival_time: '10:15 AM',
-          wait_time: '0 min'
+          wait_time: '0 min',
+          assigned_to: '00000000-0000-0000-0000-000000000010', // Another doctor
+          last_updated: '2025-05-15T10:15:00Z',
+          chief_complaint: 'Severe chest pain radiating to left arm'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000006',
+          first_name: 'Sarah',
+          last_name: 'Davis',
+          date_of_birth: '1990-04-12',
+          current_flow_step: 'waiting_consultation',
+          priority_level: 'urgent',
+          arrival_time: '10:30 AM',
+          wait_time: '10 min',
+          last_updated: '2025-05-15T10:30:00Z',
+          chief_complaint: 'Syncope episode'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000007',
+          first_name: 'David',
+          last_name: 'Miller',
+          date_of_birth: '1982-09-28',
+          current_flow_step: 'consultation',
+          priority_level: 'normal',
+          arrival_time: '10:45 AM',
+          wait_time: '0 min',
+          assigned_to: user?.id,
+          last_updated: '2025-05-15T10:45:00Z',
+          chief_complaint: 'Abnormal ECG results'
         }
       ];
       
       setPatients(mockPatients);
+      
+      // Show notification for emergency cases
+      const emergencyCases = mockPatients.filter(patient => patient.priority_level === 'critical');
+      if (emergencyCases.length > 0) {
+        emergencyCases.forEach(emergency => {
+          addNotification({
+            message: `EMERGENCY: ${emergency.first_name} ${emergency.last_name} needs immediate attention`,
+            type: 'error',
+            duration: 5000
+          });
+        });
+      }
     } catch (error) {
       console.error('Error fetching patients:', error);
     } finally {
@@ -132,16 +188,33 @@ const Cardiology: React.FC = () => {
     return age;
   };
 
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
+
   // Filter patients based on their current flow step and the active tab
   const filteredPatients = patients.filter(patient => {
     const matchesSearch = patient.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          patient.last_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPriority = filterPriority === 'all' || patient.priority_level === filterPriority;
+    const matchesAssigned = !assignedToMe || patient.assigned_to === user?.id;
     
     if (activeTab === 'waiting') {
-      return patient.current_flow_step === 'waiting_consultation' && matchesSearch && matchesPriority;
+      return patient.current_flow_step === 'waiting_consultation' && matchesSearch && matchesPriority && matchesAssigned;
     } else {
-      return patient.current_flow_step === 'consultation' && matchesSearch && matchesPriority;
+      return patient.current_flow_step === 'consultation' && matchesSearch && matchesPriority && matchesAssigned;
     }
   });
 
@@ -150,6 +223,86 @@ const Cardiology: React.FC = () => {
   const inProgressCount = patients.filter(p => p.current_flow_step === 'consultation').length;
   const completedCount = patients.filter(p => p.current_flow_step === 'post_consultation').length;
   const urgentCount = patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length;
+  const assignedToMeCount = patients.filter(p => p.assigned_to === user?.id).length;
+
+  const handleAssignToMe = (patientId: string) => {
+    // Update the patient to assign it to the current user
+    const updatedPatients = patients.map(patient => {
+      if (patient.id === patientId) {
+        return {
+          ...patient,
+          assigned_to: user?.id,
+          last_updated: new Date().toISOString()
+        };
+      }
+      return patient;
+    });
+    
+    setPatients(updatedPatients);
+    
+    // Show notification
+    const patient = patients.find(p => p.id === patientId);
+    if (patient) {
+      addNotification({
+        message: `${patient.first_name} ${patient.last_name} assigned to you`,
+        type: 'success',
+        duration: 3000
+      });
+    }
+  };
+
+  const handleReleaseAssignment = (patientId: string) => {
+    // Update the patient to unassign it
+    const updatedPatients = patients.map(patient => {
+      if (patient.id === patientId) {
+        return {
+          ...patient,
+          assigned_to: null,
+          last_updated: new Date().toISOString()
+        };
+      }
+      return patient;
+    });
+    
+    setPatients(updatedPatients);
+    
+    // Show notification
+    const patient = patients.find(p => p.id === patientId);
+    if (patient) {
+      addNotification({
+        message: `${patient.first_name} ${patient.last_name} released from your queue`,
+        type: 'info',
+        duration: 3000
+      });
+    }
+  };
+
+  const handleStartConsultation = (patientId: string) => {
+    // Update the patient status to in_progress
+    const updatedPatients = patients.map(patient => {
+      if (patient.id === patientId) {
+        return {
+          ...patient,
+          current_flow_step: 'consultation',
+          assigned_to: user?.id,
+          last_updated: new Date().toISOString()
+        };
+      }
+      return patient;
+    });
+    
+    setPatients(updatedPatients);
+    
+    // Show notification
+    const patient = patients.find(p => p.id === patientId);
+    if (patient) {
+      addNotification({
+        message: `Started consultation for ${patient.first_name} ${patient.last_name}`,
+        type: 'success',
+        duration: 3000
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -173,7 +326,7 @@ const Cardiology: React.FC = () => {
 
       <div className="flex space-x-2">
         <div 
-          className={`flex-1 rounded-lg p-3 flex items-center space-x-2 cursor-pointer ${
+          className={`flex-1 rounded-lg p-2.5 flex items-center space-x-2 cursor-pointer ${
             activeTab === 'waiting' 
               ? 'bg-white shadow-sm border border-gray-200' 
               : 'bg-gray-100 hover:bg-gray-200'
@@ -188,7 +341,7 @@ const Cardiology: React.FC = () => {
         </div>
         
         <div 
-          className={`flex-1 rounded-lg p-3 flex items-center space-x-2 cursor-pointer ${
+          className={`flex-1 rounded-lg p-2.5 flex items-center space-x-2 cursor-pointer ${
             activeTab === 'in_progress' 
               ? 'bg-white shadow-sm border border-gray-200' 
               : 'bg-gray-100 hover:bg-gray-200'
@@ -212,7 +365,7 @@ const Cardiology: React.FC = () => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="form-input pl-7 py-1.5 text-sm w-full"
+            className="form-input pl-7 py-1.5 text-sm w-full rounded-lg"
             placeholder="Search patients..."
           />
         </div>
@@ -221,7 +374,7 @@ const Cardiology: React.FC = () => {
           <select
             value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
-            className="form-input appearance-none pr-7 py-1.5 text-sm"
+            className="form-input appearance-none pr-7 py-1.5 text-sm rounded-lg"
           >
             <option value="all">All Priority</option>
             <option value="normal">Normal</option>
@@ -231,6 +384,19 @@ const Cardiology: React.FC = () => {
           <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
             <ChevronDown className="h-3 w-3 text-gray-500" />
           </div>
+        </div>
+        
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="assignedToMe"
+            checked={assignedToMe}
+            onChange={(e) => setAssignedToMe(e.target.checked)}
+            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+          />
+          <label htmlFor="assignedToMe" className="ml-2 text-xs text-gray-700">
+            Assigned to me ({assignedToMeCount})
+          </label>
         </div>
       </div>
 
@@ -260,23 +426,95 @@ const Cardiology: React.FC = () => {
                             <h3 className="text-base font-medium text-gray-900">{patient.first_name} {patient.last_name}</h3>
                             <div className="flex items-center text-xs text-gray-500">
                               <Clock className="h-3 w-3 mr-1" />
-                              <span>Wait time: {patient.wait_time}</span>
+                              <span>{getTimeAgo(patient.last_updated || '')}</span>
+                              {patient.wait_time && (
+                                <>
+                                  <span className="mx-1">•</span>
+                                  <span>Wait time: {patient.wait_time}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
                             <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-medium rounded-full ${getPriorityColor(patient.priority_level)}`}>
                               {patient.priority_level}
                             </span>
-                            <Link 
-                              to={`/patients/${patient.id}/consultation`}
-                              className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
-                            >
-                              {activeTab === 'waiting' ? 'Start Consultation' : 'Continue'} <Heart className="h-3 w-3 ml-1" />
-                            </Link>
+                            
+                            {patient.assigned_to && patient.assigned_to !== user?.id && (
+                              <span className="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-gray-100 text-gray-800">
+                                Assigned
+                              </span>
+                            )}
+                            
+                            {activeTab === 'waiting' ? (
+                              <div className="flex space-x-1">
+                                {!patient.assigned_to && (
+                                  <button 
+                                    onClick={() => handleAssignToMe(patient.id)}
+                                    className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    title="Assign to me"
+                                  >
+                                    Assign to me
+                                  </button>
+                                )}
+                                
+                                {patient.assigned_to === user?.id && (
+                                  <>
+                                    <button 
+                                      onClick={() => handleStartConsultation(patient.id)}
+                                      className="btn btn-primary inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    >
+                                      Start Consultation <Heart className="h-3 w-3 ml-1" />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleReleaseAssignment(patient.id)}
+                                      className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                      title="Release assignment"
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex space-x-1">
+                                {patient.assigned_to === user?.id ? (
+                                  <>
+                                    <Link 
+                                      to={`/patients/${patient.id}/consultation`}
+                                      className="btn btn-primary inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    >
+                                      Continue <Heart className="h-3 w-3 ml-1" />
+                                    </Link>
+                                    <button 
+                                      onClick={() => handleReleaseAssignment(patient.id)}
+                                      className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                      title="Release assignment"
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button 
+                                    onClick={() => handleAssignToMe(patient.id)}
+                                    className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    title="Take over this patient"
+                                  >
+                                    Take over
+                                  </button>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
                         <div className="mt-0.5">
-                          <span className="text-xs">{calculateAge(patient.date_of_birth)} years • {patient.date_of_birth}</span>
+                          <span className="text-xs">{calculateAge(patient.date_of_birth)} years</span>
+                          {patient.chief_complaint && (
+                            <>
+                              <span className="mx-1">•</span>
+                              <span className="text-xs text-primary-600 font-medium">{patient.chief_complaint}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -289,10 +527,86 @@ const Cardiology: React.FC = () => {
 
         {/* Right Section - Overview and Quick Actions */}
         <div className="w-1/3 space-y-3">
+          {/* My Work Queue */}
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div className="flex items-center">
+                <Layers className="h-4 w-4 text-primary-500 mr-1.5" />
+                <h2 className="text-sm font-medium text-gray-900">My Patients</h2>
+              </div>
+              <span className="text-xs text-gray-500">{patients.filter(p => p.assigned_to === user?.id).length} patients</span>
+            </div>
+            <div className="p-3">
+              {patients.filter(p => p.assigned_to === user?.id).length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">No patients currently assigned to you</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {patients
+                    .filter(p => p.assigned_to === user?.id)
+                    .sort((a, b) => {
+                      // Sort by priority first
+                      const priorityOrder = { 'critical': 0, 'urgent': 1, 'normal': 2 };
+                      const aPriority = priorityOrder[a.priority_level as keyof typeof priorityOrder] || 3;
+                      const bPriority = priorityOrder[b.priority_level as keyof typeof priorityOrder] || 3;
+                      
+                      if (aPriority !== bPriority) {
+                        return aPriority - bPriority;
+                      }
+                      
+                      // Then sort by flow step
+                      const stepOrder = { 'consultation': 0, 'waiting_consultation': 1 };
+                      const aStep = stepOrder[a.current_flow_step as keyof typeof stepOrder] || 2;
+                      const bStep = stepOrder[b.current_flow_step as keyof typeof stepOrder] || 2;
+                      
+                      return aStep - bStep;
+                    })
+                    .slice(0, 5)
+                    .map(patient => (
+                      <div key={patient.id} className={`p-2 rounded-lg border ${patient.priority_level === 'critical' ? 'border-error-200 bg-error-50' : patient.priority_level === 'urgent' ? 'border-warning-200 bg-warning-50' : 'border-gray-200'} flex items-center justify-between`}>
+                        <div className="flex items-center">
+                          <div className="mr-2">
+                            {patient.current_flow_step === 'waiting_consultation' ? (
+                              <Clock className="h-3.5 w-3.5 text-warning-500" />
+                            ) : (
+                              <Heart className="h-3.5 w-3.5 text-error-500" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-gray-900 line-clamp-1">
+                              {patient.first_name} {patient.last_name}
+                            </p>
+                            <p className="text-xs text-gray-500 line-clamp-1">
+                              {patient.chief_complaint || `${calculateAge(patient.date_of_birth)} years`}
+                            </p>
+                          </div>
+                        </div>
+                        <Link
+                          to={`/patients/${patient.id}/consultation`}
+                          className="text-xs text-primary-600 hover:text-primary-800 font-medium"
+                        >
+                          {patient.current_flow_step === 'waiting_consultation' ? 'Start' : 'Continue'}
+                        </Link>
+                      </div>
+                    ))}
+                  
+                  {patients.filter(p => p.assigned_to === user?.id).length > 5 && (
+                    <div className="text-center pt-1">
+                      <button className="text-xs text-primary-600 hover:text-primary-800">
+                        View all ({patients.filter(p => p.assigned_to === user?.id).length})
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Overview Card */}
           <div className="bg-white rounded-lg shadow-sm p-3">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-base font-medium text-gray-900">Department Overview</h2>
+              <h2 className="text-sm font-medium text-gray-900">Department Overview</h2>
               <span className="text-xs text-gray-500">Today</span>
             </div>
             <div className="space-y-2">
@@ -330,7 +644,7 @@ const Cardiology: React.FC = () => {
           {/* Quick Actions Card */}
           <div className="bg-white rounded-lg shadow-sm p-3">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-base font-medium text-gray-900">Quick Actions</h2>
+              <h2 className="text-sm font-medium text-gray-900">Quick Actions</h2>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Link to="/patients" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200">
@@ -355,7 +669,7 @@ const Cardiology: React.FC = () => {
           {/* Reference Card */}
           <div className="bg-white rounded-lg shadow-sm p-3">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-base font-medium text-gray-900 flex items-center">
+              <h2 className="text-sm font-medium text-gray-900 flex items-center">
                 <Heart className="h-4 w-4 text-error-500 mr-1.5" />
                 Cardiology Reference
               </h2>
