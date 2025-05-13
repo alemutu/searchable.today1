@@ -76,8 +76,4 @@ interface Appointment {
   doctor: string;
 }
 
-[Content continues exactly as in the original file from line 82 onwards...]
-
-[Previous content remains exactly the same until the end of the file]
-
-export default React
+export default React;
