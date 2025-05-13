@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../lib/store';
 import { Search, Filter, Microscope, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, FileImage, ChevronDown } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface RadiologyResult {
   id: string;
@@ -30,6 +30,7 @@ const Radiology: React.FC = () => {
   const { hospital } = useAuthStore();
   const { addNotification } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'pending' | 'in_progress'>('pending');
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchRadiologyResults();
@@ -187,22 +188,8 @@ const Radiology: React.FC = () => {
   const completedCount = radiologyResults.filter(r => r.status === 'completed').length;
   const urgentCount = radiologyResults.filter(r => r.is_emergency).length;
 
-  const handleProcessScan = (scanId: string, patientName: string) => {
-    // In a real app, this would navigate to a scan processing page
-    // For now, we'll just show a notification
-    addNotification({
-      message: `Started processing scan for ${patientName}`,
-      type: 'success'
-    });
-    
-    // Update the scan status in our local state
-    setRadiologyResults(prev => 
-      prev.map(result => 
-        result.id === scanId 
-          ? { ...result, status: 'in_progress' } 
-          : result
-      )
-    );
+  const handleProcessScan = (scanId: string) => {
+    navigate(`/radiology/process/${scanId}`);
   };
 
   if (isLoading) {
@@ -326,7 +313,7 @@ const Radiology: React.FC = () => {
                               </span>
                             )}
                             <button 
-                              onClick={() => handleProcessScan(result.id, `${result.patient.first_name} ${result.patient.last_name}`)}
+                              onClick={() => handleProcessScan(result.id)}
                               className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
                             >
                               Process Scan <Microscope className="h-3 w-3 ml-1" />

@@ -29,7 +29,9 @@ import BillingDetails from './components/billing/BillingDetails';
 import Triage from './pages/Triage';
 import Inpatients from './pages/Inpatients';
 import Laboratory from './pages/Laboratory';
+import LabTestProcessForm from './components/laboratory/LabTestProcessForm';
 import Radiology from './pages/Radiology';
+import RadiologyProcessForm from './components/radiology/RadiologyProcessForm';
 import Appointments from './pages/Appointments';
 import ConsultationNotes from './pages/ConsultationNotes';
 import ConsultationDetails from './pages/ConsultationDetails';
@@ -130,7 +132,9 @@ const App: React.FC = () => {
           <Route path="triage" element={<Triage />} />
           <Route path="inpatients" element={<Inpatients />} />
           <Route path="laboratory" element={<Laboratory />} />
+          <Route path="laboratory/process/:testId" element={<LabTestProcessForm />} />
           <Route path="radiology" element={<Radiology />} />
+          <Route path="radiology/process/:scanId" element={<RadiologyProcessForm />} />
           <Route path="pharmacy" element={<PharmacyList />} />
           <Route path="pharmacy/:orderId/dispense" element={<PharmacyDispense />} />
           <Route path="billing" element={<BillingList />} />
