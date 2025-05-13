@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../lib/store';
-import { Search, Filter, FlaskRound as Flask, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, FileImage, ChevronDown } from 'lucide-react';
+import { Search, Filter, FlaskRound as Flask, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, FileImage, ChevronDown, Beaker, ArrowRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 interface LabResult {
@@ -20,6 +20,12 @@ interface LabResult {
     last_name: string;
   } | null;
   is_emergency: boolean;
+  workflow_stage?: 'pending' | 'sample_collected' | 'testing' | 'review' | 'completed';
+  sample_info?: {
+    sample_id: string;
+    sample_type: string;
+    collection_time: string;
+  };
 }
 
 const Laboratory: React.FC = () => {
@@ -53,7 +59,8 @@ const Laboratory: React.FC = () => {
           status: 'pending',
           results: null,
           reviewed_by: null,
-          is_emergency: false
+          is_emergency: false,
+          workflow_stage: 'pending'
         },
         {
           id: '00000000-0000-0000-0000-000000000002',
@@ -67,7 +74,13 @@ const Laboratory: React.FC = () => {
           status: 'in_progress',
           results: null,
           reviewed_by: null,
-          is_emergency: true
+          is_emergency: true,
+          workflow_stage: 'sample_collected',
+          sample_info: {
+            sample_id: 'LAB-20250515-1234',
+            sample_type: 'blood',
+            collection_time: '2025-05-15T10:30:00Z'
+          }
         },
         {
           id: '00000000-0000-0000-0000-000000000003',
@@ -78,10 +91,16 @@ const Laboratory: React.FC = () => {
           },
           test_type: 'kidney_function',
           test_date: '2025-05-14',
-          status: 'pending',
+          status: 'in_progress',
           results: null,
           reviewed_by: null,
-          is_emergency: false
+          is_emergency: false,
+          workflow_stage: 'testing',
+          sample_info: {
+            sample_id: 'LAB-20250514-5678',
+            sample_type: 'blood',
+            collection_time: '2025-05-14T14:45:00Z'
+          }
         },
         {
           id: '00000000-0000-0000-0000-000000000004',
@@ -95,7 +114,13 @@ const Laboratory: React.FC = () => {
           status: 'in_progress',
           results: null,
           reviewed_by: null,
-          is_emergency: false
+          is_emergency: false,
+          workflow_stage: 'review',
+          sample_info: {
+            sample_id: 'LAB-20250514-9012',
+            sample_type: 'blood',
+            collection_time: '2025-05-14T16:15:00Z'
+          }
         },
         {
           id: '00000000-0000-0000-0000-000000000005',
@@ -112,7 +137,13 @@ const Laboratory: React.FC = () => {
             first_name: 'Doctor',
             last_name: 'Smith'
           },
-          is_emergency: false
+          is_emergency: false,
+          workflow_stage: 'completed',
+          sample_info: {
+            sample_id: 'LAB-20250515-3456',
+            sample_type: 'blood',
+            collection_time: '2025-05-15T09:00:00Z'
+          }
         }
       ];
       
@@ -155,6 +186,23 @@ const Laboratory: React.FC = () => {
     }
   };
 
+  const getWorkflowStageLabel = (stage?: string) => {
+    switch (stage) {
+      case 'pending':
+        return 'Awaiting Sample';
+      case 'sample_collected':
+        return 'Sample Collected';
+      case 'testing':
+        return 'Testing In Progress';
+      case 'review':
+        return 'Awaiting Review';
+      case 'completed':
+        return 'Completed';
+      default:
+        return 'Unknown';
+    }
+  };
+
   const getTestTypeLabel = (type: string) => {
     const types: Record<string, string> = {
       'complete_blood_count': 'Complete Blood Count (CBC)',
@@ -189,6 +237,25 @@ const Laboratory: React.FC = () => {
   const inProgressCount = labResults.filter(r => r.status === 'in_progress').length;
   const completedCount = labResults.filter(r => r.status === 'completed').length;
   const urgentCount = labResults.filter(r => r.is_emergency).length;
+
+  const handleStartTest = (testId: string) => {
+    // Update the test status to in_progress
+    const updatedResults = labResults.map(result => {
+      if (result.id === testId) {
+        return {
+          ...result,
+          status: 'in_progress',
+          workflow_stage: 'sample_collected'
+        };
+      }
+      return result;
+    });
+    
+    setLabResults(updatedResults);
+    
+    // Navigate to the test processing form
+    navigate(`/laboratory/process/${testId}`);
+  };
 
   const handleProcessTest = (testId: string) => {
     navigate(`/laboratory/process/${testId}`);
@@ -306,6 +373,12 @@ const Laboratory: React.FC = () => {
                             <div className="flex items-center text-xs text-gray-500">
                               <Clock className="h-3 w-3 mr-1" />
                               <span>{new Date(result.test_date).toLocaleDateString()}</span>
+                              {result.workflow_stage && result.workflow_stage !== 'pending' && (
+                                <>
+                                  <span className="mx-1">•</span>
+                                  <span>{getWorkflowStageLabel(result.workflow_stage)}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -314,17 +387,37 @@ const Laboratory: React.FC = () => {
                                 Emergency
                               </span>
                             )}
-                            <button 
-                              onClick={() => handleProcessTest(result.id)}
-                              className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
-                            >
-                              Process Test <Flask className="h-3 w-3 ml-1" />
-                            </button>
+                            {activeTab === 'pending' ? (
+                              <button 
+                                onClick={() => handleStartTest(result.id)}
+                                className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
+                              >
+                                Start Test <Beaker className="h-3 w-3 ml-1" />
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => handleProcessTest(result.id)}
+                                className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
+                              >
+                                {result.workflow_stage === 'sample_collected' ? 'Enter Results' : 
+                                 result.workflow_stage === 'testing' ? 'Continue Testing' : 
+                                 result.workflow_stage === 'review' ? 'Review Results' : 'Process Test'}
+                                <ArrowRight className="h-3 w-3 ml-1" />
+                              </button>
+                            )}
                           </div>
                         </div>
                         <div className="mt-0.5">
                           <span className="text-xs font-medium">Test: </span>
                           <span className="text-xs">{getTestTypeLabel(result.test_type)}</span>
+                          {result.sample_info && (
+                            <>
+                              <span className="mx-1">•</span>
+                              <span className="text-xs">
+                                Sample ID: {result.sample_info.sample_id}
+                              </span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>

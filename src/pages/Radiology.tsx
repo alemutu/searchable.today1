@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../lib/store';
-import { Search, Filter, Microscope, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, FileImage, ChevronDown } from 'lucide-react';
+import { Search, Filter, Microscope, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, FileImage, ChevronDown, ArrowRight } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 interface RadiologyResult {
@@ -20,6 +20,12 @@ interface RadiologyResult {
     last_name: string;
   } | null;
   is_emergency: boolean;
+  workflow_stage?: 'pending' | 'in_progress' | 'completed';
+  scan_info?: {
+    scan_id: string;
+    scan_time: string;
+    equipment_used: string;
+  };
 }
 
 const Radiology: React.FC = () => {
@@ -53,7 +59,8 @@ const Radiology: React.FC = () => {
           status: 'pending',
           results: null,
           reviewed_by: null,
-          is_emergency: false
+          is_emergency: false,
+          workflow_stage: 'pending'
         },
         {
           id: '00000000-0000-0000-0000-000000000002',
@@ -67,7 +74,13 @@ const Radiology: React.FC = () => {
           status: 'in_progress',
           results: null,
           reviewed_by: null,
-          is_emergency: true
+          is_emergency: true,
+          workflow_stage: 'in_progress',
+          scan_info: {
+            scan_id: 'RAD-20250515-1234',
+            scan_time: '2025-05-15T10:30:00Z',
+            equipment_used: 'ct_scanner'
+          }
         },
         {
           id: '00000000-0000-0000-0000-000000000003',
@@ -81,7 +94,8 @@ const Radiology: React.FC = () => {
           status: 'pending',
           results: null,
           reviewed_by: null,
-          is_emergency: false
+          is_emergency: false,
+          workflow_stage: 'pending'
         },
         {
           id: '00000000-0000-0000-0000-000000000004',
@@ -95,7 +109,13 @@ const Radiology: React.FC = () => {
           status: 'in_progress',
           results: null,
           reviewed_by: null,
-          is_emergency: false
+          is_emergency: false,
+          workflow_stage: 'in_progress',
+          scan_info: {
+            scan_id: 'RAD-20250514-5678',
+            scan_time: '2025-05-14T15:45:00Z',
+            equipment_used: 'ultrasound_machine'
+          }
         },
         {
           id: '00000000-0000-0000-0000-000000000005',
@@ -112,7 +132,13 @@ const Radiology: React.FC = () => {
             first_name: 'Doctor',
             last_name: 'Smith'
           },
-          is_emergency: false
+          is_emergency: false,
+          workflow_stage: 'completed',
+          scan_info: {
+            scan_id: 'RAD-20250515-9012',
+            scan_time: '2025-05-15T09:15:00Z',
+            equipment_used: 'mammography_unit'
+          }
         }
       ];
       
@@ -169,6 +195,22 @@ const Radiology: React.FC = () => {
     return types[type] || type;
   };
 
+  const getEquipmentLabel = (equipment?: string) => {
+    if (!equipment) return '';
+    
+    const types: Record<string, string> = {
+      'x_ray_machine': 'X-Ray Machine',
+      'ct_scanner': 'CT Scanner',
+      'mri_scanner': 'MRI Scanner',
+      'ultrasound_machine': 'Ultrasound Machine',
+      'mammography_unit': 'Mammography Unit',
+      'pet_scanner': 'PET Scanner',
+      'dexa_scanner': 'DEXA Scanner',
+      'fluoroscopy_unit': 'Fluoroscopy Unit'
+    };
+    return types[equipment] || equipment;
+  };
+
   const filteredResults = radiologyResults.filter(result => {
     const patientName = `${result.patient.first_name} ${result.patient.last_name}`.toLowerCase();
     const matchesSearch = patientName.includes(searchTerm.toLowerCase()) ||
@@ -187,6 +229,25 @@ const Radiology: React.FC = () => {
   const inProgressCount = radiologyResults.filter(r => r.status === 'in_progress').length;
   const completedCount = radiologyResults.filter(r => r.status === 'completed').length;
   const urgentCount = radiologyResults.filter(r => r.is_emergency).length;
+
+  const handleStartScan = (scanId: string) => {
+    // Update the scan status to in_progress
+    const updatedResults = radiologyResults.map(result => {
+      if (result.id === scanId) {
+        return {
+          ...result,
+          status: 'in_progress',
+          workflow_stage: 'in_progress'
+        };
+      }
+      return result;
+    });
+    
+    setRadiologyResults(updatedResults);
+    
+    // Navigate to the scan processing form
+    navigate(`/radiology/process/${scanId}`);
+  };
 
   const handleProcessScan = (scanId: string) => {
     navigate(`/radiology/process/${scanId}`);
@@ -304,6 +365,12 @@ const Radiology: React.FC = () => {
                             <div className="flex items-center text-xs text-gray-500">
                               <Clock className="h-3 w-3 mr-1" />
                               <span>{new Date(result.scan_date).toLocaleDateString()}</span>
+                              {result.scan_info && (
+                                <>
+                                  <span className="mx-1">•</span>
+                                  <span>Scan ID: {result.scan_info.scan_id}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
@@ -312,17 +379,32 @@ const Radiology: React.FC = () => {
                                 Emergency
                               </span>
                             )}
-                            <button 
-                              onClick={() => handleProcessScan(result.id)}
-                              className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
-                            >
-                              Process Scan <Microscope className="h-3 w-3 ml-1" />
-                            </button>
+                            {activeTab === 'pending' ? (
+                              <button 
+                                onClick={() => handleStartScan(result.id)}
+                                className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
+                              >
+                                Start Scan <FileImage className="h-3 w-3 ml-1" />
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => handleProcessScan(result.id)}
+                                className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
+                              >
+                                Process Scan <ArrowRight className="h-3 w-3 ml-1" />
+                              </button>
+                            )}
                           </div>
                         </div>
                         <div className="mt-0.5">
                           <span className="text-xs font-medium">Scan: </span>
                           <span className="text-xs">{getScanTypeLabel(result.scan_type)}</span>
+                          {result.scan_info?.equipment_used && (
+                            <>
+                              <span className="mx-1">•</span>
+                              <span className="text-xs">{getEquipmentLabel(result.scan_info.equipment_used)}</span>
+                            </>
+                          )}
                         </div>
                       </div>
                     </div>
