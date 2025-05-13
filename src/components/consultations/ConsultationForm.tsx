@@ -1820,3 +1820,5 @@ const ConsultationForm: React.FC = () => {
 };
 
 export default ConsultationForm;
+
+export default ConsultationForm
