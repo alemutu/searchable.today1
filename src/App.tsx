@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './lib/store';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
@@ -65,12 +65,13 @@ import Physiotherapy from './pages/departments/Physiotherapy';
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isLoading } = useAuthStore();
   const navigate = useNavigate();
+  const location = useLocation();
   
   useEffect(() => {
     if (!isLoading && !user) {
-      navigate('/login');
+      navigate('/login', { state: { from: location } });
     }
-  }, [user, isLoading, navigate]);
+  }, [user, isLoading, navigate, location]);
   
   if (isLoading) {
     return (
@@ -172,7 +173,7 @@ const App: React.FC = () => {
           <Route path="departments/physiotherapy" element={<Physiotherapy />} />
         </Route>
         
-        <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
       
       {/* Offline indicator */}

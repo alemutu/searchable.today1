@@ -55,30 +55,6 @@ export interface Notification {
   duration?: number; // in milliseconds, default will be 3000
 }
 
-// Mock data for development
-const mockUser = {
-  id: '00000000-0000-0000-0000-000000000001',
-  email: 'dev@example.com',
-  user_metadata: {
-    first_name: 'Dev',
-    last_name: 'User',
-    role: 'super_admin'
-  }
-} as User;
-
-const mockHospital = {
-  id: '00000000-0000-0000-0000-000000000000',
-  name: 'Development Hospital',
-  subdomain: 'dev',
-  address: '123 Dev Street',
-  phone: '555-0123',
-  patient_id_format: 'prefix_number',
-  patient_id_prefix: 'PT',
-  patient_id_digits: 6,
-  patient_id_auto_increment: true,
-  patient_id_last_number: 0
-};
-
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   hospital: null,
@@ -106,47 +82,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ user });
           await get().fetchUserProfile();
           await syncAllData(); // Sync any pending changes
-        } else {
-          // Use mock data in development
-          if (import.meta.env.DEV) {
-            set({ 
-              user: mockUser,
-              hospital: mockHospital,
-              isAdmin: true,
-              isDoctor: true,
-              isNurse: true,
-              isReceptionist: true
-            });
-          }
-        }
-      } else {
-        // Use mock data in development
-        if (import.meta.env.DEV) {
-          set({ 
-            user: mockUser,
-            hospital: mockHospital,
-            isAdmin: true,
-            isDoctor: true,
-            isNurse: true,
-            isReceptionist: true
-          });
         }
       }
     } catch (error: any) {
       console.error('Error initializing auth:', error.message);
       set({ error: error.message });
-      
-      // Use mock data in development
-      if (import.meta.env.DEV) {
-        set({ 
-          user: mockUser,
-          hospital: mockHospital,
-          isAdmin: true,
-          isDoctor: true,
-          isNurse: true,
-          isReceptionist: true
-        });
-      }
     } finally {
       set({ isLoading: false });
     }
@@ -167,32 +107,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ user: data.user });
         await get().fetchUserProfile();
         await syncAllData(); // Sync any pending changes
-      } else if (import.meta.env.DEV) {
-        // Use mock data in development
-        set({ 
-          user: mockUser,
-          hospital: mockHospital,
-          isAdmin: true,
-          isDoctor: true,
-          isNurse: true,
-          isReceptionist: true
-        });
       }
     } catch (error: any) {
       console.error('Error logging in:', error.message);
       set({ error: `Error logging in: ${error.message}` });
-      
-      // Use mock data in development
-      if (import.meta.env.DEV) {
-        set({ 
-          user: mockUser,
-          hospital: mockHospital,
-          isAdmin: true,
-          isDoctor: true,
-          isNurse: true,
-          isReceptionist: true
-        });
-      }
     } finally {
       set({ isLoading: false });
     }
@@ -214,32 +132,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       if (data.user) {
         set({ user: data.user });
-      } else if (import.meta.env.DEV) {
-        // Use mock data in development
-        set({ 
-          user: mockUser,
-          hospital: mockHospital,
-          isAdmin: true,
-          isDoctor: true,
-          isNurse: true,
-          isReceptionist: true
-        });
       }
     } catch (error: any) {
       console.error('Error signing up:', error.message);
       set({ error: error.message });
-      
-      // Use mock data in development
-      if (import.meta.env.DEV) {
-        set({ 
-          user: mockUser,
-          hospital: mockHospital,
-          isAdmin: true,
-          isDoctor: true,
-          isNurse: true,
-          isReceptionist: true
-        });
-      }
     } finally {
       set({ isLoading: false });
     }
@@ -260,18 +156,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isNurse: false,
         isReceptionist: false
       });
-      
-      // Use mock data in development
-      if (import.meta.env.DEV) {
-        set({ 
-          user: mockUser,
-          hospital: mockHospital,
-          isAdmin: true,
-          isDoctor: true,
-          isNurse: true,
-          isReceptionist: true
-        });
-      }
     } catch (error: any) {
       console.error('Error logging out:', error.message);
       set({ error: error.message });
@@ -302,29 +186,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
         
         await get().fetchCurrentHospital();
-      } else if (import.meta.env.DEV) {
-        // Fallback to mock data in development
-        set({
-          isAdmin: true,
-          isDoctor: true,
-          isNurse: true,
-          isReceptionist: true,
-          hospital: mockHospital
-        });
       }
     } catch (error: any) {
       console.error('Error fetching user profile:', error.message);
-      
-      // Fallback to mock data in development
-      if (import.meta.env.DEV) {
-        set({
-          isAdmin: true,
-          isDoctor: true,
-          isNurse: true,
-          isReceptionist: true,
-          hospital: mockHospital
-        });
-      }
     }
   },
   
@@ -354,19 +218,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ hospital });
           // Save hospital to local storage for offline use
           localStorage.setItem(`hospitals_${hospital.id}`, JSON.stringify(hospital));
-        } else if (import.meta.env.DEV) {
-          set({ hospital: mockHospital });
         }
-      } else if (import.meta.env.DEV) {
-        set({ hospital: mockHospital });
       }
     } catch (error: any) {
       console.error('Error fetching hospital:', error.message);
-      
-      // Fallback to mock data in development
-      if (import.meta.env.DEV) {
-        set({ hospital: mockHospital });
-      }
     }
   }
 }));

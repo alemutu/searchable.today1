@@ -190,18 +190,6 @@ const RegisterForm: React.FC = () => {
               Create Account
             </button>
           </div>
-          
-          {import.meta.env.DEV && (
-            <div className="mt-4">
-              <button
-                type="button"
-                onClick={() => navigate('/dashboard')}
-                className="btn btn-outline w-full"
-              >
-                Continue in Development Mode
-              </button>
-            </div>
-          )}
         </form>
       </div>
     </div>

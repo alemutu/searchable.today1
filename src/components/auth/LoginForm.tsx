@@ -24,11 +24,6 @@ const LoginForm: React.FC = () => {
     }
     
     await login(data.email, data.password);
-    
-    // If we're in development mode, navigate to dashboard regardless of login success
-    if (import.meta.env.DEV) {
-      navigate('/dashboard');
-    }
   };
   
   return (
@@ -149,18 +144,6 @@ const LoginForm: React.FC = () => {
               Sign in
             </button>
           </div>
-          
-          {import.meta.env.DEV && (
-            <div className="mt-4">
-              <button
-                type="button"
-                onClick={() => navigate('/dashboard')}
-                className="btn btn-outline w-full"
-              >
-                Continue in Development Mode
-              </button>
-            </div>
-          )}
         </form>
       </div>
     </div>
