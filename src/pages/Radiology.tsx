@@ -40,6 +40,7 @@ const Radiology: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'pending' | 'in_progress'>('pending');
   const navigate = useNavigate();
   const [assignedToMe, setAssignedToMe] = useState(false);
+  const [notifiedEmergencies, setNotifiedEmergencies] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     fetchRadiologyResults();
@@ -175,13 +176,26 @@ const Radiology: React.FC = () => {
       // Show notification for emergency cases
       const emergencyCases = mockResults.filter(result => result.is_emergency && (result.status === 'pending' || result.status === 'in_progress'));
       if (emergencyCases.length > 0) {
+        // Create a new Set of emergency IDs that we've already notified about
+        const newNotifiedEmergencies = new Set(notifiedEmergencies);
+        
         emergencyCases.forEach(emergency => {
-          addNotification({
-            message: `EMERGENCY: ${getScanTypeLabel(emergency.scan_type)} needed for ${emergency.patient.first_name} ${emergency.patient.last_name}`,
-            type: 'error',
-            duration: 5000
-          });
+          // Only show notification if we haven't already notified about this emergency
+          const emergencyKey = `${emergency.id}-${emergency.patient.id}`;
+          if (!newNotifiedEmergencies.has(emergencyKey)) {
+            addNotification({
+              message: `EMERGENCY: ${getScanTypeLabel(emergency.scan_type)} needed for ${emergency.patient.first_name} ${emergency.patient.last_name}`,
+              type: 'error',
+              duration: 5000
+            });
+            
+            // Add this emergency to our set of notified emergencies
+            newNotifiedEmergencies.add(emergencyKey);
+          }
         });
+        
+        // Update the state with our new set of notified emergencies
+        setNotifiedEmergencies(newNotifiedEmergencies);
       }
     } catch (error) {
       console.error('Error fetching radiology results:', error);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Pill, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, ChevronDown, Layers, Loader2 } from 'lucide-react';
+import { Search, Filter, Pill, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, ChevronDown, Layers, Loader2, CreditCard, Building2, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../lib/store';
@@ -34,6 +34,7 @@ const PharmacyList: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'pending' | 'processing'>('pending');
   const [inventoryStatus, setInventoryStatus] = useState<{[key: string]: {inStock: boolean, quantity: number}}>({});
   const [assignedToMe, setAssignedToMe] = useState(false);
+  const [notifiedEmergencies, setNotifiedEmergencies] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchOrders = async () => {
@@ -193,13 +194,26 @@ const PharmacyList: React.FC = () => {
         // Show notification for emergency cases
         const emergencyCases = mockOrders.filter(order => order.is_emergency && (order.status === 'pending' || order.status === 'processing'));
         if (emergencyCases.length > 0) {
+          // Create a new Set of emergency IDs that we've already notified about
+          const newNotifiedEmergencies = new Set(notifiedEmergencies);
+          
           emergencyCases.forEach(emergency => {
-            addNotification({
-              message: `EMERGENCY: Prescription for ${emergency.patient.first_name} ${emergency.patient.last_name} needs immediate attention`,
-              type: 'error',
-              duration: 5000
-            });
+            // Only show notification if we haven't already notified about this emergency
+            const emergencyKey = `${emergency.id}-${emergency.patient.id}`;
+            if (!newNotifiedEmergencies.has(emergencyKey)) {
+              addNotification({
+                message: `EMERGENCY: Prescription for ${emergency.patient.first_name} ${emergency.patient.last_name} needs immediate attention`,
+                type: 'error',
+                duration: 5000
+              });
+              
+              // Add this emergency to our set of notified emergencies
+              newNotifiedEmergencies.add(emergencyKey);
+            }
           });
+          
+          // Update the state with our new set of notified emergencies
+          setNotifiedEmergencies(newNotifiedEmergencies);
         }
         
         // Check inventory status for all medications
@@ -266,28 +280,6 @@ const PharmacyList: React.FC = () => {
     return `${diffDays}d ago`;
   };
   
-  const handleProcessOrder = async (orderId: string, patientName: string) => {
-    // Update order status in state
-    const updatedOrders = orders.map(order => 
-      order.id === orderId 
-        ? { 
-            ...order, 
-            status: 'processing',
-            assigned_to: user?.id,
-            last_updated: new Date().toISOString()
-          } 
-        : order
-    );
-    
-    setOrders(updatedOrders);
-    
-    // Show notification
-    addNotification({
-      message: `Started processing order for ${patientName}`,
-      type: 'success'
-    });
-  };
-  
   const handleAssignToMe = (orderId: string) => {
     // Update the order to assign it to the current user
     const updatedOrders = orders.map(order => {
@@ -339,6 +331,32 @@ const PharmacyList: React.FC = () => {
       });
     }
   };
+  
+  const handleProcessOrder = async (orderId: string) => {
+    // Update order status in state
+    const updatedOrders = orders.map(order => 
+      order.id === orderId 
+        ? { 
+            ...order, 
+            status: 'processing',
+            assigned_to: user?.id,
+            last_updated: new Date().toISOString()
+          } 
+        : order
+    );
+    
+    setOrders(updatedOrders);
+    
+    // Show notification
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      addNotification({
+        message: `Started processing order for ${order.patient.first_name} ${order.patient.last_name}`,
+        type: 'success',
+        duration: 3000
+      });
+    }
+  };
 
   const filteredOrders = orders.filter(order => {
     const patientName = `${order.patient.first_name} ${order.patient.last_name}`.toLowerCase();
@@ -384,7 +402,7 @@ const PharmacyList: React.FC = () => {
         return 'bg-gray-100 text-gray-800';
     }
   };
-
+  
   // Count orders in each category
   const pendingCount = orders.filter(o => o.status === 'pending').length;
   const processingCount = orders.filter(o => o.status === 'processing').length;
@@ -470,7 +488,7 @@ const PharmacyList: React.FC = () => {
             <option value="insured">Insured</option>
           </select>
           <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-            <ChevronDown className="h-3 w-3 text-gray-500" />
+            <Filter className="h-4 w-4 text-gray-400" />
           </div>
         </div>
         
@@ -552,7 +570,7 @@ const PharmacyList: React.FC = () => {
                                 {order.assigned_to === user?.id && (
                                   <>
                                     <button 
-                                      onClick={() => handleProcessOrder(order.id, `${order.patient.first_name} ${order.patient.last_name}`)}
+                                      onClick={() => handleProcessOrder(order.id)}
                                       disabled={order.payment_status === 'pending'}
                                       className="btn btn-primary inline-flex items-center text-xs py-1 px-2 rounded-lg"
                                       title={order.payment_status === 'pending' ? 'Payment required before processing' : ''}
@@ -772,19 +790,19 @@ const PharmacyList: React.FC = () => {
               <h2 className="text-sm font-medium text-gray-900">Quick Actions</h2>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <Link to="/pharmacy/inventory" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200">
+              <Link to="/pharmacy/inventory" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200 transition-colors">
                 <Plus className="h-4 w-4 text-primary-500 mr-1.5" />
                 <span className="text-xs text-gray-700">Inventory</span>
               </Link>
-              <Link to="/patients" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200">
+              <Link to="/patients" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200 transition-colors">
                 <FileText className="h-4 w-4 text-primary-500 mr-1.5" />
                 <span className="text-xs text-gray-700">View Records</span>
               </Link>
-              <Link to="/reception" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200">
+              <Link to="/reception" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200 transition-colors">
                 <User className="h-4 w-4 text-primary-500 mr-1.5" />
                 <span className="text-xs text-gray-700">Reception</span>
               </Link>
-              <Link to="/appointments" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200">
+              <Link to="/appointments" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200 transition-colors">
                 <Calendar className="h-4 w-4 text-primary-500 mr-1.5" />
                 <span className="text-xs text-gray-700">Appointments</span>
               </Link>

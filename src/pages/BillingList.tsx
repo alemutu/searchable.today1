@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, DollarSign, FileText, AlertTriangle, Plus, Layers, Clock, XCircle, CheckCircle } from 'lucide-react';
+import { Search, Filter, DollarSign, FileText, AlertTriangle, Plus, Layers, Clock, XCircle, CheckCircle, CreditCard, Building2, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../lib/store';
@@ -38,6 +38,7 @@ const BillingList: React.FC = () => {
   const { addNotification } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'pending' | 'processing'>('pending');
   const [assignedToMe, setAssignedToMe] = useState(false);
+  const [notifiedEmergencies, setNotifiedEmergencies] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchBills = async () => {
@@ -216,13 +217,26 @@ const BillingList: React.FC = () => {
         );
         
         if (urgentBills.length > 0) {
+          // Create a new Set of emergency IDs that we've already notified about
+          const newNotifiedEmergencies = new Set(notifiedEmergencies);
+          
           urgentBills.forEach(bill => {
-            addNotification({
-              message: `Urgent: Process payment for ${bill.patient.first_name} ${bill.patient.last_name}`,
-              type: 'warning',
-              duration: 5000
-            });
+            // Only show notification if we haven't already notified about this emergency
+            const emergencyKey = `${bill.id}-${bill.patient.id}`;
+            if (!newNotifiedEmergencies.has(emergencyKey)) {
+              addNotification({
+                message: `Urgent: Process payment for ${bill.patient.first_name} ${bill.patient.last_name}`,
+                type: 'warning',
+                duration: 5000
+              });
+              
+              // Add this emergency to our set of notified emergencies
+              newNotifiedEmergencies.add(emergencyKey);
+            }
           });
+          
+          // Update the state with our new set of notified emergencies
+          setNotifiedEmergencies(newNotifiedEmergencies);
         }
       } catch (error) {
         console.error('Error fetching bills:', error);
