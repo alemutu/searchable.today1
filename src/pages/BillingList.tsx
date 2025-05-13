@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, DollarSign, FileText, AlertTriangle } from 'lucide-react';
+import { Search, Filter, DollarSign, FileText, AlertTriangle, Plus, Layers, Clock, XCircle, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { useAuthStore } from '../lib/store';
+import { useAuthStore, useNotificationStore } from '../lib/store';
 
 interface Bill {
   id: string;
@@ -25,6 +25,8 @@ interface Bill {
     policy_number: string;
     coverage_percentage: number;
   } | null;
+  assigned_to?: string;
+  last_updated?: string;
 }
 
 const BillingList: React.FC = () => {
@@ -32,39 +34,317 @@ const BillingList: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [bills, setBills] = useState<Bill[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { hospital } = useAuthStore();
+  const { hospital, user } = useAuthStore();
+  const { addNotification } = useNotificationStore();
+  const [activeTab, setActiveTab] = useState<'pending' | 'processing'>('pending');
+  const [assignedToMe, setAssignedToMe] = useState(false);
 
   useEffect(() => {
     const fetchBills = async () => {
-      if (!hospital) return;
+      if (!hospital?.id) return;
 
       try {
-        const { data, error } = await supabase
-          .from('billing')
-          .select(`
-            *,
-            patient:patients(id, first_name, last_name)
-          `)
-          .eq('hospital_id', hospital.id)
-          .order('created_at', { ascending: false });
-
-        if (error) throw error;
-        setBills(data || []);
+        // In a real app, we would fetch from Supabase
+        // For now, we'll use mock data
+        const mockBills = [
+          {
+            id: '00000000-0000-0000-0000-000000000001',
+            created_at: '2025-05-15T09:15:00Z',
+            patient: {
+              id: '00000000-0000-0000-0000-000000000001',
+              first_name: 'John',
+              last_name: 'Doe'
+            },
+            services: [
+              {
+                name: 'Consultation',
+                amount: 150,
+                quantity: 1
+              },
+              {
+                name: 'Blood Test',
+                amount: 75,
+                quantity: 1
+              }
+            ],
+            total_amount: 225,
+            paid_amount: 0,
+            payment_status: 'pending',
+            insurance_info: null,
+            last_updated: '2025-05-15T09:15:00Z'
+          },
+          {
+            id: '00000000-0000-0000-0000-000000000002',
+            created_at: '2025-05-15T10:30:00Z',
+            patient: {
+              id: '00000000-0000-0000-0000-000000000002',
+              first_name: 'Jane',
+              last_name: 'Smith'
+            },
+            services: [
+              {
+                name: 'Emergency Consultation',
+                amount: 250,
+                quantity: 1
+              },
+              {
+                name: 'X-Ray',
+                amount: 120,
+                quantity: 1
+              }
+            ],
+            total_amount: 370,
+            paid_amount: 370,
+            payment_status: 'paid',
+            insurance_info: null,
+            assigned_to: user?.id,
+            last_updated: '2025-05-15T10:30:00Z'
+          },
+          {
+            id: '00000000-0000-0000-0000-000000000003',
+            created_at: '2025-05-15T11:45:00Z',
+            patient: {
+              id: '00000000-0000-0000-0000-000000000003',
+              first_name: 'Robert',
+              last_name: 'Johnson'
+            },
+            services: [
+              {
+                name: 'Consultation',
+                amount: 150,
+                quantity: 1
+              },
+              {
+                name: 'Medication',
+                amount: 85,
+                quantity: 1
+              }
+            ],
+            total_amount: 235,
+            paid_amount: 0,
+            payment_status: 'insured',
+            insurance_info: {
+              provider: 'HealthPlus',
+              policy_number: 'HP12345678',
+              coverage_percentage: 80
+            },
+            last_updated: '2025-05-15T11:45:00Z'
+          },
+          {
+            id: '00000000-0000-0000-0000-000000000004',
+            created_at: '2025-05-15T12:15:00Z',
+            patient: {
+              id: '00000000-0000-0000-0000-000000000004',
+              first_name: 'Emily',
+              last_name: 'Williams'
+            },
+            services: [
+              {
+                name: 'Consultation',
+                amount: 150,
+                quantity: 1
+              }
+            ],
+            total_amount: 150,
+            paid_amount: 75,
+            payment_status: 'partial',
+            insurance_info: null,
+            assigned_to: '00000000-0000-0000-0000-000000000010', // Another billing staff
+            last_updated: '2025-05-15T12:15:00Z'
+          },
+          {
+            id: '00000000-0000-0000-0000-000000000005',
+            created_at: '2025-05-15T13:00:00Z',
+            patient: {
+              id: '00000000-0000-0000-0000-000000000005',
+              first_name: 'Michael',
+              last_name: 'Brown'
+            },
+            services: [
+              {
+                name: 'Consultation',
+                amount: 150,
+                quantity: 1
+              },
+              {
+                name: 'ECG',
+                amount: 100,
+                quantity: 1
+              }
+            ],
+            total_amount: 250,
+            paid_amount: 250,
+            payment_status: 'paid',
+            insurance_info: null,
+            assigned_to: user?.id,
+            last_updated: '2025-05-15T13:00:00Z'
+          },
+          {
+            id: '00000000-0000-0000-0000-000000000006',
+            created_at: '2025-05-15T13:30:00Z',
+            patient: {
+              id: '00000000-0000-0000-0000-000000000006',
+              first_name: 'Sarah',
+              last_name: 'Davis'
+            },
+            services: [
+              {
+                name: 'Emergency Consultation',
+                amount: 250,
+                quantity: 1
+              },
+              {
+                name: 'CT Scan',
+                amount: 350,
+                quantity: 1
+              }
+            ],
+            total_amount: 600,
+            paid_amount: 0,
+            payment_status: 'pending',
+            insurance_info: null,
+            last_updated: '2025-05-15T13:30:00Z'
+          }
+        ];
+        
+        setBills(mockBills);
+        
+        // Show notification for urgent bills
+        const urgentBills = mockBills.filter(bill => 
+          bill.payment_status === 'pending' && 
+          bill.services.some(service => service.name.includes('Emergency'))
+        );
+        
+        if (urgentBills.length > 0) {
+          urgentBills.forEach(bill => {
+            addNotification({
+              message: `Urgent: Process payment for ${bill.patient.first_name} ${bill.patient.last_name}`,
+              type: 'warning',
+              duration: 5000
+            });
+          });
+        }
       } catch (error) {
         console.error('Error fetching bills:', error);
+        addNotification({
+          message: 'Failed to load billing information',
+          type: 'error'
+        });
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchBills();
-  }, [hospital]);
+  }, [hospital, addNotification, user?.id]);
+  
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
+  
+  const handleAssignToMe = (billId: string) => {
+    // Update the bill to assign it to the current user
+    const updatedBills = bills.map(bill => {
+      if (bill.id === billId) {
+        return {
+          ...bill,
+          assigned_to: user?.id,
+          last_updated: new Date().toISOString()
+        };
+      }
+      return bill;
+    });
+    
+    setBills(updatedBills);
+    
+    // Show notification
+    const bill = bills.find(b => b.id === billId);
+    if (bill) {
+      addNotification({
+        message: `Bill for ${bill.patient.first_name} ${bill.patient.last_name} assigned to you`,
+        type: 'success',
+        duration: 3000
+      });
+    }
+  };
+
+  const handleReleaseAssignment = (billId: string) => {
+    // Update the bill to unassign it
+    const updatedBills = bills.map(bill => {
+      if (bill.id === billId) {
+        return {
+          ...bill,
+          assigned_to: null,
+          last_updated: new Date().toISOString()
+        };
+      }
+      return bill;
+    });
+    
+    setBills(updatedBills);
+    
+    // Show notification
+    const bill = bills.find(b => b.id === billId);
+    if (bill) {
+      addNotification({
+        message: `Bill for ${bill.patient.first_name} ${bill.patient.last_name} released from your queue`,
+        type: 'info',
+        duration: 3000
+      });
+    }
+  };
+  
+  const handleProcessBill = (billId: string) => {
+    // Update the bill status to processing
+    const updatedBills = bills.map(bill => {
+      if (bill.id === billId) {
+        return {
+          ...bill,
+          payment_status: 'processing',
+          assigned_to: user?.id,
+          last_updated: new Date().toISOString()
+        };
+      }
+      return bill;
+    });
+    
+    setBills(updatedBills);
+    
+    // Show notification
+    const bill = bills.find(b => b.id === billId);
+    if (bill) {
+      addNotification({
+        message: `Started processing bill for ${bill.patient.first_name} ${bill.patient.last_name}`,
+        type: 'success',
+        duration: 3000
+      });
+    }
+  };
 
   const filteredBills = bills.filter(bill => {
     const patientName = `${bill.patient.first_name} ${bill.patient.last_name}`.toLowerCase();
     const matchesSearch = patientName.includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || bill.payment_status === filterStatus;
-    return matchesSearch && matchesFilter;
+    const matchesAssigned = !assignedToMe || bill.assigned_to === user?.id;
+    
+    if (activeTab === 'pending') {
+      return (bill.payment_status === 'pending' || bill.payment_status === 'partial') && 
+             matchesSearch && matchesFilter && matchesAssigned;
+    } else {
+      return bill.payment_status === 'processing' && matchesSearch && matchesFilter && matchesAssigned;
+    }
   });
 
   const getStatusColor = (status: string) => {
@@ -75,6 +355,8 @@ const BillingList: React.FC = () => {
         return 'bg-warning-100 text-warning-800';
       case 'pending':
         return 'bg-error-100 text-error-800';
+      case 'processing':
+        return 'bg-primary-100 text-primary-800';
       case 'insured':
         return 'bg-primary-100 text-primary-800';
       case 'waived':
@@ -90,153 +372,421 @@ const BillingList: React.FC = () => {
       currency: 'USD'
     }).format(amount);
   };
+  
+  // Count bills in each category
+  const pendingCount = bills.filter(b => b.payment_status === 'pending' || b.payment_status === 'partial').length;
+  const processingCount = bills.filter(b => b.payment_status === 'processing').length;
+  const paidCount = bills.filter(b => b.payment_status === 'paid').length;
+  const insuredCount = bills.filter(b => b.payment_status === 'insured').length;
+  const assignedToMeCount = bills.filter(b => b.assigned_to === user?.id).length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Billing</h1>
+        <h1 className="text-xl font-bold text-gray-900">Billing</h1>
+        <Link to="/billing/new" className="btn btn-primary inline-flex items-center text-sm py-1.5 px-3">
+          <Plus className="h-4 w-4 mr-1.5" />
+          New Invoice
+        </Link>
       </div>
       
-      <div className="card">
-        <div className="p-6 flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
-          <div className="relative flex-grow">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="h-5 w-5 text-gray-400" />
-            </div>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="form-input pl-10"
-              placeholder="Search bills..."
-            />
+      <div className="flex space-x-2">
+        <div 
+          className={`flex-1 rounded-lg p-2.5 flex items-center space-x-2 cursor-pointer ${
+            activeTab === 'pending' 
+              ? 'bg-white shadow-sm border border-gray-200' 
+              : 'bg-gray-100 hover:bg-gray-200'
+          }`}
+          onClick={() => setActiveTab('pending')}
+        >
+          <Clock className="h-4 w-4 text-gray-500" />
+          <span className="font-medium text-sm">Pending</span>
+          <span className="ml-auto bg-gray-200 text-gray-800 rounded-full w-5 h-5 flex items-center justify-center text-xs">
+            {pendingCount}
+          </span>
+        </div>
+        
+        <div 
+          className={`flex-1 rounded-lg p-2.5 flex items-center space-x-2 cursor-pointer ${
+            activeTab === 'processing' 
+              ? 'bg-white shadow-sm border border-gray-200' 
+              : 'bg-gray-100 hover:bg-gray-200'
+          }`}
+          onClick={() => setActiveTab('processing')}
+        >
+          <DollarSign className="h-4 w-4 text-primary-500" />
+          <span className="font-medium text-sm">Processing</span>
+          <span className="ml-auto bg-primary-100 text-primary-800 rounded-full w-5 h-5 flex items-center justify-center text-xs">
+            {processingCount}
+          </span>
+        </div>
+      </div>
+      
+      <div className="flex items-center space-x-2">
+        <div className="relative flex-grow">
+          <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+            <Search className="h-4 w-4 text-gray-400" />
           </div>
-          
-          <div className="relative sm:w-1/4">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Filter className="h-5 w-5 text-gray-400" />
-            </div>
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="form-input pl-10"
-            >
-              <option value="all">All Bills</option>
-              <option value="pending">Pending</option>
-              <option value="partial">Partial</option>
-              <option value="paid">Paid</option>
-              <option value="insured">Insured</option>
-              <option value="waived">Waived</option>
-            </select>
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="form-input pl-7 py-1.5 text-sm w-full rounded-lg"
+            placeholder="Search bills..."
+          />
+        </div>
+        
+        <div className="relative">
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="form-input appearance-none pr-7 py-1.5 text-sm rounded-lg"
+          >
+            <option value="all">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="partial">Partial</option>
+            <option value="paid">Paid</option>
+            <option value="insured">Insured</option>
+          </select>
+          <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+            <Filter className="h-4 w-4 text-gray-400" />
           </div>
         </div>
         
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Patient
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Services
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Amount
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th scope="col" className="relative px-6 py-3">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {isLoading ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center">
-                    <div className="flex justify-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="assignedToMe"
+            checked={assignedToMe}
+            onChange={(e) => setAssignedToMe(e.target.checked)}
+            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+          />
+          <label htmlFor="assignedToMe" className="ml-2 text-xs text-gray-700">
+            Assigned to me ({assignedToMeCount})
+          </label>
+        </div>
+      </div>
+      
+      <div className="flex space-x-3">
+        {/* Left Section - Bills List */}
+        <div className="w-2/3">
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            {filteredBills.length === 0 ? (
+              <div className="p-6 text-center">
+                <div className="mx-auto w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                  <DollarSign className="h-5 w-5 text-gray-400" />
+                </div>
+                <h3 className="text-base font-medium text-gray-900 mb-1">No bills {activeTab === 'pending' ? 'pending' : 'processing'}</h3>
+                <p className="text-xs text-gray-500">There are currently no bills in this category</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-200">
+                {filteredBills.map((bill) => (
+                  <div key={bill.id} className="p-3 hover:bg-gray-50">
+                    <div className="flex items-center">
+                      <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm">
+                        {bill.patient.first_name.charAt(0)}
+                      </div>
+                      <div className="ml-3 flex-1">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="text-base font-medium text-gray-900">
+                              {bill.patient.first_name} {bill.patient.last_name}
+                            </h3>
+                            <div className="flex items-center text-xs text-gray-500 mt-0.5">
+                              <Clock className="h-3 w-3 mr-1" />
+                              <span>{getTimeAgo(bill.last_updated || bill.created_at)}</span>
+                              <span className="mx-1.5">•</span>
+                              <span>Bill #{bill.id.slice(0, 8)}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span className={`px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full ${getStatusColor(bill.payment_status)}`}>
+                              {bill.payment_status.charAt(0).toUpperCase() + bill.payment_status.slice(1)}
+                            </span>
+                            
+                            {bill.assigned_to && bill.assigned_to !== user?.id && (
+                              <span className="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-gray-100 text-gray-800">
+                                Assigned
+                              </span>
+                            )}
+                            
+                            {activeTab === 'pending' ? (
+                              <div className="flex space-x-1">
+                                {!bill.assigned_to && (
+                                  <button 
+                                    onClick={() => handleAssignToMe(bill.id)}
+                                    className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    title="Assign to me"
+                                  >
+                                    Assign to me
+                                  </button>
+                                )}
+                                
+                                {bill.assigned_to === user?.id && (
+                                  <>
+                                    <Link 
+                                      to={`/billing/${bill.id}`}
+                                      className="btn btn-primary inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    >
+                                      Process Payment <DollarSign className="h-3 w-3 ml-1" />
+                                    </Link>
+                                    <button 
+                                      onClick={() => handleReleaseAssignment(bill.id)}
+                                      className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                      title="Release assignment"
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex space-x-1">
+                                {bill.assigned_to === user?.id ? (
+                                  <>
+                                    <Link 
+                                      to={`/billing/${bill.id}`}
+                                      className="btn btn-primary inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    >
+                                      Continue <DollarSign className="h-3 w-3 ml-1" />
+                                    </Link>
+                                    <button 
+                                      onClick={() => handleReleaseAssignment(bill.id)}
+                                      className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                      title="Release assignment"
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button 
+                                    onClick={() => handleAssignToMe(bill.id)}
+                                    className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    title="Take over this bill"
+                                  >
+                                    Take over
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="mt-2 flex justify-between items-center">
+                          <div className="flex flex-wrap gap-2">
+                            {bill.services.slice(0, 2).map((service, index) => (
+                              <span key={index} className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-800">
+                                <DollarSign className="h-3 w-3 mr-1 text-gray-500" />
+                                {service.name} ({formatCurrency(service.amount)})
+                              </span>
+                            ))}
+                            {bill.services.length > 2 && (
+                              <span className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-800">
+                                +{bill.services.length - 2} more
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-right">
+                            <div className="text-sm font-medium text-gray-900">
+                              {formatCurrency(bill.total_amount)}
+                            </div>
+                            {bill.paid_amount > 0 && bill.paid_amount < bill.total_amount && (
+                              <div className="text-xs text-gray-500">
+                                Paid: {formatCurrency(bill.paid_amount)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </td>
-                </tr>
-              ) : filteredBills.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-sm text-gray-500">
-                    No bills found.
-                  </td>
-                </tr>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Section - Overview and Quick Actions */}
+        <div className="w-1/3 space-y-3">
+          {/* My Work Queue */}
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div className="flex items-center">
+                <Layers className="h-4 w-4 text-primary-500 mr-1.5" />
+                <h2 className="text-sm font-medium text-gray-900">My Work Queue</h2>
+              </div>
+              <span className="text-xs text-gray-500">{bills.filter(b => b.assigned_to === user?.id).length} bills</span>
+            </div>
+            <div className="p-3">
+              {bills.filter(b => b.assigned_to === user?.id).length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">No bills currently assigned to you</p>
+                </div>
               ) : (
-                filteredBills.map((bill) => (
-                  <tr key={bill.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <div>
-                          <div className="text-sm font-medium text-gray-900">
-                            {bill.patient.first_name} {bill.patient.last_name}
+                <div className="space-y-2">
+                  {bills
+                    .filter(b => b.assigned_to === user?.id)
+                    .sort((a, b) => {
+                      // Sort by status first
+                      const statusOrder = { 
+                        'pending': 0, 
+                        'partial': 1, 
+                        'processing': 2, 
+                        'insured': 3, 
+                        'paid': 4 
+                      };
+                      const aStatus = statusOrder[a.payment_status as keyof typeof statusOrder] || 5;
+                      const bStatus = statusOrder[b.payment_status as keyof typeof statusOrder] || 5;
+                      
+                      return aStatus - bStatus;
+                    })
+                    .slice(0, 5)
+                    .map(bill => (
+                      <div key={bill.id} className="p-2 rounded-lg border border-gray-200 flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="mr-2">
+                            {bill.payment_status === 'pending' ? (
+                              <Clock className="h-3.5 w-3.5 text-warning-500" />
+                            ) : bill.payment_status === 'partial' ? (
+                              <DollarSign className="h-3.5 w-3.5 text-warning-500" />
+                            ) : bill.payment_status === 'processing' ? (
+                              <DollarSign className="h-3.5 w-3.5 text-primary-500" />
+                            ) : (
+                              <CheckCircle className="h-3.5 w-3.5 text-success-500" />
+                            )}
                           </div>
-                          <div className="text-sm text-gray-500">
-                            Bill #{bill.id.slice(0, 8)}
+                          <div>
+                            <p className="text-xs font-medium text-gray-900 line-clamp-1">
+                              {bill.patient.first_name} {bill.patient.last_name}
+                            </p>
+                            <p className="text-xs text-gray-500 line-clamp-1">
+                              {formatCurrency(bill.total_amount)}
+                              {bill.paid_amount > 0 && bill.paid_amount < bill.total_amount && 
+                                ` (${formatCurrency(bill.paid_amount)} paid)`}
+                            </p>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        {bill.services.map((service, index) => (
-                          <div key={index} className="flex items-center mb-1">
-                            <DollarSign className="h-4 w-4 mr-1 text-gray-400" />
-                            {service.name} x{service.quantity}
-                          </div>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {formatCurrency(bill.total_amount)}
-                      </div>
-                      {bill.paid_amount > 0 && bill.paid_amount < bill.total_amount && (
-                        <div className="text-sm text-gray-500">
-                          Paid: {formatCurrency(bill.paid_amount)}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusColor(bill.payment_status)}`}>
-                        {bill.payment_status.charAt(0).toUpperCase() + bill.payment_status.slice(1)}
-                      </span>
-                      {bill.insurance_info && (
-                        <div className="mt-1 text-xs text-gray-500">
-                          Insured ({bill.insurance_info.coverage_percentage}%)
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
                         <Link
                           to={`/billing/${bill.id}`}
-                          className="text-primary-600 hover:text-primary-900"
+                          className="text-xs text-primary-600 hover:text-primary-800 font-medium"
                         >
-                          <FileText className="h-5 w-5" />
+                          Process
                         </Link>
                       </div>
-                    </td>
-                  </tr>
-                ))
+                    ))}
+                  
+                  {bills.filter(b => b.assigned_to === user?.id).length > 5 && (
+                    <div className="text-center pt-1">
+                      <button className="text-xs text-primary-600 hover:text-primary-800">
+                        View all ({bills.filter(b => b.assigned_to === user?.id).length})
+                      </button>
+                    </div>
+                  )}
+                </div>
               )}
-            </tbody>
-          </table>
-        </div>
-        
-        <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
-          <div className="text-sm text-gray-700">
-            Showing <span className="font-medium">{filteredBills.length}</span> of{' '}
-            <span className="font-medium">{bills.length}</span> bills
+            </div>
           </div>
-          <div className="flex space-x-2">
-            <button className="btn btn-outline py-1 px-3">Previous</button>
-            <button className="btn btn-outline py-1 px-3">Next</button>
+
+          {/* Overview Card */}
+          <div className="bg-white rounded-lg shadow-sm p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-medium text-gray-900">Billing Overview</h2>
+              <span className="text-xs text-gray-500">Today</span>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
+                <div className="flex items-center">
+                  <Clock className="h-4 w-4 text-gray-400 mr-1.5" />
+                  <span className="text-sm text-gray-700">Pending</span>
+                </div>
+                <span className="font-medium text-sm">{pendingCount}</span>
+              </div>
+              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
+                <div className="flex items-center">
+                  <DollarSign className="h-4 w-4 text-primary-500 mr-1.5" />
+                  <span className="text-sm text-gray-700">Processing</span>
+                </div>
+                <span className="font-medium text-sm">{processingCount}</span>
+              </div>
+              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
+                <div className="flex items-center">
+                  <CheckCircle className="h-4 w-4 text-success-500 mr-1.5" />
+                  <span className="text-sm text-gray-700">Paid</span>
+                </div>
+                <span className="font-medium text-sm">{paidCount}</span>
+              </div>
+              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
+                <div className="flex items-center">
+                  <FileText className="h-4 w-4 text-secondary-500 mr-1.5" />
+                  <span className="text-sm text-gray-700">Insured</span>
+                </div>
+                <span className="font-medium text-sm">{insuredCount}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Stats Card */}
+          <div className="bg-white rounded-lg shadow-sm p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-medium text-gray-900">Today's Revenue</h2>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-xs text-gray-500">Collected</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {formatCurrency(bills.filter(b => 
+                    new Date(b.created_at).toDateString() === new Date().toDateString() && 
+                    b.paid_amount > 0
+                  ).reduce((sum, bill) => sum + bill.paid_amount, 0))}
+                </p>
+              </div>
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-xs text-gray-500">Pending</p>
+                <p className="text-lg font-semibold text-gray-900">
+                  {formatCurrency(bills.filter(b => 
+                    new Date(b.created_at).toDateString() === new Date().toDateString() && 
+                    (b.payment_status === 'pending' || b.payment_status === 'partial')
+                  ).reduce((sum, bill) => sum + (bill.total_amount - bill.paid_amount), 0))}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Methods Card */}
+          <div className="bg-white rounded-lg shadow-sm p-3">
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-sm font-medium text-gray-900">Payment Methods</h2>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
+                <div className="flex items-center">
+                  <DollarSign className="h-4 w-4 text-success-500 mr-1.5" />
+                  <span className="text-sm text-gray-700">Cash</span>
+                </div>
+                <span className="text-xs text-gray-500">Available</span>
+              </div>
+              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
+                <div className="flex items-center">
+                  <CreditCard className="h-4 w-4 text-primary-500 mr-1.5" />
+                  <span className="text-sm text-gray-700">Credit Card</span>
+                </div>
+                <span className="text-xs text-gray-500">Available</span>
+              </div>
+              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
+                <div className="flex items-center">
+                  <Building2 className="h-4 w-4 text-secondary-500 mr-1.5" />
+                  <span className="text-sm text-gray-700">Insurance</span>
+                </div>
+                <span className="text-xs text-gray-500">Available</span>
+              </div>
+              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
+                <div className="flex items-center">
+                  <Smartphone className="h-4 w-4 text-accent-500 mr-1.5" />
+                  <span className="text-sm text-gray-700">Mobile Payment</span>
+                </div>
+                <span className="text-xs text-gray-500">Available</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>

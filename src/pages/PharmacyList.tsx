@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, Pill, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, ChevronDown } from 'lucide-react';
+import { Search, Filter, Pill, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, ChevronDown, Layers, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../lib/store';
@@ -8,6 +8,7 @@ interface PharmacyOrder {
   id: string;
   created_at: string;
   patient: {
+    id: string;
     first_name: string;
     last_name: string;
   };
@@ -19,6 +20,8 @@ interface PharmacyOrder {
   status: string;
   payment_status: string;
   is_emergency: boolean;
+  assigned_to?: string;
+  last_updated?: string;
 }
 
 const PharmacyList: React.FC = () => {
@@ -26,14 +29,15 @@ const PharmacyList: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [orders, setOrders] = useState<PharmacyOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { hospital } = useAuthStore();
+  const { hospital, user } = useAuthStore();
   const { addNotification } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'pending' | 'processing'>('pending');
   const [inventoryStatus, setInventoryStatus] = useState<{[key: string]: {inStock: boolean, quantity: number}}>({});
+  const [assignedToMe, setAssignedToMe] = useState(false);
 
   useEffect(() => {
     const fetchOrders = async () => {
-      if (!hospital?.id) return;
+      if (!hospital) return;
 
       try {
         // In a real app, we would fetch from Supabase
@@ -43,6 +47,7 @@ const PharmacyList: React.FC = () => {
             id: '00000000-0000-0000-0000-000000000001',
             created_at: '2025-05-15T09:15:00Z',
             patient: {
+              id: '00000000-0000-0000-0000-000000000001',
               first_name: 'John',
               last_name: 'Doe'
             },
@@ -60,12 +65,14 @@ const PharmacyList: React.FC = () => {
             ],
             status: 'pending',
             payment_status: 'pending',
-            is_emergency: false
+            is_emergency: false,
+            last_updated: '2025-05-15T09:15:00Z'
           },
           {
             id: '00000000-0000-0000-0000-000000000002',
             created_at: '2025-05-15T10:30:00Z',
             patient: {
+              id: '00000000-0000-0000-0000-000000000002',
               first_name: 'Jane',
               last_name: 'Smith'
             },
@@ -78,12 +85,15 @@ const PharmacyList: React.FC = () => {
             ],
             status: 'processing',
             payment_status: 'paid',
-            is_emergency: true
+            is_emergency: true,
+            assigned_to: user?.id,
+            last_updated: '2025-05-15T10:30:00Z'
           },
           {
             id: '00000000-0000-0000-0000-000000000003',
             created_at: '2025-05-15T11:45:00Z',
             patient: {
+              id: '00000000-0000-0000-0000-000000000003',
               first_name: 'Robert',
               last_name: 'Johnson'
             },
@@ -106,12 +116,14 @@ const PharmacyList: React.FC = () => {
             ],
             status: 'pending',
             payment_status: 'insured',
-            is_emergency: false
+            is_emergency: false,
+            last_updated: '2025-05-15T11:45:00Z'
           },
           {
             id: '00000000-0000-0000-0000-000000000004',
             created_at: '2025-05-15T12:15:00Z',
             patient: {
+              id: '00000000-0000-0000-0000-000000000004',
               first_name: 'Emily',
               last_name: 'Williams'
             },
@@ -124,12 +136,15 @@ const PharmacyList: React.FC = () => {
             ],
             status: 'processing',
             payment_status: 'pending',
-            is_emergency: false
+            is_emergency: false,
+            assigned_to: '00000000-0000-0000-0000-000000000010', // Another pharmacist
+            last_updated: '2025-05-15T12:15:00Z'
           },
           {
             id: '00000000-0000-0000-0000-000000000005',
             created_at: '2025-05-15T13:00:00Z',
             patient: {
+              id: '00000000-0000-0000-0000-000000000005',
               first_name: 'Michael',
               last_name: 'Brown'
             },
@@ -142,18 +157,45 @@ const PharmacyList: React.FC = () => {
             ],
             status: 'ready',
             payment_status: 'paid',
-            is_emergency: false
+            is_emergency: false,
+            assigned_to: user?.id,
+            last_updated: '2025-05-15T13:00:00Z'
+          },
+          {
+            id: '00000000-0000-0000-0000-000000000006',
+            created_at: '2025-05-15T13:30:00Z',
+            patient: {
+              id: '00000000-0000-0000-0000-000000000006',
+              first_name: 'Sarah',
+              last_name: 'Davis'
+            },
+            medications: [
+              {
+                medication: 'Omeprazole',
+                dosage: '20mg',
+                quantity: 28
+              },
+              {
+                medication: 'Ranitidine',
+                dosage: '150mg',
+                quantity: 30
+              }
+            ],
+            status: 'pending',
+            payment_status: 'pending',
+            is_emergency: true,
+            last_updated: '2025-05-15T13:30:00Z'
           }
         ];
         
         setOrders(mockOrders);
         
-        // Check for emergency orders and show notifications
-        const emergencyOrders = mockOrders.filter(order => order.is_emergency && order.status === 'pending');
-        if (emergencyOrders.length > 0) {
-          emergencyOrders.forEach(order => {
+        // Show notification for emergency cases
+        const emergencyCases = mockOrders.filter(order => order.is_emergency && (order.status === 'pending' || order.status === 'processing'));
+        if (emergencyCases.length > 0) {
+          emergencyCases.forEach(emergency => {
             addNotification({
-              message: `EMERGENCY: Prescription for ${order.patient.first_name} ${order.patient.last_name} needs immediate attention`,
+              message: `EMERGENCY: Prescription for ${emergency.patient.first_name} ${emergency.patient.last_name} needs immediate attention`,
               type: 'error',
               duration: 5000
             });
@@ -170,7 +212,8 @@ const PharmacyList: React.FC = () => {
           'Aspirin': { inStock: true, quantity: 100 },
           'Salbutamol': { inStock: false, quantity: 0 },
           'Prednisolone': { inStock: true, quantity: 45 },
-          'Omeprazole': { inStock: false, quantity: 0 }
+          'Omeprazole': { inStock: false, quantity: 0 },
+          'Ranitidine': { inStock: true, quantity: 25 }
         };
         
         setInventoryStatus(mockInventory);
@@ -205,17 +248,38 @@ const PharmacyList: React.FC = () => {
     };
 
     fetchOrders();
-  }, [hospital, addNotification]);
+  }, [hospital, addNotification, user?.id]);
   
-  const handleProcessOrder = (orderId: string, patientName: string) => {
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
+  
+  const handleProcessOrder = async (orderId: string, patientName: string) => {
     // Update order status in state
-    setOrders(prevOrders => 
-      prevOrders.map(order => 
-        order.id === orderId 
-          ? { ...order, status: 'processing' } 
-          : order
-      )
+    const updatedOrders = orders.map(order => 
+      order.id === orderId 
+        ? { 
+            ...order, 
+            status: 'processing',
+            assigned_to: user?.id,
+            last_updated: new Date().toISOString()
+          } 
+        : order
     );
+    
+    setOrders(updatedOrders);
     
     // Show notification
     addNotification({
@@ -223,16 +287,69 @@ const PharmacyList: React.FC = () => {
       type: 'success'
     });
   };
+  
+  const handleAssignToMe = (orderId: string) => {
+    // Update the order to assign it to the current user
+    const updatedOrders = orders.map(order => {
+      if (order.id === orderId) {
+        return {
+          ...order,
+          assigned_to: user?.id,
+          last_updated: new Date().toISOString()
+        };
+      }
+      return order;
+    });
+    
+    setOrders(updatedOrders);
+    
+    // Show notification
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      addNotification({
+        message: `Order for ${order.patient.first_name} ${order.patient.last_name} assigned to you`,
+        type: 'success',
+        duration: 3000
+      });
+    }
+  };
+
+  const handleReleaseAssignment = (orderId: string) => {
+    // Update the order to unassign it
+    const updatedOrders = orders.map(order => {
+      if (order.id === orderId) {
+        return {
+          ...order,
+          assigned_to: null,
+          last_updated: new Date().toISOString()
+        };
+      }
+      return order;
+    });
+    
+    setOrders(updatedOrders);
+    
+    // Show notification
+    const order = orders.find(o => o.id === orderId);
+    if (order) {
+      addNotification({
+        message: `Order for ${order.patient.first_name} ${order.patient.last_name} released from your queue`,
+        type: 'info',
+        duration: 3000
+      });
+    }
+  };
 
   const filteredOrders = orders.filter(order => {
     const patientName = `${order.patient.first_name} ${order.patient.last_name}`.toLowerCase();
     const matchesSearch = patientName.includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || order.payment_status === filterStatus;
+    const matchesAssigned = !assignedToMe || order.assigned_to === user?.id;
     
     if (activeTab === 'pending') {
-      return order.status === 'pending' && matchesSearch && matchesFilter;
+      return order.status === 'pending' && matchesSearch && matchesFilter && matchesAssigned;
     } else {
-      return order.status === 'processing' && matchesSearch && matchesFilter;
+      return order.status === 'processing' && matchesSearch && matchesFilter && matchesAssigned;
     }
   });
 
@@ -273,6 +390,7 @@ const PharmacyList: React.FC = () => {
   const processingCount = orders.filter(o => o.status === 'processing').length;
   const readyCount = orders.filter(o => o.status === 'ready').length;
   const urgentCount = orders.filter(o => o.is_emergency).length;
+  const assignedToMeCount = orders.filter(o => o.assigned_to === user?.id).length;
 
   if (isLoading) {
     return (
@@ -296,7 +414,7 @@ const PharmacyList: React.FC = () => {
 
       <div className="flex space-x-2">
         <div 
-          className={`flex-1 rounded-lg p-3 flex items-center space-x-2 cursor-pointer ${
+          className={`flex-1 rounded-lg p-2.5 flex items-center space-x-2 cursor-pointer ${
             activeTab === 'pending' 
               ? 'bg-white shadow-sm border border-gray-200' 
               : 'bg-gray-100 hover:bg-gray-200'
@@ -311,7 +429,7 @@ const PharmacyList: React.FC = () => {
         </div>
         
         <div 
-          className={`flex-1 rounded-lg p-3 flex items-center space-x-2 cursor-pointer ${
+          className={`flex-1 rounded-lg p-2.5 flex items-center space-x-2 cursor-pointer ${
             activeTab === 'processing' 
               ? 'bg-white shadow-sm border border-gray-200' 
               : 'bg-gray-100 hover:bg-gray-200'
@@ -335,7 +453,7 @@ const PharmacyList: React.FC = () => {
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="form-input pl-7 py-1.5 text-sm w-full"
+            className="form-input pl-7 py-1.5 text-sm w-full rounded-lg"
             placeholder="Search prescriptions..."
           />
         </div>
@@ -344,7 +462,7 @@ const PharmacyList: React.FC = () => {
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="form-input appearance-none pr-7 py-1.5 text-sm"
+            className="form-input appearance-none pr-7 py-1.5 text-sm rounded-lg"
           >
             <option value="all">All Payment</option>
             <option value="paid">Paid</option>
@@ -354,6 +472,19 @@ const PharmacyList: React.FC = () => {
           <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
             <ChevronDown className="h-3 w-3 text-gray-500" />
           </div>
+        </div>
+        
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="assignedToMe"
+            checked={assignedToMe}
+            onChange={(e) => setAssignedToMe(e.target.checked)}
+            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+          />
+          <label htmlFor="assignedToMe" className="ml-2 text-xs text-gray-700">
+            Assigned to me ({assignedToMeCount})
+          </label>
         </div>
       </div>
 
@@ -383,10 +514,10 @@ const PharmacyList: React.FC = () => {
                             <h3 className="text-base font-medium text-gray-900">
                               {order.patient.first_name} {order.patient.last_name}
                             </h3>
-                            <div className="flex items-center text-xs text-gray-500">
+                            <div className="flex items-center text-xs text-gray-500 mt-0.5">
                               <Clock className="h-3 w-3 mr-1" />
-                              <span>{new Date(order.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
-                              <span className="mx-1">•</span>
+                              <span>{getTimeAgo(order.last_updated || order.created_at)}</span>
+                              <span className="mx-1.5">•</span>
                               <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getPaymentStatusColor(order.payment_status)}`}>
                                 {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
                               </span>
@@ -394,48 +525,98 @@ const PharmacyList: React.FC = () => {
                           </div>
                           <div className="flex items-center space-x-2">
                             {order.is_emergency && (
-                              <span className="px-2 py-0.5 inline-flex text-xs leading-5 font-medium rounded-full bg-error-100 text-error-800">
-                                Emergency
+                              <span className="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-error-100 text-error-800">
+                                <AlertTriangle className="h-3 w-3 mr-1" />
+                                URGENT
                               </span>
                             )}
+                            
+                            {order.assigned_to && order.assigned_to !== user?.id && (
+                              <span className="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-gray-100 text-gray-800">
+                                Assigned
+                              </span>
+                            )}
+                            
                             {activeTab === 'pending' ? (
-                              <button 
-                                onClick={() => handleProcessOrder(order.id, `${order.patient.first_name} ${order.patient.last_name}`)}
-                                className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
-                                disabled={order.payment_status === 'pending'}
-                                title={order.payment_status === 'pending' ? 'Payment required before processing' : ''}
-                              >
-                                Process Order <Pill className="h-3 w-3 ml-1" />
-                              </button>
+                              <div className="flex space-x-1">
+                                {!order.assigned_to && (
+                                  <button 
+                                    onClick={() => handleAssignToMe(order.id)}
+                                    className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    title="Assign to me"
+                                  >
+                                    Assign to me
+                                  </button>
+                                )}
+                                
+                                {order.assigned_to === user?.id && (
+                                  <>
+                                    <button 
+                                      onClick={() => handleProcessOrder(order.id, `${order.patient.first_name} ${order.patient.last_name}`)}
+                                      disabled={order.payment_status === 'pending'}
+                                      className="btn btn-primary inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                      title={order.payment_status === 'pending' ? 'Payment required before processing' : ''}
+                                    >
+                                      Process Order <Pill className="h-3 w-3 ml-1" />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleReleaseAssignment(order.id)}
+                                      className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                      title="Release assignment"
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
                             ) : (
-                              <Link 
-                                to={`/pharmacy/${order.id}/dispense`}
-                                className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
-                              >
-                                Dispense <Pill className="h-3 w-3 ml-1" />
-                              </Link>
+                              <div className="flex space-x-1">
+                                {order.assigned_to === user?.id ? (
+                                  <>
+                                    <Link 
+                                      to={`/pharmacy/${order.id}/dispense`}
+                                      className="btn btn-primary inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    >
+                                      Dispense <Pill className="h-3 w-3 ml-1" />
+                                    </Link>
+                                    <button 
+                                      onClick={() => handleReleaseAssignment(order.id)}
+                                      className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                      title="Release assignment"
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button 
+                                    onClick={() => handleAssignToMe(order.id)}
+                                    className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    title="Take over this order"
+                                  >
+                                    Take over
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
-                        <div className="mt-0.5">
-                          <div className="flex flex-wrap gap-1">
-                            {order.medications.slice(0, 2).map((med, index) => (
-                              <span key={index} className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
-                                inventoryStatus[med.medication]?.inStock 
-                                  ? 'bg-gray-100 text-gray-800' 
-                                  : 'bg-error-100 text-error-800'
-                              }`}>
-                                <Pill className="h-2.5 w-2.5 mr-0.5" />
-                                {med.medication} ({med.quantity})
-                                {!inventoryStatus[med.medication]?.inStock && ' - Out of stock'}
-                              </span>
-                            ))}
-                            {order.medications.length > 2 && (
-                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                                +{order.medications.length - 2} more
-                              </span>
-                            )}
-                          </div>
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {order.medications.slice(0, 3).map((med, index) => (
+                            <span key={index} className={`inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium ${
+                              inventoryStatus[med.medication]?.inStock 
+                                ? 'bg-gray-100 text-gray-800' 
+                                : 'bg-error-100 text-error-800'
+                            }`}>
+                              <Pill className="h-2.5 w-2.5 mr-0.5" />
+                              {med.medication} ({med.quantity})
+                              {!inventoryStatus[med.medication]?.inStock && ' - Out of stock'}
+                            </span>
+                          ))}
+                          {order.medications.length > 3 && (
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                              +{order.medications.length - 3} more
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -448,10 +629,86 @@ const PharmacyList: React.FC = () => {
 
         {/* Right Section - Overview and Quick Actions */}
         <div className="w-1/3 space-y-3">
+          {/* My Work Queue */}
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div className="flex items-center">
+                <Layers className="h-4 w-4 text-primary-500 mr-1.5" />
+                <h2 className="text-sm font-medium text-gray-900">My Work Queue</h2>
+              </div>
+              <span className="text-xs text-gray-500">{orders.filter(o => o.assigned_to === user?.id).length} orders</span>
+            </div>
+            <div className="p-3">
+              {orders.filter(o => o.assigned_to === user?.id).length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">No orders currently assigned to you</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {orders
+                    .filter(o => o.assigned_to === user?.id)
+                    .sort((a, b) => {
+                      // Sort by emergency first, then by status
+                      if (a.is_emergency && !b.is_emergency) return -1;
+                      if (!a.is_emergency && b.is_emergency) return 1;
+                      
+                      // Then sort by status
+                      const statusOrder = {
+                        'pending': 0,
+                        'processing': 1,
+                        'ready': 2,
+                        'dispensed': 3
+                      };
+                      
+                      return (statusOrder[a.status as keyof typeof statusOrder] || 0) - (statusOrder[b.status as keyof typeof statusOrder] || 0);
+                    })
+                    .slice(0, 5)
+                    .map(order => (
+                      <div key={order.id} className={`p-2 rounded-lg border ${order.is_emergency ? 'border-error-200 bg-error-50' : 'border-gray-200'} flex items-center justify-between`}>
+                        <div className="flex items-center">
+                          <div className="mr-2">
+                            {order.status === 'pending' ? (
+                              <Clock className="h-3.5 w-3.5 text-warning-500" />
+                            ) : order.status === 'processing' ? (
+                              <Pill className="h-3.5 w-3.5 text-primary-500" />
+                            ) : (
+                              <CheckCircle className="h-3.5 w-3.5 text-success-500" />
+                            )}
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-gray-900 line-clamp-1">
+                              {order.patient.first_name} {order.patient.last_name}
+                            </p>
+                            <p className="text-xs text-gray-500 line-clamp-1">
+                              {order.medications.length} medication{order.medications.length !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <Link
+                          to={`/pharmacy/${order.id}/dispense`}
+                          className="text-xs text-primary-600 hover:text-primary-800 font-medium"
+                        >
+                          {order.status === 'pending' ? 'Process' : 'Continue'}
+                        </Link>
+                      </div>
+                    ))}
+                  
+                  {orders.filter(o => o.assigned_to === user?.id).length > 5 && (
+                    <div className="text-center pt-1">
+                      <button className="text-xs text-primary-600 hover:text-primary-800">
+                        View all ({orders.filter(o => o.assigned_to === user?.id).length})
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Overview Card */}
           <div className="bg-white rounded-lg shadow-sm p-3">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-base font-medium text-gray-900">Pharmacy Overview</h2>
+              <h2 className="text-sm font-medium text-gray-900">Pharmacy Overview</h2>
               <span className="text-xs text-gray-500">Today</span>
             </div>
             <div className="space-y-2">
@@ -489,7 +746,7 @@ const PharmacyList: React.FC = () => {
           {/* Inventory Status Card */}
           <div className="bg-white rounded-lg shadow-sm p-3">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-base font-medium text-gray-900">Inventory Status</h2>
+              <h2 className="text-sm font-medium text-gray-900">Inventory Status</h2>
               <button className="text-primary-600 text-xs font-medium">View All</button>
             </div>
             <div className="space-y-2">
@@ -512,7 +769,7 @@ const PharmacyList: React.FC = () => {
           {/* Quick Actions Card */}
           <div className="bg-white rounded-lg shadow-sm p-3">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-base font-medium text-gray-900">Quick Actions</h2>
+              <h2 className="text-sm font-medium text-gray-900">Quick Actions</h2>
             </div>
             <div className="grid grid-cols-2 gap-2">
               <Link to="/pharmacy/inventory" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200">
@@ -537,7 +794,7 @@ const PharmacyList: React.FC = () => {
           {/* Reference Card */}
           <div className="bg-white rounded-lg shadow-sm p-3">
             <div className="flex items-center justify-between mb-2">
-              <h2 className="text-base font-medium text-gray-900 flex items-center">
+              <h2 className="text-sm font-medium text-gray-900 flex items-center">
                 <Pill className="h-4 w-4 text-primary-500 mr-1.5" />
                 Medication Reference
               </h2>
