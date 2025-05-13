@@ -2,23 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { 
-  Flask, 
-  Save, 
-  ArrowLeft, 
-  User, 
-  Calendar, 
-  FileText, 
-  CheckCircle,
-  AlertTriangle,
-  Beaker,
-  ArrowRight,
-  Clock,
-  ChevronRight,
-  Microscope,
-  Loader2,
-  XCircle
-} from 'lucide-react';
+import { FlaskRound as Flask, Save, ArrowLeft, User, Calendar, FileText, CheckCircle, AlertTriangle, Beaker, ArrowRight, Clock, ChevronRight, Microscope, Loader2, XCircle } from 'lucide-react';
 
 interface LabTest {
   id: string;
