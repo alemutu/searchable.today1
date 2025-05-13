@@ -1154,169 +1154,168 @@ const ConsultationForm: React.FC = () => {
             )}
           </button>
         </div>
+
+        {/* Lab Tests Modal */}
+        {showLabTestsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] flex flex-col">
+              <div className="p-4 border-b border-gray-200">
+                <h2 className="text-lg font-medium text-gray-900">Select Lab Tests</h2>
+              </div>
+              <div className="p-4 overflow-y-auto flex-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {labTests.map(test => (
+                    <div 
+                      key={test.id} 
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        selectedLabTests.some(t => t.testName === test.name)
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-gray-200 hover:border-primary-300'
+                      }`}
+                      onClick={() => addLabTest(test)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <Flask className="h-4 w-4 text-primary-500 mr-2" />
+                          <span className="text-sm font-medium">{test.name}</span>
+                        </div>
+                        <span className="text-sm font-medium">${test.price.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="p-4 border-t border-gray-200 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowLabTestsModal(false)}
+                  className="btn btn-primary"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Radiology Tests Modal */}
+        {showRadiologyTestsModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] flex flex-col">
+              <div className="p-4 border-b border-gray-200">
+                <h2 className="text-lg font-medium text-gray-900">Select Radiology Tests</h2>
+              </div>
+              <div className="p-4 overflow-y-auto flex-1">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {radiologyTests.map(test => (
+                    <div 
+                      key={test.id} 
+                      className={`p-3 border rounded-lg cursor-pointer transition-colors ${
+                        selectedRadiologyTests.some(t => t.testName === test.name)
+                          ? 'border-primary-500 bg-primary-50'
+                          : 'border-gray-200 hover:border-primary-300'
+                      }`}
+                      onClick={() => addRadiologyTest(test)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center">
+                          <Microscope className="h-4 w-4 text-primary-500 mr-2" />
+                          <span className="text-sm font-medium">{test.name}</span>
+                        </div>
+                        <span className="text-sm font-medium">${test.price.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="p-4 border-t border-gray-200 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowRadiologyTestsModal(false)}
+                  className="btn btn-primary"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Referral Modal */}
+        {showReferralModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+            <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+              <div className="p-4 border-b border-gray-200">
+                <h2 className="text-lg font-medium text-gray-900">Refer Patient</h2>
+              </div>
+              <div className="p-4">
+                <div className="space-y-4">
+                  <div>
+                    <label className="form-label">Department</label>
+                    <select
+                      className="form-input"
+                      id="referralDepartment"
+                    >
+                      <option value="">Select department</option>
+                      {departments.map(dept => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="form-label">Reason for Referral</label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      id="referralReason"
+                      placeholder="Enter reason for referral"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="form-label">Additional Notes</label>
+                    <textarea
+                      className="form-input"
+                      id="referralNotes"
+                      rows={3}
+                      placeholder="Enter any additional notes"
+                    ></textarea>
+                  </div>
+                </div>
+              </div>
+              <div className="p-4 border-t border-gray-200 flex justify-end space-x-2">
+                <button
+                  type="button"
+                  onClick={() => setShowReferralModal(false)}
+                  className="btn btn-outline"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const departmentId = (document.getElementById('referralDepartment') as HTMLSelectElement).value;
+                    const reason = (document.getElementById('referralReason') as HTMLInputElement).value;
+                    const notes = (document.getElementById('referralNotes') as HTMLTextAreaElement).value;
+                    
+                    if (!departmentId || !reason) {
+                      alert('Please select a department and enter a reason for referral');
+                      return;
+                    }
+                    
+                    handleReferralSubmit(departmentId, reason, notes);
+                  }}
+                  className="btn btn-primary"
+                >
+                  Submit Referral
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </form>
-
-      {/* Lab Tests Modal */}
-      {showLabTestsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">Select Lab Tests</h2>
-            </div>
-            <div className="p-4 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {labTests.map(test => (
-                  <div 
-                    key={test.id} 
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedLabTests.some(t => t.testName === test.name)
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-gray-200 hover:border-primary-300'
-                    }`}
-                    onClick={() => addLabTest(test)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Flask className="h-4 w-4 text-primary-500 mr-2" />
-                        <span className="text-sm font-medium">{test.name}</span>
-                      </div>
-                      <span className="text-sm font-medium">${test.price.toFixed(2)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="p-4 border-t border-gray-200 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowLabTestsModal(false)}
-                className="btn btn-primary"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Radiology Tests Modal */}
-      {showRadiologyTestsModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-2xl w-full max-h-[80vh] flex flex-col">
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">Select Radiology Tests</h2>
-            </div>
-            <div className="p-4 overflow-y-auto flex-1">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {radiologyTests.map(test => (
-                  <div 
-                    key={test.id} 
-                    className={`p-3 border rounded-lg cursor-pointer transition-colors ${
-                      selectedRadiologyTests.some(t => t.testName === test.name)
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-gray-200 hover:border-primary-300'
-                    }`}
-                    onClick={() => addRadiologyTest(test)}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <Microscope className="h-4 w-4 text-primary-500 mr-2" />
-                        <span className="text-sm font-medium">{test.name}</span>
-                      </div>
-                      <span className="text-sm font-medium">${test.price.toFixed(2)}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="p-4 border-t border-gray-200 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setShowRadiologyTestsModal(false)}
-                className="btn btn-primary"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Referral Modal */}
-      {showReferralModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="text-lg font-medium text-gray-900">Refer Patient</h2>
-            </div>
-            <div className="p-4">
-              <div className="space-y-4">
-                <div>
-                  <label className="form-label">Department</label>
-                  <select
-                    className="form-input"
-                    id="referralDepartment"
-                  >
-                    <option value="">Select department</option>
-                    {departments.map(dept => (
-                      <option key={dept.id} value={dept.id}>{dept.name}</option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="form-label">Reason for Referral</label>
-                  <input
-                    type="text"
-                    className="form-input"
-                    id="referralReason"
-                    placeholder="Enter reason for referral"
-                  />
-                </div>
-                
-                <div>
-                  <label className="form-label">Additional Notes</label>
-                  <textarea
-                    className="form-input"
-                    id="referralNotes"
-                    rows={3}
-                    placeholder="Enter any additional notes"
-                  ></textarea>
-                </div>
-              </div>
-            </div>
-            <div className="p-4 border-t border-gray-200 flex justify-end space-x-2">
-              <button
-                type="button"
-                onClick={() => setShowReferralModal(false)}
-                className="btn btn-outline"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const departmentId = (document.getElementById('referralDepartment') as HTMLSelectElement).value;
-                  const reason = (document.getElementById('referralReason') as HTMLInputElement).value;
-                  const notes = (document.getElementById('referralNotes') as HTMLTextAreaElement).value;
-                  
-                  if (!departmentId || !reason) {
-                    alert('Please select a department and enter a reason for referral');
-                    return;
-                  }
-                  
-                  handleReferralSubmit(departmentId, reason, notes);
-                }}
-                className="btn btn-primary"
-              >
-                Submit Referral
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </form>
-  </div>
+    </div>
   );
 };
 
