@@ -3,8 +3,9 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { Stethoscope, Pill, FileText, ClipboardList, CheckSquare, Search, Plus, X, Activity, Heart, Thermometer, Settings as Lungs, Droplets, Clock, Calendar, AlertTriangle, AlertCircle, ChevronRight, ChevronDown, Save } from 'lucide-react';
+import { Stethoscope, Pill, FileText, ClipboardList, CheckSquare, Search, Plus, X, Activity, Heart, Thermometer, Settings as Lungs, Droplets, Clock, Calendar, AlertTriangle, AlertCircle, ChevronRight, ChevronDown, Save, User } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import type { User as SupabaseUser } from '@supabase/supabase-js';
 
 interface Patient {
   id: string;
@@ -1518,6 +1519,7 @@ const ConsultationForm: React.FC = () => {
                                   <label className="form-label required">Test Name</label>
                                   <input
                                     type="text"
+                
                                     value={test.testName}
                                     onChange={(e) => {
                                       const updatedTests = [...diagnosticTests];
