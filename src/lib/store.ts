@@ -377,6 +377,18 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifiedEmergencies: new Set<string>(),
   
   addNotification: (notification) => {
+    // For emergency notifications, check if we've already notified about this emergency
+    if (notification.type === 'error' || notification.type === 'warning') {
+      // Create a unique key from the message to identify duplicate notifications
+      const messageKey = notification.message.trim().toLowerCase();
+      
+      // Check if we've already shown this emergency notification
+      if (get().notifications.some(n => n.message.trim().toLowerCase() === messageKey)) {
+        // Skip adding duplicate emergency notification
+        return;
+      }
+    }
+    
     const id = Math.random().toString(36).substring(2, 9);
     set((state) => ({
       notifications: [
