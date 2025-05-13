@@ -197,19 +197,9 @@ const ConsultationForm: React.FC = () => {
         .from('patients')
         .select('*')
         .eq('id', patientId)
-        .maybeSingle();
+        .single();
 
       if (error) throw error;
-      
-      if (!data) {
-        addNotification({
-          message: 'Patient not found',
-          type: 'error'
-        });
-        navigate('/patients');
-        return;
-      }
-
       setPatient(data);
       
       // Pre-fill form with patient data if available
@@ -236,13 +226,8 @@ const ConsultationForm: React.FC = () => {
           familyHistory: data.medical_history.familyHistory || ''
         }));
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error loading patient:', error);
-      addNotification({
-        message: `Error loading patient: ${error.message}`,
-        type: 'error'
-      });
-      navigate('/patients');
     } finally {
       setIsLoading(false);
     }
@@ -1510,7 +1495,6 @@ const ConsultationForm: React.FC = () => {
                   )}
                 </div>
               </div>
-            
             </div>
           )}
           
