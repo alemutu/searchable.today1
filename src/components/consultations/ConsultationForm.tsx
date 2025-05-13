@@ -3,30 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { 
-  User, 
-  Calendar, 
-  FileText, 
-  Pill, 
-  Save, 
-  ArrowLeft, 
-  Plus, 
-  Trash2, 
-  CheckCircle, 
-  AlertTriangle, 
-  FileImage,
-  Stethoscope,
-  Heart,
-  Brain,
-  Lungs,
-  Droplets,
-  Activity,
-  Thermometer,
-  Clipboard,
-  ClipboardList,
-  Pencil,
-  X
-} from 'lucide-react';
+import { User, Calendar, FileText, Pill, Save, ArrowLeft, Plus, Trash2, CheckCircle, AlertTriangle, FileImage, Stethoscope, Heart, Brain, Settings as Lungs, Droplets, Activity, Thermometer, Clipboard, ClipboardList, Pencil, X } from 'lucide-react';
 
 interface Patient {
   id: string;
