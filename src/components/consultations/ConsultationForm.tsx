@@ -3,44 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { 
-  Save, 
-  ArrowLeft, 
-  User, 
-  Calendar, 
-  FileText, 
-  Pill, 
-  Stethoscope, 
-  CheckCircle, 
-  Plus, 
-  Trash2, 
-  ChevronDown, 
-  ChevronUp, 
-  Microscope, 
-  FileImage, 
-  Heart, 
-  Lungs, 
-  Activity, 
-  Brain, 
-  Bone, 
-  Thermometer, 
-  Droplets, 
-  Clipboard, 
-  ClipboardCheck, 
-  Briefcase, 
-  Home, 
-  DollarSign, 
-  Users, 
-  Utensils, 
-  Wine, 
-  Cigarette, 
-  Dumbbell, 
-  Bed, 
-  Eye, 
-  Ear, 
-  Skull, 
-  Stethoscope as StethoscopeIcon
-} from 'lucide-react';
+import { Save, ArrowLeft, User, Calendar, FileText, Pill, Stethoscope, CheckCircle, Plus, Trash2, ChevronDown, ChevronUp, Microscope, FileImage, Heart, Settings as Lungs, Activity, Brain, Bone, Thermometer, Droplets, Clipboard, ClipboardCheck, Briefcase, Home, DollarSign, Users, Utensils, Wine, Cigarette, Dumbbell, Bed, Eye, Ear, Skull, Stethoscope as StethoscopeIcon } from 'lucide-react';
 
 interface ConsultationFormData {
   chiefComplaint: string;
