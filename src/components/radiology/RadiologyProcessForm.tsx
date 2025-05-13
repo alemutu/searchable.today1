@@ -18,7 +18,8 @@ import {
   ArrowRight,
   Clock,
   ChevronRight,
-  Scan
+  Scan,
+  XCircle
 } from 'lucide-react';
 
 interface RadiologyTest {
@@ -42,6 +43,7 @@ interface RadiologyTest {
     equipment_used: string;
     notes?: string;
   };
+  assigned_to?: string;
 }
 
 const RadiologyProcessForm: React.FC = () => {
@@ -73,6 +75,9 @@ const RadiologyProcessForm: React.FC = () => {
     equipment_used: 'x_ray_machine',
     notes: ''
   });
+  
+  // Confirmation state
+  const [confirmRelease, setConfirmRelease] = useState(false);
 
   useEffect(() => {
     if (scanId) {
@@ -120,13 +125,30 @@ const RadiologyProcessForm: React.FC = () => {
           },
           scan_type: 'x_ray',
           scan_date: new Date().toISOString(),
-          status: 'pending',
+          status: 'in_progress',
           results: null,
           is_emergency: Math.random() > 0.7,
-          workflow_stage: 'pending'
+          workflow_stage: 'in_progress',
+          assigned_to: user?.id
         };
         
         setScan(mockScan);
+        
+        // Check if scan has scan info
+        if (mockScan.scan_info) {
+          setScanInfo(mockScan.scan_info);
+          setWorkflowStage(mockScan.workflow_stage === 'in_progress' ? 'processing' : 
+                         mockScan.workflow_stage === 'completed' ? 'completed' : 'scan_setup');
+        }
+        
+        // Load existing results if available
+        if (mockScan.results) {
+          setFindings(mockScan.results.findings || '');
+          setImpression(mockScan.results.impression || '');
+          setRecommendations(mockScan.results.recommendations || '');
+          setImageUrls(mockScan.results.image_urls || []);
+        }
+        
         setIsLoading(false);
         return;
       }
@@ -313,12 +335,26 @@ const RadiologyProcessForm: React.FC = () => {
         
         await new Promise(resolve => setTimeout(resolve, 1000));
         
+        // Update local state
+        setScan({
+          ...scan,
+          results: {
+            findings,
+            impression,
+            recommendations,
+            image_urls: allImageUrls
+          },
+          workflow_stage: 'completed',
+          status: 'completed'
+        });
+        
+        setWorkflowStage('completed');
+        
         addNotification({
           message: 'Radiology scan results saved successfully',
           type: 'success'
         });
         
-        navigate('/radiology');
         return;
       }
       
@@ -349,12 +385,26 @@ const RadiologyProcessForm: React.FC = () => {
         })
         .eq('id', scan.patient.id);
       
+      // Update local state
+      setScan({
+        ...scan,
+        results: {
+          findings,
+          impression,
+          recommendations,
+          image_urls: allImageUrls
+        },
+        workflow_stage: 'completed',
+        status: 'completed'
+      });
+      
+      setWorkflowStage('completed');
+      
       addNotification({
         message: 'Radiology scan results saved successfully',
         type: 'success'
       });
       
-      navigate('/radiology');
     } catch (error: any) {
       console.error('Error saving radiology scan results:', error);
       addNotification({
@@ -397,7 +447,7 @@ const RadiologyProcessForm: React.FC = () => {
   if (isLoading) {
     return (
       <div className="flex justify-center p-8">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-secondary-500"></div>
       </div>
     );
   }
@@ -411,7 +461,7 @@ const RadiologyProcessForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5">
+    <div className="max-w-5xl mx-auto space-y-4">
       {/* Header with workflow progress */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-secondary-600 to-secondary-500 px-5 py-3.5 flex justify-between items-center">
@@ -799,11 +849,11 @@ const RadiologyProcessForm: React.FC = () => {
               onClick={() => navigate('/radiology')}
               className="btn btn-outline py-2 text-sm px-4"
             >
-              Cancel
+              Save for Later
             </button>
             <button
-              onClick={handleSave}
-              disabled={isSaving}
+              onClick={() => setConfirmRelease(true)}
+              disabled={isSaving || !findings || !impression}
               className="btn btn-primary py-2 text-sm px-4"
             >
               {isSaving ? (
@@ -818,6 +868,37 @@ const RadiologyProcessForm: React.FC = () => {
               )}
             </button>
           </div>
+          
+          {/* Confirmation Modal */}
+          {confirmRelease && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-3">
+                  Confirm Results Submission
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Are you sure you want to complete and submit these scan results? This action cannot be undone.
+                </p>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => setConfirmRelease(false)}
+                    className="btn btn-outline py-2 text-sm px-4"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setConfirmRelease(false);
+                      handleSave();
+                    }}
+                    className="btn btn-primary py-2 text-sm px-4"
+                  >
+                    Confirm & Submit
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 

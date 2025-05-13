@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
 import { 
-  FlaskRound as Flask, 
+  Flask, 
   Save, 
   ArrowLeft, 
   User, 
@@ -11,14 +11,13 @@ import {
   FileText, 
   CheckCircle,
   AlertTriangle,
-  Upload,
-  Trash2,
-  Plus,
-  FileBarChart2,
+  Beaker,
   ArrowRight,
   Clock,
   ChevronRight,
-  Beaker
+  Microscope,
+  Loader2,
+  XCircle
 } from 'lucide-react';
 
 interface LabTest {
@@ -38,17 +37,10 @@ interface LabTest {
   sample_info?: {
     sample_id: string;
     sample_type: string;
-    container_type: string;
     collection_time: string;
+    container_type?: string;
   };
-}
-
-interface TestResult {
-  parameter: string;
-  value: string;
-  unit: string;
-  reference_range: string;
-  is_abnormal: boolean;
+  assigned_to?: string;
 }
 
 const LabTestProcessForm: React.FC = () => {
@@ -59,24 +51,32 @@ const LabTestProcessForm: React.FC = () => {
   const [test, setTest] = useState<LabTest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [results, setResults] = useState<TestResult[]>([]);
-  const [notes, setNotes] = useState('');
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
-  const [fileUrls, setFileUrls] = useState<string[]>([]);
   
   // Sample collection state
   const [workflowStage, setWorkflowStage] = useState<'sample_collection' | 'testing' | 'review' | 'completed'>('sample_collection');
   const [sampleInfo, setSampleInfo] = useState<{
     sample_id: string;
     sample_type: string;
-    container_type: string;
     collection_time: string;
+    container_type: string;
   }>({
     sample_id: '',
     sample_type: 'blood',
-    container_type: 'tube',
-    collection_time: new Date().toISOString()
+    collection_time: new Date().toISOString(),
+    container_type: 'red_top_tube'
   });
+  
+  // Test results state
+  const [testResults, setTestResults] = useState<any>({});
+  const [testNotes, setTestNotes] = useState('');
+  const [isAbnormal, setIsAbnormal] = useState(false);
+  
+  // Review state
+  const [reviewNotes, setReviewNotes] = useState('');
+  const [isApproved, setIsApproved] = useState(true);
+  
+  // Confirmation state
+  const [confirmRelease, setConfirmRelease] = useState(false);
 
   useEffect(() => {
     if (testId) {
@@ -120,49 +120,45 @@ const LabTestProcessForm: React.FC = () => {
           },
           test_type: 'complete_blood_count',
           test_date: new Date().toISOString(),
-          status: 'pending',
+          status: 'in_progress',
           results: null,
           is_emergency: Math.random() > 0.7,
-          workflow_stage: 'pending'
+          workflow_stage: 'sample_collected',
+          assigned_to: user?.id
         };
         
         setTest(mockTest);
         
-        // Initialize with default parameters based on test type
-        if (mockTest.test_type === 'complete_blood_count') {
-          setResults([
-            { parameter: 'Hemoglobin', value: '', unit: 'g/dL', reference_range: '13.5-17.5', is_abnormal: false },
-            { parameter: 'White Blood Cells', value: '', unit: '10^9/L', reference_range: '4.5-11.0', is_abnormal: false },
-            { parameter: 'Platelets', value: '', unit: '10^9/L', reference_range: '150-450', is_abnormal: false },
-            { parameter: 'Red Blood Cells', value: '', unit: '10^12/L', reference_range: '4.5-5.9', is_abnormal: false },
-            { parameter: 'Hematocrit', value: '', unit: '%', reference_range: '41-50', is_abnormal: false }
-          ]);
-        } else if (mockTest.test_type === 'liver_function') {
-          setResults([
-            { parameter: 'ALT', value: '', unit: 'U/L', reference_range: '7-56', is_abnormal: false },
-            { parameter: 'AST', value: '', unit: 'U/L', reference_range: '5-40', is_abnormal: false },
-            { parameter: 'ALP', value: '', unit: 'U/L', reference_range: '44-147', is_abnormal: false },
-            { parameter: 'Total Bilirubin', value: '', unit: 'mg/dL', reference_range: '0.1-1.2', is_abnormal: false }
-          ]);
-        } else if (mockTest.test_type === 'kidney_function') {
-          setResults([
-            { parameter: 'Creatinine', value: '', unit: 'mg/dL', reference_range: '0.6-1.2', is_abnormal: false },
-            { parameter: 'BUN', value: '', unit: 'mg/dL', reference_range: '7-20', is_abnormal: false },
-            { parameter: 'eGFR', value: '', unit: 'mL/min/1.73m²', reference_range: '>60', is_abnormal: false }
-          ]);
-        } else if (mockTest.test_type === 'lipid_profile') {
-          setResults([
-            { parameter: 'Total Cholesterol', value: '', unit: 'mg/dL', reference_range: '<200', is_abnormal: false },
-            { parameter: 'LDL', value: '', unit: 'mg/dL', reference_range: '<100', is_abnormal: false },
-            { parameter: 'HDL', value: '', unit: 'mg/dL', reference_range: '>40', is_abnormal: false },
-            { parameter: 'Triglycerides', value: '', unit: 'mg/dL', reference_range: '<150', is_abnormal: false }
-          ]);
-        } else {
-          // Generic parameters
-          setResults([
-            { parameter: 'Parameter 1', value: '', unit: '', reference_range: '', is_abnormal: false },
-            { parameter: 'Parameter 2', value: '', unit: '', reference_range: '', is_abnormal: false }
-          ]);
+        // Set initial workflow stage based on test status
+        if (mockTest.workflow_stage === 'sample_collected') {
+          setWorkflowStage('sample_collection');
+        } else if (mockTest.workflow_stage === 'testing') {
+          setWorkflowStage('testing');
+          
+          // If we're in testing stage, we should have sample info
+          if (mockTest.sample_info) {
+            setSampleInfo(mockTest.sample_info as any);
+          }
+        } else if (mockTest.workflow_stage === 'review') {
+          setWorkflowStage('review');
+          
+          // If we're in review stage, we should have sample info and results
+          if (mockTest.sample_info) {
+            setSampleInfo(mockTest.sample_info as any);
+          }
+          
+          if (mockTest.results) {
+            setTestResults(mockTest.results);
+          } else {
+            // Mock results for review
+            setTestResults({
+              wbc: 7.5,
+              rbc: 4.8,
+              hemoglobin: 14.2,
+              hematocrit: 42,
+              platelets: 250
+            });
+          }
         }
         
         setIsLoading(false);
@@ -182,58 +178,32 @@ const LabTestProcessForm: React.FC = () => {
       
       setTest(data);
       
-      // Check if test has sample info
-      if (data.sample_info) {
-        setSampleInfo(data.sample_info);
-        setWorkflowStage(data.workflow_stage === 'sample_collected' ? 'testing' : 
-                         data.workflow_stage === 'testing' ? 'testing' : 
-                         data.workflow_stage === 'review' ? 'review' : 
-                         data.workflow_stage === 'completed' ? 'completed' : 'sample_collection');
-      }
-      
-      // Initialize results if test is new
-      if (data.status === 'pending' && !data.results) {
-        // Set default parameters based on test type
-        if (data.test_type === 'complete_blood_count') {
-          setResults([
-            { parameter: 'Hemoglobin', value: '', unit: 'g/dL', reference_range: '13.5-17.5', is_abnormal: false },
-            { parameter: 'White Blood Cells', value: '', unit: '10^9/L', reference_range: '4.5-11.0', is_abnormal: false },
-            { parameter: 'Platelets', value: '', unit: '10^9/L', reference_range: '150-450', is_abnormal: false },
-            { parameter: 'Red Blood Cells', value: '', unit: '10^12/L', reference_range: '4.5-5.9', is_abnormal: false },
-            { parameter: 'Hematocrit', value: '', unit: '%', reference_range: '41-50', is_abnormal: false }
-          ]);
-        } else if (data.test_type === 'liver_function') {
-          setResults([
-            { parameter: 'ALT', value: '', unit: 'U/L', reference_range: '7-56', is_abnormal: false },
-            { parameter: 'AST', value: '', unit: 'U/L', reference_range: '5-40', is_abnormal: false },
-            { parameter: 'ALP', value: '', unit: 'U/L', reference_range: '44-147', is_abnormal: false },
-            { parameter: 'Total Bilirubin', value: '', unit: 'mg/dL', reference_range: '0.1-1.2', is_abnormal: false }
-          ]);
-        } else if (data.test_type === 'kidney_function') {
-          setResults([
-            { parameter: 'Creatinine', value: '', unit: 'mg/dL', reference_range: '0.6-1.2', is_abnormal: false },
-            { parameter: 'BUN', value: '', unit: 'mg/dL', reference_range: '7-20', is_abnormal: false },
-            { parameter: 'eGFR', value: '', unit: 'mL/min/1.73m²', reference_range: '>60', is_abnormal: false }
-          ]);
-        } else if (data.test_type === 'lipid_profile') {
-          setResults([
-            { parameter: 'Total Cholesterol', value: '', unit: 'mg/dL', reference_range: '<200', is_abnormal: false },
-            { parameter: 'LDL', value: '', unit: 'mg/dL', reference_range: '<100', is_abnormal: false },
-            { parameter: 'HDL', value: '', unit: 'mg/dL', reference_range: '>40', is_abnormal: false },
-            { parameter: 'Triglycerides', value: '', unit: 'mg/dL', reference_range: '<150', is_abnormal: false }
-          ]);
-        } else {
-          // Generic parameters
-          setResults([
-            { parameter: 'Parameter 1', value: '', unit: '', reference_range: '', is_abnormal: false },
-            { parameter: 'Parameter 2', value: '', unit: '', reference_range: '', is_abnormal: false }
-          ]);
+      // Set initial workflow stage based on test status
+      if (data.workflow_stage === 'sample_collected') {
+        setWorkflowStage('sample_collection');
+        
+        // If we have sample info, use it
+        if (data.sample_info) {
+          setSampleInfo(data.sample_info);
         }
-      } else if (data.results) {
-        // Load existing results
-        setResults(data.results.parameters || []);
-        setNotes(data.results.notes || '');
-        setFileUrls(data.results.file_urls || []);
+      } else if (data.workflow_stage === 'testing') {
+        setWorkflowStage('testing');
+        
+        // If we have sample info, use it
+        if (data.sample_info) {
+          setSampleInfo(data.sample_info);
+        }
+      } else if (data.workflow_stage === 'review') {
+        setWorkflowStage('review');
+        
+        // If we have sample info and results, use them
+        if (data.sample_info) {
+          setSampleInfo(data.sample_info);
+        }
+        
+        if (data.results) {
+          setTestResults(data.results);
+        }
       }
     } catch (error) {
       console.error('Error fetching lab test:', error);
@@ -246,87 +216,6 @@ const LabTestProcessForm: React.FC = () => {
     }
   };
 
-  const handleValueChange = (index: number, value: string) => {
-    const updatedResults = [...results];
-    updatedResults[index].value = value;
-    
-    // Check if value is outside reference range
-    const refRange = updatedResults[index].reference_range;
-    if (refRange && value) {
-      const numValue = parseFloat(value);
-      
-      if (refRange.startsWith('<')) {
-        // Upper limit only
-        const limit = parseFloat(refRange.substring(1));
-        updatedResults[index].is_abnormal = numValue >= limit;
-      } else if (refRange.startsWith('>')) {
-        // Lower limit only
-        const limit = parseFloat(refRange.substring(1));
-        updatedResults[index].is_abnormal = numValue <= limit;
-      } else if (refRange.includes('-')) {
-        // Range with lower and upper limits
-        const [lower, upper] = refRange.split('-').map(parseFloat);
-        updatedResults[index].is_abnormal = numValue < lower || numValue > upper;
-      }
-    }
-    
-    setResults(updatedResults);
-  };
-
-  const handleAddParameter = () => {
-    setResults([...results, { parameter: '', value: '', unit: '', reference_range: '', is_abnormal: false }]);
-  };
-
-  const handleRemoveParameter = (index: number) => {
-    const updatedResults = [...results];
-    updatedResults.splice(index, 1);
-    setResults(updatedResults);
-  };
-
-  const handleParameterChange = (index: number, field: keyof TestResult, value: string | boolean) => {
-    const updatedResults = [...results];
-    updatedResults[index] = { ...updatedResults[index], [field]: value };
-    setResults(updatedResults);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      const newFiles = Array.from(e.target.files);
-      setUploadedFiles([...uploadedFiles, ...newFiles]);
-    }
-  };
-
-  const handleRemoveFile = (index: number) => {
-    const updatedFiles = [...uploadedFiles];
-    updatedFiles.splice(index, 1);
-    setUploadedFiles(updatedFiles);
-  };
-
-  const handleRemoveFileUrl = (index: number) => {
-    const updatedUrls = [...fileUrls];
-    updatedUrls.splice(index, 1);
-    setFileUrls(updatedUrls);
-  };
-
-  const uploadFiles = async (): Promise<string[]> => {
-    if (uploadedFiles.length === 0) return [];
-    
-    const urls: string[] = [];
-    
-    // In a real app, this would upload to Supabase storage
-    // For now, we'll just simulate it
-    for (const file of uploadedFiles) {
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Create a fake URL
-      const fakeUrl = `https://storage.example.com/lab-results/${Date.now()}-${file.name}`;
-      urls.push(fakeUrl);
-    }
-    
-    return urls;
-  };
-
   const handleSampleCollection = async () => {
     if (!test || !user) return;
     
@@ -336,7 +225,7 @@ const LabTestProcessForm: React.FC = () => {
       // Validate sample info
       if (!sampleInfo.sample_id || !sampleInfo.sample_type || !sampleInfo.container_type) {
         addNotification({
-          message: 'Please complete all sample information',
+          message: 'Please complete all required sample information',
           type: 'warning'
         });
         return;
@@ -352,7 +241,8 @@ const LabTestProcessForm: React.FC = () => {
         setTest({
           ...test,
           sample_info: sampleInfo,
-          workflow_stage: 'sample_collected'
+          workflow_stage: 'testing',
+          status: 'in_progress'
         });
         
         setWorkflowStage('testing');
@@ -370,7 +260,7 @@ const LabTestProcessForm: React.FC = () => {
         .from('lab_results')
         .update({
           sample_info: sampleInfo,
-          workflow_stage: 'sample_collected',
+          workflow_stage: 'testing',
           status: 'in_progress'
         })
         .eq('id', test.id);
@@ -381,7 +271,7 @@ const LabTestProcessForm: React.FC = () => {
       setTest({
         ...test,
         sample_info: sampleInfo,
-        workflow_stage: 'sample_collected',
+        workflow_stage: 'testing',
         status: 'in_progress'
       });
       
@@ -409,11 +299,10 @@ const LabTestProcessForm: React.FC = () => {
     try {
       setIsSaving(true);
       
-      // Validate results
-      const incompleteResults = results.some(r => !r.parameter || !r.value);
-      if (incompleteResults) {
+      // Validate test results
+      if (Object.keys(testResults).length === 0) {
         addNotification({
-          message: 'Please complete all test parameters and values',
+          message: 'Please enter test results',
           type: 'warning'
         });
         return;
@@ -421,44 +310,39 @@ const LabTestProcessForm: React.FC = () => {
       
       if (import.meta.env.DEV) {
         // Simulate successful submission in development
-        console.log('Test results submitted:', {
-          parameters: results,
-          notes,
-          file_urls: fileUrls
-        });
+        console.log('Test results submitted:', testResults);
         
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Update local state
         setTest({
           ...test,
-          workflow_stage: 'review'
+          results: testResults,
+          workflow_stage: 'review',
+          status: 'in_progress'
         });
         
         setWorkflowStage('review');
         
         addNotification({
-          message: 'Test results submitted for review',
+          message: 'Test results saved successfully',
           type: 'success'
         });
         
         return;
       }
       
-      // Upload files if any
-      const newFileUrls = await uploadFiles();
-      const allFileUrls = [...fileUrls, ...newFileUrls];
-      
       // Update lab test in database
       const { error } = await supabase
         .from('lab_results')
         .update({
-          workflow_stage: 'review',
           results: {
-            parameters: results,
-            notes,
-            file_urls: allFileUrls
-          }
+            ...testResults,
+            notes: testNotes,
+            is_abnormal: isAbnormal
+          },
+          workflow_stage: 'review',
+          status: 'in_progress'
         })
         .eq('id', test.id);
 
@@ -467,13 +351,19 @@ const LabTestProcessForm: React.FC = () => {
       // Update local state
       setTest({
         ...test,
-        workflow_stage: 'review'
+        results: {
+          ...testResults,
+          notes: testNotes,
+          is_abnormal: isAbnormal
+        },
+        workflow_stage: 'review',
+        status: 'in_progress'
       });
       
       setWorkflowStage('review');
       
       addNotification({
-        message: 'Test results submitted for review',
+        message: 'Test results saved successfully',
         type: 'success'
       });
       
@@ -496,16 +386,33 @@ const LabTestProcessForm: React.FC = () => {
       
       if (import.meta.env.DEV) {
         // Simulate successful submission in development
-        console.log('Test results reviewed and approved');
+        console.log('Review completed:', { isApproved, reviewNotes });
         
         await new Promise(resolve => setTimeout(resolve, 1000));
         
+        // Update local state
+        setTest({
+          ...test,
+          results: {
+            ...test.results,
+            review_notes: reviewNotes,
+            approved: isApproved
+          },
+          workflow_stage: 'completed',
+          status: 'completed',
+          reviewed_by: {
+            first_name: 'Current',
+            last_name: 'User'
+          }
+        });
+        
+        setWorkflowStage('completed');
+        
         addNotification({
-          message: 'Lab test results finalized successfully',
+          message: 'Test review completed successfully',
           type: 'success'
         });
         
-        navigate('/laboratory');
         return;
       }
       
@@ -513,8 +420,13 @@ const LabTestProcessForm: React.FC = () => {
       const { error } = await supabase
         .from('lab_results')
         .update({
-          status: 'completed',
+          results: {
+            ...test.results,
+            review_notes: reviewNotes,
+            approved: isApproved
+          },
           workflow_stage: 'completed',
+          status: 'completed',
           reviewed_by: user.id,
           reviewed_at: new Date().toISOString()
         })
@@ -530,16 +442,33 @@ const LabTestProcessForm: React.FC = () => {
         })
         .eq('id', test.patient.id);
       
+      // Update local state
+      setTest({
+        ...test,
+        results: {
+          ...test.results,
+          review_notes: reviewNotes,
+          approved: isApproved
+        },
+        workflow_stage: 'completed',
+        status: 'completed',
+        reviewed_by: {
+          first_name: user.email?.split('@')[0] || 'User',
+          last_name: ''
+        }
+      });
+      
+      setWorkflowStage('completed');
+      
       addNotification({
-        message: 'Lab test results finalized successfully',
+        message: 'Test review completed successfully',
         type: 'success'
       });
       
-      navigate('/laboratory');
     } catch (error: any) {
-      console.error('Error finalizing lab test results:', error);
+      console.error('Error completing review:', error);
       addNotification({
-        message: `Error finalizing results: ${error.message}`,
+        message: `Error completing review: ${error.message}`,
         type: 'error'
       });
     } finally {
@@ -563,6 +492,174 @@ const LabTestProcessForm: React.FC = () => {
     return types[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
+  const getSampleTypeOptions = () => {
+    const options = [
+      { value: 'blood', label: 'Blood' },
+      { value: 'urine', label: 'Urine' },
+      { value: 'stool', label: 'Stool' },
+      { value: 'csf', label: 'Cerebrospinal Fluid' },
+      { value: 'sputum', label: 'Sputum' },
+      { value: 'swab', label: 'Swab' },
+      { value: 'tissue', label: 'Tissue' },
+      { value: 'fluid', label: 'Body Fluid' }
+    ];
+    
+    // Filter options based on test type
+    if (test?.test_type === 'urinalysis') {
+      return options.filter(o => o.value === 'urine');
+    } else if (test?.test_type === 'stool_analysis') {
+      return options.filter(o => o.value === 'stool');
+    } else if (test?.test_type.includes('blood') || 
+               test?.test_type === 'complete_blood_count' || 
+               test?.test_type === 'liver_function' || 
+               test?.test_type === 'kidney_function' ||
+               test?.test_type === 'lipid_profile' ||
+               test?.test_type === 'hba1c' ||
+               test?.test_type === 'coagulation_profile' ||
+               test?.test_type === 'electrolytes') {
+      return options.filter(o => o.value === 'blood');
+    }
+    
+    return options;
+  };
+
+  const getContainerTypeOptions = (sampleType: string) => {
+    if (sampleType === 'blood') {
+      return [
+        { value: 'red_top_tube', label: 'Red Top Tube (No Additives)' },
+        { value: 'green_top_tube', label: 'Green Top Tube (Heparin)' },
+        { value: 'purple_top_tube', label: 'Purple Top Tube (EDTA)' },
+        { value: 'blue_top_tube', label: 'Blue Top Tube (Citrate)' },
+        { value: 'gray_top_tube', label: 'Gray Top Tube (Fluoride)' },
+        { value: 'yellow_top_tube', label: 'Yellow Top Tube (ACD)' }
+      ];
+    } else if (sampleType === 'urine') {
+      return [
+        { value: 'urine_container', label: 'Sterile Urine Container' },
+        { value: '24hr_urine_container', label: '24-Hour Urine Container' }
+      ];
+    } else if (sampleType === 'stool') {
+      return [
+        { value: 'stool_container', label: 'Stool Collection Container' }
+      ];
+    } else if (sampleType === 'swab') {
+      return [
+        { value: 'swab_tube', label: 'Swab Transport Tube' }
+      ];
+    } else if (sampleType === 'tissue') {
+      return [
+        { value: 'formalin_container', label: 'Formalin Container' },
+        { value: 'slide', label: 'Microscope Slide' }
+      ];
+    }
+    
+    return [
+      { value: 'generic_container', label: 'Generic Container' }
+    ];
+  };
+
+  const getTestResultFields = () => {
+    if (!test) return [];
+    
+    switch (test.test_type) {
+      case 'complete_blood_count':
+        return [
+          { name: 'wbc', label: 'White Blood Cells (WBC)', unit: 'x10^9/L', reference: '4.5-11.0' },
+          { name: 'rbc', label: 'Red Blood Cells (RBC)', unit: 'x10^12/L', reference: '4.5-5.9' },
+          { name: 'hemoglobin', label: 'Hemoglobin (Hb)', unit: 'g/dL', reference: '13.5-17.5' },
+          { name: 'hematocrit', label: 'Hematocrit (Hct)', unit: '%', reference: '41-50' },
+          { name: 'platelets', label: 'Platelets', unit: 'x10^9/L', reference: '150-450' },
+          { name: 'mcv', label: 'Mean Corpuscular Volume (MCV)', unit: 'fL', reference: '80-96' },
+          { name: 'mch', label: 'Mean Corpuscular Hemoglobin (MCH)', unit: 'pg', reference: '27-33' },
+          { name: 'mchc', label: 'Mean Corpuscular Hemoglobin Concentration (MCHC)', unit: 'g/dL', reference: '33-36' }
+        ];
+      case 'liver_function':
+        return [
+          { name: 'alt', label: 'Alanine Aminotransferase (ALT)', unit: 'U/L', reference: '7-56' },
+          { name: 'ast', label: 'Aspartate Aminotransferase (AST)', unit: 'U/L', reference: '5-40' },
+          { name: 'alp', label: 'Alkaline Phosphatase (ALP)', unit: 'U/L', reference: '44-147' },
+          { name: 'ggt', label: 'Gamma-Glutamyl Transferase (GGT)', unit: 'U/L', reference: '8-61' },
+          { name: 'bilirubin_total', label: 'Total Bilirubin', unit: 'mg/dL', reference: '0.1-1.2' },
+          { name: 'bilirubin_direct', label: 'Direct Bilirubin', unit: 'mg/dL', reference: '0.0-0.3' },
+          { name: 'albumin', label: 'Albumin', unit: 'g/dL', reference: '3.5-5.0' },
+          { name: 'total_protein', label: 'Total Protein', unit: 'g/dL', reference: '6.0-8.3' }
+        ];
+      case 'kidney_function':
+        return [
+          { name: 'creatinine', label: 'Creatinine', unit: 'mg/dL', reference: '0.7-1.3' },
+          { name: 'bun', label: 'Blood Urea Nitrogen (BUN)', unit: 'mg/dL', reference: '7-20' },
+          { name: 'egfr', label: 'Estimated GFR', unit: 'mL/min/1.73m²', reference: '>60' },
+          { name: 'sodium', label: 'Sodium', unit: 'mmol/L', reference: '135-145' },
+          { name: 'potassium', label: 'Potassium', unit: 'mmol/L', reference: '3.5-5.0' },
+          { name: 'chloride', label: 'Chloride', unit: 'mmol/L', reference: '98-107' },
+          { name: 'bicarbonate', label: 'Bicarbonate', unit: 'mmol/L', reference: '22-29' }
+        ];
+      case 'lipid_profile':
+        return [
+          { name: 'cholesterol', label: 'Total Cholesterol', unit: 'mg/dL', reference: '<200' },
+          { name: 'triglycerides', label: 'Triglycerides', unit: 'mg/dL', reference: '<150' },
+          { name: 'hdl', label: 'HDL Cholesterol', unit: 'mg/dL', reference: '>40' },
+          { name: 'ldl', label: 'LDL Cholesterol', unit: 'mg/dL', reference: '<100' },
+          { name: 'cholesterol_hdl_ratio', label: 'Total Cholesterol/HDL Ratio', unit: '', reference: '<5.0' }
+        ];
+      case 'blood_glucose':
+        return [
+          { name: 'glucose', label: 'Glucose', unit: 'mg/dL', reference: '70-99' }
+        ];
+      case 'urinalysis':
+        return [
+          { name: 'color', label: 'Color', unit: '', reference: 'Pale Yellow to Amber' },
+          { name: 'appearance', label: 'Appearance', unit: '', reference: 'Clear' },
+          { name: 'specific_gravity', label: 'Specific Gravity', unit: '', reference: '1.005-1.030' },
+          { name: 'ph', label: 'pH', unit: '', reference: '4.5-8.0' },
+          { name: 'protein', label: 'Protein', unit: '', reference: 'Negative' },
+          { name: 'glucose', label: 'Glucose', unit: '', reference: 'Negative' },
+          { name: 'ketones', label: 'Ketones', unit: '', reference: 'Negative' },
+          { name: 'blood', label: 'Blood', unit: '', reference: 'Negative' },
+          { name: 'nitrites', label: 'Nitrites', unit: '', reference: 'Negative' },
+          { name: 'leukocytes', label: 'Leukocytes', unit: '', reference: 'Negative' }
+        ];
+      default:
+        return [
+          { name: 'result', label: 'Result', unit: '', reference: '' }
+        ];
+    }
+  };
+
+  const isValueAbnormal = (name: string, value: any) => {
+    if (!value || value === '') return false;
+    
+    const field = getTestResultFields().find(f => f.name === name);
+    if (!field || !field.reference) return false;
+    
+    // Check if the reference is a range (e.g., "4.5-11.0")
+    if (field.reference.includes('-')) {
+      const [min, max] = field.reference.split('-').map(parseFloat);
+      const numValue = parseFloat(value);
+      return numValue < min || numValue > max;
+    }
+    
+    // Check if the reference is a comparison (e.g., "<200", ">40")
+    if (field.reference.startsWith('<')) {
+      const threshold = parseFloat(field.reference.substring(1));
+      const numValue = parseFloat(value);
+      return numValue >= threshold;
+    }
+    
+    if (field.reference.startsWith('>')) {
+      const threshold = parseFloat(field.reference.substring(1));
+      const numValue = parseFloat(value);
+      return numValue <= threshold;
+    }
+    
+    // For non-numeric values (e.g., "Negative")
+    if (field.reference === 'Negative') {
+      return value !== 'Negative' && value !== 'negative';
+    }
+    
+    return false;
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center p-8">
@@ -580,7 +677,7 @@ const LabTestProcessForm: React.FC = () => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-5">
+    <div className="max-w-5xl mx-auto space-y-4">
       {/* Header with workflow progress */}
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
         <div className="bg-gradient-to-r from-primary-600 to-primary-500 px-5 py-3.5 flex justify-between items-center">
@@ -592,7 +689,7 @@ const LabTestProcessForm: React.FC = () => {
               <ArrowLeft className="h-4 w-4" />
             </button>
             <div>
-              <h1 className="text-lg font-bold text-white">Process Lab Test</h1>
+              <h1 className="text-lg font-bold text-white">Process Laboratory Test</h1>
               <p className="text-primary-100 text-xs">
                 {getTestTypeLabel(test.test_type)} • {test.is_emergency && "EMERGENCY • "}
                 {test.patient.first_name} {test.patient.last_name}
@@ -622,7 +719,7 @@ const LabTestProcessForm: React.FC = () => {
             
             <div className={`flex items-center ${workflowStage === 'review' ? 'opacity-100' : 'opacity-70'}`}>
               <div className={`w-7 h-7 rounded-full flex items-center justify-center ${workflowStage === 'review' ? 'bg-white text-primary-600' : workflowStage === 'completed' ? 'bg-primary-400 text-white' : 'bg-primary-300/50 text-white'}`}>
-                <FileBarChart2 className="h-3.5 w-3.5" />
+                <FileText className="h-3.5 w-3.5" />
               </div>
               <span className="ml-1.5 text-xs font-medium">Review</span>
             </div>
@@ -702,7 +799,7 @@ const LabTestProcessForm: React.FC = () => {
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <div className="px-5 py-3.5 bg-gray-50 border-b border-gray-200">
             <h2 className="text-base font-medium text-gray-900">Sample Collection</h2>
-            <p className="text-xs text-gray-500 mt-0.5">Collect and label the patient sample</p>
+            <p className="text-xs text-gray-500 mt-0.5">Record sample details and collection information</p>
           </div>
           
           <div className="p-5">
@@ -732,19 +829,12 @@ const LabTestProcessForm: React.FC = () => {
                     onChange={(e) => setSampleInfo({...sampleInfo, sample_type: e.target.value})}
                     className="form-input py-2 text-sm rounded-lg"
                   >
-                    <option value="blood">Blood</option>
-                    <option value="urine">Urine</option>
-                    <option value="stool">Stool</option>
-                    <option value="csf">Cerebrospinal Fluid</option>
-                    <option value="sputum">Sputum</option>
-                    <option value="swab">Swab</option>
-                    <option value="tissue">Tissue</option>
-                    <option value="other">Other</option>
+                    {getSampleTypeOptions().map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
                   </select>
                 </div>
-              </div>
-              
-              <div className="space-y-3.5">
+                
                 <div>
                   <label className="form-label required text-sm">Container Type</label>
                   <select
@@ -752,17 +842,14 @@ const LabTestProcessForm: React.FC = () => {
                     onChange={(e) => setSampleInfo({...sampleInfo, container_type: e.target.value})}
                     className="form-input py-2 text-sm rounded-lg"
                   >
-                    <option value="tube">Blood Tube</option>
-                    <option value="edta">EDTA Tube</option>
-                    <option value="serum">Serum Separator Tube</option>
-                    <option value="urine_container">Urine Container</option>
-                    <option value="stool_container">Stool Container</option>
-                    <option value="swab_tube">Swab Tube</option>
-                    <option value="slide">Microscope Slide</option>
-                    <option value="other">Other</option>
+                    {getContainerTypeOptions(sampleInfo.sample_type).map(option => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
                   </select>
                 </div>
-                
+              </div>
+              
+              <div className="space-y-3.5">
                 <div>
                   <label className="form-label required text-sm">Collection Time</label>
                   <div className="relative">
@@ -776,6 +863,17 @@ const LabTestProcessForm: React.FC = () => {
                       className="form-input pl-9 py-2 text-sm rounded-lg"
                     />
                   </div>
+                </div>
+                
+                <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
+                  <h3 className="text-sm font-medium text-blue-800 mb-1.5">Collection Instructions</h3>
+                  <ul className="space-y-1 text-xs text-blue-700 list-disc pl-4">
+                    <li>Verify patient identity before collection</li>
+                    <li>Use appropriate PPE during collection</li>
+                    <li>Label sample immediately after collection</li>
+                    <li>Store sample according to test requirements</li>
+                    <li>Transport to laboratory promptly</li>
+                  </ul>
                 </div>
               </div>
             </div>
@@ -799,7 +897,7 @@ const LabTestProcessForm: React.FC = () => {
                   </>
                 ) : (
                   <>
-                    Collect Sample <ArrowRight className="h-4 w-4 ml-1.5" />
+                    Start Testing <ArrowRight className="h-4 w-4 ml-1.5" />
                   </>
                 )}
               </button>
@@ -830,11 +928,11 @@ const LabTestProcessForm: React.FC = () => {
               </div>
               <div className="bg-white p-2.5 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Sample Type</p>
-                <p className="text-sm font-medium text-gray-900 mt-0.5">{sampleInfo.sample_type}</p>
+                <p className="text-sm font-medium text-gray-900 mt-0.5">{getSampleTypeOptions().find(o => o.value === sampleInfo.sample_type)?.label || sampleInfo.sample_type}</p>
               </div>
               <div className="bg-white p-2.5 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Container</p>
-                <p className="text-sm font-medium text-gray-900 mt-0.5">{sampleInfo.container_type}</p>
+                <p className="text-sm font-medium text-gray-900 mt-0.5">{getContainerTypeOptions(sampleInfo.sample_type).find(o => o.value === sampleInfo.container_type)?.label || sampleInfo.container_type}</p>
               </div>
               <div className="bg-white p-2.5 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Collection Time</p>
@@ -845,196 +943,72 @@ const LabTestProcessForm: React.FC = () => {
 
           {/* Test Results */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="px-5 py-3.5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-              <div>
-                <h2 className="text-base font-medium text-gray-900">Test Results</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Enter the laboratory test results</p>
-              </div>
-              <button
-                type="button"
-                onClick={handleAddParameter}
-                className="btn btn-outline btn-sm py-1 px-2.5 text-xs flex items-center"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1" />
-                Add Parameter
-              </button>
+            <div className="px-5 py-3.5 bg-gray-50 border-b border-gray-200">
+              <h2 className="text-base font-medium text-gray-900">Test Results</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Enter the laboratory test results</p>
             </div>
             
-            <div className="p-5">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Parameter
-                      </th>
-                      <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Value
-                      </th>
-                      <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Unit
-                      </th>
-                      <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Reference Range
-                      </th>
-                      <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                      <th scope="col" className="relative px-4 py-2.5">
-                        <span className="sr-only">Actions</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {results.map((result, index) => (
-                      <tr key={index}>
-                        <td className="px-4 py-2.5 whitespace-nowrap">
-                          <input
-                            type="text"
-                            value={result.parameter}
-                            onChange={(e) => handleParameterChange(index, 'parameter', e.target.value)}
-                            className="form-input py-1.5 text-sm w-full"
-                            placeholder="Parameter name"
-                          />
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap">
-                          <input
-                            type="text"
-                            value={result.value}
-                            onChange={(e) => handleValueChange(index, e.target.value)}
-                            className="form-input py-1.5 text-sm w-full"
-                            placeholder="Result value"
-                          />
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap">
-                          <input
-                            type="text"
-                            value={result.unit}
-                            onChange={(e) => handleParameterChange(index, 'unit', e.target.value)}
-                            className="form-input py-1.5 text-sm w-full"
-                            placeholder="Unit"
-                          />
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap">
-                          <input
-                            type="text"
-                            value={result.reference_range}
-                            onChange={(e) => handleParameterChange(index, 'reference_range', e.target.value)}
-                            className="form-input py-1.5 text-sm w-full"
-                            placeholder="Reference range"
-                          />
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap">
-                          <select
-                            value={result.is_abnormal ? 'abnormal' : 'normal'}
-                            onChange={(e) => handleParameterChange(index, 'is_abnormal', e.target.value === 'abnormal')}
-                            className={`form-input py-1.5 text-xs w-full ${
-                              result.is_abnormal ? 'text-error-600 border-error-300' : 'text-success-600 border-success-300'
-                            }`}
-                          >
-                            <option value="normal">Normal</option>
-                            <option value="abnormal">Abnormal</option>
-                          </select>
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-right">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveParameter(index)}
-                            className="text-error-600 hover:text-error-900"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          {/* Notes and Files */}
-          <div className="bg-white rounded-xl shadow-sm p-5 space-y-3.5">
-            <div>
-              <label className="form-label text-sm">Notes</label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                className="form-input py-2 text-sm rounded-lg"
-                rows={2}
-                placeholder="Add any additional notes or observations"
-              />
-            </div>
-
-            <div>
-              <label className="form-label text-sm">Attach Files</label>
-              <div className="mt-1 flex justify-center px-5 pt-4 pb-5 border-2 border-gray-300 border-dashed rounded-lg">
-                <div className="space-y-1 text-center">
-                  <Upload className="mx-auto h-10 w-10 text-gray-400" />
-                  <div className="flex text-xs text-gray-600">
-                    <label
-                      htmlFor="file-upload"
-                      className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary-500"
-                    >
-                      <span>Upload files</span>
+            <div className="p-5 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                {getTestResultFields().map((field) => (
+                  <div key={field.name}>
+                    <label className="form-label text-sm">{field.label}</label>
+                    <div className="flex">
                       <input
-                        id="file-upload"
-                        name="file-upload"
-                        type="file"
-                        className="sr-only"
-                        multiple
-                        onChange={handleFileChange}
+                        type="text"
+                        value={testResults[field.name] || ''}
+                        onChange={(e) => {
+                          setTestResults({
+                            ...testResults,
+                            [field.name]: e.target.value
+                          });
+                        }}
+                        className={`form-input py-2 text-sm rounded-lg flex-1 ${
+                          testResults[field.name] && isValueAbnormal(field.name, testResults[field.name])
+                            ? 'border-error-300 text-error-900'
+                            : ''
+                        }`}
+                        placeholder="Enter value"
                       />
-                    </label>
-                    <p className="pl-1">or drag and drop</p>
+                      {field.unit && (
+                        <div className="ml-2 flex items-center bg-gray-100 px-3 rounded-lg">
+                          <span className="text-sm text-gray-500">{field.unit}</span>
+                        </div>
+                      )}
+                    </div>
+                    {field.reference && (
+                      <p className="mt-0.5 text-xs text-gray-500">
+                        Reference: {field.reference}
+                      </p>
+                    )}
                   </div>
-                  <p className="text-xs text-gray-500">
-                    PNG, JPG, PDF up to 10MB
-                  </p>
-                </div>
+                ))}
+              </div>
+
+              <div>
+                <label className="form-label text-sm">Notes</label>
+                <textarea
+                  value={testNotes}
+                  onChange={(e) => setTestNotes(e.target.value)}
+                  className="form-input py-2 text-sm rounded-lg"
+                  rows={3}
+                  placeholder="Add any notes or observations about the test results"
+                />
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isAbnormal"
+                  checked={isAbnormal}
+                  onChange={(e) => setIsAbnormal(e.target.checked)}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <label htmlFor="isAbnormal" className="ml-2 block text-sm text-gray-900">
+                  Flag results as abnormal
+                </label>
               </div>
             </div>
-
-            {/* Display uploaded files */}
-            {(uploadedFiles.length > 0 || fileUrls.length > 0) && (
-              <div className="mt-3.5">
-                <h3 className="text-xs font-medium text-gray-700">Files</h3>
-                <div className="mt-1.5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
-                  {fileUrls.map((url, index) => (
-                    <div key={`url-${index}`} className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
-                      <div className="flex items-center">
-                        <FileText className="h-4 w-4 text-gray-400 mr-1.5" />
-                        <span className="text-xs text-gray-900 truncate max-w-[120px]">
-                          {url.split('/').pop()}
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFileUrl(index)}
-                        className="text-error-600 hover:text-error-900"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                  {uploadedFiles.map((file, index) => (
-                    <div key={`file-${index}`} className="flex items-center justify-between bg-gray-50 p-2 rounded-lg">
-                      <div className="flex items-center">
-                        <FileText className="h-4 w-4 text-gray-400 mr-1.5" />
-                        <span className="text-xs text-gray-900 truncate max-w-[120px]">{file.name}</span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveFile(index)}
-                        className="text-error-600 hover:text-error-900"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Action Buttons */}
@@ -1043,7 +1017,7 @@ const LabTestProcessForm: React.FC = () => {
               onClick={() => navigate('/laboratory')}
               className="btn btn-outline py-2 text-sm px-4"
             >
-              Cancel
+              Save for Later
             </button>
             <button
               onClick={handleTestingComplete}
@@ -1057,7 +1031,7 @@ const LabTestProcessForm: React.FC = () => {
                 </>
               ) : (
                 <>
-                  Submit for Review <ArrowRight className="h-4 w-4 ml-1.5" />
+                  Complete & Submit for Review <FileText className="h-4 w-4 ml-1.5" />
                 </>
               )}
             </button>
@@ -1071,12 +1045,12 @@ const LabTestProcessForm: React.FC = () => {
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-5 py-3.5 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
               <div>
-                <h2 className="text-base font-medium text-gray-900">Sample Information</h2>
-                <p className="text-xs text-gray-500 mt-0.5">Sample details for reference during review</p>
+                <h2 className="text-base font-medium text-gray-900">Test Information</h2>
+                <p className="text-xs text-gray-500 mt-0.5">Review test results and sample information</p>
               </div>
               <div className="flex items-center space-x-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-success-500"></div>
-                <span className="text-xs font-medium text-success-700">Sample Collected</span>
+                <div className="w-2.5 h-2.5 rounded-full bg-secondary-500"></div>
+                <span className="text-xs font-medium text-secondary-700">Ready for Review</span>
               </div>
             </div>
             
@@ -1086,12 +1060,12 @@ const LabTestProcessForm: React.FC = () => {
                 <p className="text-sm font-medium text-gray-900 mt-0.5">{sampleInfo.sample_id}</p>
               </div>
               <div className="bg-white p-2.5 rounded-lg shadow-sm">
-                <p className="text-xs text-gray-500">Sample Type</p>
-                <p className="text-sm font-medium text-gray-900 mt-0.5">{sampleInfo.sample_type}</p>
+                <p className="text-xs text-gray-500">Test Type</p>
+                <p className="text-sm font-medium text-gray-900 mt-0.5">{getTestTypeLabel(test.test_type)}</p>
               </div>
               <div className="bg-white p-2.5 rounded-lg shadow-sm">
-                <p className="text-xs text-gray-500">Container</p>
-                <p className="text-sm font-medium text-gray-900 mt-0.5">{sampleInfo.container_type}</p>
+                <p className="text-xs text-gray-500">Sample Type</p>
+                <p className="text-sm font-medium text-gray-900 mt-0.5">{getSampleTypeOptions().find(o => o.value === sampleInfo.sample_type)?.label || sampleInfo.sample_type}</p>
               </div>
               <div className="bg-white p-2.5 rounded-lg shadow-sm">
                 <p className="text-xs text-gray-500">Collection Time</p>
@@ -1104,79 +1078,68 @@ const LabTestProcessForm: React.FC = () => {
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-5 py-3.5 bg-gray-50 border-b border-gray-200">
               <h2 className="text-base font-medium text-gray-900">Test Results Review</h2>
-              <p className="text-xs text-gray-500 mt-0.5">Review and verify the test results before finalizing</p>
+              <p className="text-xs text-gray-500 mt-0.5">Review and verify the test results</p>
             </div>
             
-            <div className="p-5">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Parameter
-                      </th>
-                      <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Value
-                      </th>
-                      <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Unit
-                      </th>
-                      <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Reference Range
-                      </th>
-                      <th scope="col" className="px-4 py-2.5 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {results.map((result, index) => (
-                      <tr key={index} className={result.is_abnormal ? 'bg-error-50/50' : ''}>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-sm font-medium text-gray-900">
-                          {result.parameter}
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-900">
-                          {result.value}
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-500">
-                          {result.unit}
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap text-sm text-gray-500">
-                          {result.reference_range}
-                        </td>
-                        <td className="px-4 py-2.5 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            result.is_abnormal ? 'bg-error-100 text-error-800' : 'bg-success-100 text-success-800'
-                          }`}>
-                            {result.is_abnormal ? 'Abnormal' : 'Normal'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+            <div className="p-5 space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                {getTestResultFields().map((field) => (
+                  <div key={field.name} className="flex justify-between items-center p-3 rounded-lg border border-gray-200">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{field.label}</p>
+                      <p className="text-xs text-gray-500">{field.reference && `Reference: ${field.reference}`}</p>
+                    </div>
+                    <div className="flex items-center">
+                      <p className={`text-sm font-medium ${
+                        testResults[field.name] && isValueAbnormal(field.name, testResults[field.name])
+                          ? 'text-error-600'
+                          : 'text-gray-900'
+                      }`}>
+                        {testResults[field.name] || 'N/A'} {field.unit}
+                      </p>
+                      {testResults[field.name] && isValueAbnormal(field.name, testResults[field.name]) && (
+                        <AlertTriangle className="h-4 w-4 text-error-500 ml-1.5" />
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
-              
-              {notes && (
-                <div className="mt-4 bg-gray-50 p-3.5 rounded-lg">
-                  <h3 className="text-sm font-medium text-gray-900 mb-1.5">Notes</h3>
-                  <p className="text-sm text-gray-700">{notes}</p>
+
+              {testNotes && (
+                <div className="p-3 rounded-lg border border-gray-200">
+                  <p className="text-sm font-medium text-gray-900">Technician Notes</p>
+                  <p className="text-sm text-gray-700 mt-1">{testNotes}</p>
                 </div>
               )}
+
+              <div>
+                <label className="form-label text-sm">Review Notes</label>
+                <textarea
+                  value={reviewNotes}
+                  onChange={(e) => setReviewNotes(e.target.value)}
+                  className="form-input py-2 text-sm rounded-lg"
+                  rows={3}
+                  placeholder="Add any notes or comments about the test results"
+                />
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="isApproved"
+                  checked={isApproved}
+                  onChange={(e) => setIsApproved(e.target.checked)}
+                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                />
+                <label htmlFor="isApproved" className="ml-2 block text-sm text-gray-900">
+                  Approve results for release
+                </label>
+              </div>
               
-              {fileUrls.length > 0 && (
-                <div className="mt-4">
-                  <h3 className="text-sm font-medium text-gray-900 mb-1.5">Attached Files</h3>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                    {fileUrls.map((url, index) => (
-                      <div key={index} className="bg-gray-50 p-2.5 rounded-lg">
-                        <div className="flex items-center">
-                          <FileText className="h-4 w-4 text-gray-400 mr-1.5" />
-                          <span className="text-xs text-gray-900 truncate">{url.split('/').pop()}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+              {!isApproved && (
+                <div className="p-3 rounded-lg bg-error-50 border border-error-200">
+                  <p className="text-sm font-medium text-error-800">Results not approved</p>
+                  <p className="text-sm text-error-700 mt-1">Please provide detailed notes explaining why the results are not approved and what actions should be taken.</p>
                 </div>
               )}
             </div>
@@ -1185,13 +1148,13 @@ const LabTestProcessForm: React.FC = () => {
           {/* Action Buttons */}
           <div className="flex justify-end space-x-3.5">
             <button
-              onClick={() => setWorkflowStage('testing')}
+              onClick={() => navigate('/laboratory')}
               className="btn btn-outline py-2 text-sm px-4"
             >
-              Back to Testing
+              Save for Later
             </button>
             <button
-              onClick={handleReviewComplete}
+              onClick={() => setConfirmRelease(true)}
               disabled={isSaving}
               className="btn btn-primary py-2 text-sm px-4"
             >
@@ -1202,11 +1165,44 @@ const LabTestProcessForm: React.FC = () => {
                 </>
               ) : (
                 <>
-                  Approve & Finalize <CheckCircle className="h-4 w-4 ml-1.5" />
+                  {isApproved ? 'Approve & Release Results' : 'Reject & Return for Testing'} <CheckCircle className="h-4 w-4 ml-1.5" />
                 </>
               )}
             </button>
           </div>
+          
+          {/* Confirmation Modal */}
+          {confirmRelease && (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+              <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6">
+                <h3 className="text-lg font-medium text-gray-900 mb-3">
+                  {isApproved ? 'Confirm Results Release' : 'Confirm Results Rejection'}
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  {isApproved 
+                    ? 'Are you sure you want to approve and release these test results? This action cannot be undone.'
+                    : 'Are you sure you want to reject these results and return them for retesting? This action cannot be undone.'}
+                </p>
+                <div className="flex justify-end space-x-3">
+                  <button
+                    onClick={() => setConfirmRelease(false)}
+                    className="btn btn-outline py-2 text-sm px-4"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setConfirmRelease(false);
+                      handleReviewComplete();
+                    }}
+                    className={`btn py-2 text-sm px-4 ${isApproved ? 'btn-primary' : 'btn-error'}`}
+                  >
+                    {isApproved ? 'Approve & Release' : 'Reject & Return'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 

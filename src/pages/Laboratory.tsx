@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../lib/store';
-import { Search, Filter, FlaskRound as Flask, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, FileImage, ChevronDown, Beaker, ArrowRight } from 'lucide-react';
+import { Search, Filter, FlaskRound as Flask, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, FileImage, ChevronDown, Beaker, ArrowRight, Loader2, MoreHorizontal, Layers } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
 interface LabResult {
@@ -25,7 +25,10 @@ interface LabResult {
     sample_id: string;
     sample_type: string;
     collection_time: string;
+    container_type?: string;
   };
+  assigned_to?: string;
+  last_updated?: string;
 }
 
 const Laboratory: React.FC = () => {
@@ -33,10 +36,11 @@ const Laboratory: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [labResults, setLabResults] = useState<LabResult[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { hospital } = useAuthStore();
+  const { hospital, user } = useAuthStore();
   const { addNotification } = useNotificationStore();
-  const [activeTab, setActiveTab] = useState<'pending' | 'in_progress'>('pending');
+  const [activeTab, setActiveTab] = useState<'pending' | 'in_progress' | 'review'>('pending');
   const navigate = useNavigate();
+  const [assignedToMe, setAssignedToMe] = useState(false);
 
   useEffect(() => {
     fetchLabResults();
@@ -60,7 +64,8 @@ const Laboratory: React.FC = () => {
           results: null,
           reviewed_by: null,
           is_emergency: false,
-          workflow_stage: 'pending'
+          workflow_stage: 'pending',
+          last_updated: '2025-05-15T09:15:00Z'
         },
         {
           id: '00000000-0000-0000-0000-000000000002',
@@ -79,8 +84,11 @@ const Laboratory: React.FC = () => {
           sample_info: {
             sample_id: 'LAB-20250515-1234',
             sample_type: 'blood',
-            collection_time: '2025-05-15T10:30:00Z'
-          }
+            collection_time: '2025-05-15T10:30:00Z',
+            container_type: 'red_top_tube'
+          },
+          assigned_to: user?.id,
+          last_updated: '2025-05-15T10:35:00Z'
         },
         {
           id: '00000000-0000-0000-0000-000000000003',
@@ -99,8 +107,11 @@ const Laboratory: React.FC = () => {
           sample_info: {
             sample_id: 'LAB-20250514-5678',
             sample_type: 'blood',
-            collection_time: '2025-05-14T14:45:00Z'
-          }
+            collection_time: '2025-05-14T14:45:00Z',
+            container_type: 'green_top_tube'
+          },
+          assigned_to: '00000000-0000-0000-0000-000000000010', // Another technician
+          last_updated: '2025-05-14T15:00:00Z'
         },
         {
           id: '00000000-0000-0000-0000-000000000004',
@@ -112,15 +123,23 @@ const Laboratory: React.FC = () => {
           test_type: 'lipid_profile',
           test_date: '2025-05-14',
           status: 'in_progress',
-          results: null,
+          results: {
+            cholesterol: 180,
+            triglycerides: 150,
+            hdl: 45,
+            ldl: 110
+          },
           reviewed_by: null,
           is_emergency: false,
           workflow_stage: 'review',
           sample_info: {
             sample_id: 'LAB-20250514-9012',
             sample_type: 'blood',
-            collection_time: '2025-05-14T16:15:00Z'
-          }
+            collection_time: '2025-05-14T16:15:00Z',
+            container_type: 'purple_top_tube'
+          },
+          assigned_to: user?.id,
+          last_updated: '2025-05-14T17:30:00Z'
         },
         {
           id: '00000000-0000-0000-0000-000000000005',
@@ -132,7 +151,12 @@ const Laboratory: React.FC = () => {
           test_type: 'blood_glucose',
           test_date: '2025-05-15',
           status: 'completed',
-          results: { findings: 'Normal study' },
+          results: { 
+            glucose: 95,
+            units: 'mg/dL',
+            reference_range: '70-99',
+            interpretation: 'Normal'
+          },
           reviewed_by: {
             first_name: 'Doctor',
             last_name: 'Smith'
@@ -142,8 +166,27 @@ const Laboratory: React.FC = () => {
           sample_info: {
             sample_id: 'LAB-20250515-3456',
             sample_type: 'blood',
-            collection_time: '2025-05-15T09:00:00Z'
-          }
+            collection_time: '2025-05-15T09:00:00Z',
+            container_type: 'gray_top_tube'
+          },
+          assigned_to: user?.id,
+          last_updated: '2025-05-15T10:15:00Z'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000006',
+          patient: {
+            id: '00000000-0000-0000-0000-000000000006',
+            first_name: 'Sarah',
+            last_name: 'Davis'
+          },
+          test_type: 'urinalysis',
+          test_date: '2025-05-15',
+          status: 'pending',
+          results: null,
+          reviewed_by: null,
+          is_emergency: true,
+          workflow_stage: 'pending',
+          last_updated: '2025-05-15T11:00:00Z'
         }
       ];
       
@@ -203,6 +246,23 @@ const Laboratory: React.FC = () => {
     }
   };
 
+  const getWorkflowStageIcon = (stage?: string) => {
+    switch (stage) {
+      case 'pending':
+        return <Clock className="h-3.5 w-3.5 text-warning-500" />;
+      case 'sample_collected':
+        return <Flask className="h-3.5 w-3.5 text-primary-500" />;
+      case 'testing':
+        return <Beaker className="h-3.5 w-3.5 text-primary-500" />;
+      case 'review':
+        return <FileText className="h-3.5 w-3.5 text-secondary-500" />;
+      case 'completed':
+        return <CheckCircle className="h-3.5 w-3.5 text-success-500" />;
+      default:
+        return <Clock className="h-3.5 w-3.5 text-gray-400" />;
+    }
+  };
+
   const getTestTypeLabel = (type: string) => {
     const types: Record<string, string> = {
       'complete_blood_count': 'Complete Blood Count (CBC)',
@@ -219,33 +279,99 @@ const Laboratory: React.FC = () => {
     return types[type] || type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
   };
 
+  const getSampleTypeLabel = (type?: string) => {
+    if (!type) return '';
+    
+    const types: Record<string, string> = {
+      'blood': 'Blood',
+      'urine': 'Urine',
+      'stool': 'Stool',
+      'csf': 'Cerebrospinal Fluid',
+      'sputum': 'Sputum',
+      'swab': 'Swab',
+      'tissue': 'Tissue',
+      'fluid': 'Body Fluid'
+    };
+    return types[type] || type;
+  };
+
+  const getContainerTypeLabel = (type?: string) => {
+    if (!type) return '';
+    
+    const types: Record<string, string> = {
+      'red_top_tube': 'Red Top Tube',
+      'green_top_tube': 'Green Top Tube (Heparin)',
+      'purple_top_tube': 'Purple Top Tube (EDTA)',
+      'blue_top_tube': 'Blue Top Tube (Citrate)',
+      'gray_top_tube': 'Gray Top Tube (Fluoride)',
+      'yellow_top_tube': 'Yellow Top Tube (ACD)',
+      'urine_container': 'Urine Container',
+      'stool_container': 'Stool Container',
+      'swab_tube': 'Swab Tube',
+      'slide': 'Microscope Slide'
+    };
+    return types[type] || type;
+  };
+
+  const getTimeAgo = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
+
   const filteredResults = labResults.filter(result => {
     const patientName = `${result.patient.first_name} ${result.patient.last_name}`.toLowerCase();
     const matchesSearch = patientName.includes(searchTerm.toLowerCase()) ||
                          result.test_type.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || result.status === filterStatus;
+    const matchesAssigned = !assignedToMe || result.assigned_to === user?.id;
     
     if (activeTab === 'pending') {
-      return result.status === 'pending' && matchesSearch && matchesFilter;
+      return result.workflow_stage === 'pending' && matchesSearch && matchesFilter && matchesAssigned;
+    } else if (activeTab === 'in_progress') {
+      return (result.workflow_stage === 'sample_collected' || result.workflow_stage === 'testing') && 
+             matchesSearch && matchesFilter && matchesAssigned;
     } else {
-      return result.status === 'in_progress' && matchesSearch && matchesFilter;
+      return result.workflow_stage === 'review' && matchesSearch && matchesFilter && matchesAssigned;
     }
   });
 
   // Count tests in each category
-  const pendingCount = labResults.filter(r => r.status === 'pending').length;
-  const inProgressCount = labResults.filter(r => r.status === 'in_progress').length;
-  const completedCount = labResults.filter(r => r.status === 'completed').length;
+  const pendingCount = labResults.filter(r => r.workflow_stage === 'pending').length;
+  const inProgressCount = labResults.filter(r => r.workflow_stage === 'sample_collected' || r.workflow_stage === 'testing').length;
+  const reviewCount = labResults.filter(r => r.workflow_stage === 'review').length;
+  const completedCount = labResults.filter(r => r.workflow_stage === 'completed').length;
   const urgentCount = labResults.filter(r => r.is_emergency).length;
+  const assignedToMeCount = labResults.filter(r => r.assigned_to === user?.id).length;
 
-  const handleStartTest = (testId: string) => {
+  const handleStartTest = async (testId: string) => {
     // Update the test status to in_progress
     const updatedResults = labResults.map(result => {
       if (result.id === testId) {
         return {
           ...result,
           status: 'in_progress',
-          workflow_stage: 'sample_collected'
+          workflow_stage: 'sample_collected',
+          assigned_to: user?.id,
+          sample_info: {
+            sample_id: `LAB-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
+            sample_type: result.test_type === 'urinalysis' ? 'urine' : 'blood',
+            collection_time: new Date().toISOString(),
+            container_type: result.test_type === 'urinalysis' ? 'urine_container' : 
+                           result.test_type === 'complete_blood_count' ? 'purple_top_tube' :
+                           result.test_type === 'blood_glucose' ? 'gray_top_tube' : 'red_top_tube'
+          },
+          last_updated: new Date().toISOString()
         };
       }
       return result;
@@ -253,12 +379,85 @@ const Laboratory: React.FC = () => {
     
     setLabResults(updatedResults);
     
-    // Navigate to the test processing form
-    navigate(`/laboratory/process/${testId}`);
+    // Show notification
+    addNotification({
+      message: `Sample collection started for ${updatedResults.find(r => r.id === testId)?.patient.first_name} ${updatedResults.find(r => r.id === testId)?.patient.last_name}`,
+      type: 'success',
+      duration: 3000
+    });
   };
 
   const handleProcessTest = (testId: string) => {
     navigate(`/laboratory/process/${testId}`);
+  };
+
+  const handleAssignToMe = (testId: string) => {
+    // Update the test to assign it to the current user
+    const updatedResults = labResults.map(result => {
+      if (result.id === testId) {
+        return {
+          ...result,
+          assigned_to: user?.id,
+          last_updated: new Date().toISOString()
+        };
+      }
+      return result;
+    });
+    
+    setLabResults(updatedResults);
+    
+    // Show notification
+    addNotification({
+      message: `Test assigned to you`,
+      type: 'success',
+      duration: 3000
+    });
+  };
+
+  const handleReleaseAssignment = (testId: string) => {
+    // Update the test to unassign it
+    const updatedResults = labResults.map(result => {
+      if (result.id === testId) {
+        return {
+          ...result,
+          assigned_to: null,
+          last_updated: new Date().toISOString()
+        };
+      }
+      return result;
+    });
+    
+    setLabResults(updatedResults);
+    
+    // Show notification
+    addNotification({
+      message: `Test released from your queue`,
+      type: 'info',
+      duration: 3000
+    });
+  };
+
+  const handleUpdateWorkflowStage = (testId: string, newStage: 'sample_collected' | 'testing' | 'review' | 'completed') => {
+    // Update the test workflow stage
+    const updatedResults = labResults.map(result => {
+      if (result.id === testId) {
+        return {
+          ...result,
+          workflow_stage: newStage,
+          last_updated: new Date().toISOString()
+        };
+      }
+      return result;
+    });
+    
+    setLabResults(updatedResults);
+    
+    // Show notification
+    addNotification({
+      message: `Test moved to ${getWorkflowStageLabel(newStage)}`,
+      type: 'success',
+      duration: 3000
+    });
   };
 
   if (isLoading) {
@@ -270,71 +469,83 @@ const Laboratory: React.FC = () => {
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="bg-gradient-to-r from-primary-600 to-primary-500 px-6 py-4">
+        <div className="bg-gradient-to-r from-primary-600 to-primary-500 px-5 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
               <div className="p-2 bg-white/10 rounded-lg">
-                <Flask className="h-6 w-6 text-white" />
+                <Flask className="h-5 w-5 text-white" />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-white">Laboratory</h1>
-                <p className="text-primary-100 text-sm">Test Management & Results</p>
+                <h1 className="text-lg font-bold text-white">Laboratory</h1>
+                <p className="text-primary-100 text-xs">Test Management & Results</p>
               </div>
             </div>
-            <Link to="/laboratory/new-test" className="btn bg-white text-primary-600 hover:bg-white/90 shadow-sm flex items-center">
+            <Link to="/laboratory/new-test" className="btn bg-white text-primary-600 hover:bg-white/90 shadow-sm flex items-center py-1.5 px-3 text-sm">
               <Plus className="h-4 w-4 mr-1.5" />
               New Test
             </Link>
           </div>
         </div>
         
-        <div className="p-4 grid grid-cols-2 md:grid-cols-4 gap-4 bg-gray-50">
-          <div className="bg-white p-4 rounded-lg shadow-sm">
+        <div className="p-3 grid grid-cols-2 md:grid-cols-5 gap-3 bg-gray-50">
+          <div className="bg-white p-3 rounded-lg shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-gray-500">Pending</p>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">{pendingCount}</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">{pendingCount}</p>
               </div>
               <div className="p-2 rounded-full bg-warning-100">
-                <Clock className="h-5 w-5 text-warning-600" />
+                <Clock className="h-4 w-4 text-warning-600" />
               </div>
             </div>
           </div>
           
-          <div className="bg-white p-4 rounded-lg shadow-sm">
+          <div className="bg-white p-3 rounded-lg shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-gray-500">In Progress</p>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">{inProgressCount}</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">{inProgressCount}</p>
               </div>
               <div className="p-2 rounded-full bg-primary-100">
-                <Flask className="h-5 w-5 text-primary-600" />
+                <Flask className="h-4 w-4 text-primary-600" />
               </div>
             </div>
           </div>
           
-          <div className="bg-white p-4 rounded-lg shadow-sm">
+          <div className="bg-white p-3 rounded-lg shadow-sm">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs font-medium text-gray-500">For Review</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">{reviewCount}</p>
+              </div>
+              <div className="p-2 rounded-full bg-secondary-100">
+                <FileText className="h-4 w-4 text-secondary-600" />
+              </div>
+            </div>
+          </div>
+          
+          <div className="bg-white p-3 rounded-lg shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-gray-500">Completed</p>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">{completedCount}</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">{completedCount}</p>
               </div>
               <div className="p-2 rounded-full bg-success-100">
-                <CheckCircle className="h-5 w-5 text-success-600" />
+                <CheckCircle className="h-4 w-4 text-success-600" />
               </div>
             </div>
           </div>
           
-          <div className="bg-white p-4 rounded-lg shadow-sm">
+          <div className="bg-white p-3 rounded-lg shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-xs font-medium text-gray-500">Urgent</p>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">{urgentCount}</p>
+                <p className="mt-1 text-xl font-semibold text-gray-900">{urgentCount}</p>
               </div>
               <div className="p-2 rounded-full bg-error-100">
-                <AlertTriangle className="h-5 w-5 text-error-600" />
+                <AlertTriangle className="h-4 w-4 text-error-600" />
               </div>
             </div>
           </div>
@@ -343,7 +554,7 @@ const Laboratory: React.FC = () => {
 
       <div className="flex space-x-2">
         <div 
-          className={`flex-1 rounded-lg p-3 flex items-center space-x-2 cursor-pointer ${
+          className={`flex-1 rounded-lg p-2.5 flex items-center space-x-2 cursor-pointer ${
             activeTab === 'pending' 
               ? 'bg-white shadow-sm border border-gray-200' 
               : 'bg-gray-100 hover:bg-gray-200'
@@ -358,7 +569,7 @@ const Laboratory: React.FC = () => {
         </div>
         
         <div 
-          className={`flex-1 rounded-lg p-3 flex items-center space-x-2 cursor-pointer ${
+          className={`flex-1 rounded-lg p-2.5 flex items-center space-x-2 cursor-pointer ${
             activeTab === 'in_progress' 
               ? 'bg-white shadow-sm border border-gray-200' 
               : 'bg-gray-100 hover:bg-gray-200'
@@ -369,6 +580,21 @@ const Laboratory: React.FC = () => {
           <span className="font-medium text-sm">In Progress</span>
           <span className="ml-auto bg-primary-100 text-primary-800 rounded-full w-5 h-5 flex items-center justify-center text-xs">
             {inProgressCount}
+          </span>
+        </div>
+        
+        <div 
+          className={`flex-1 rounded-lg p-2.5 flex items-center space-x-2 cursor-pointer ${
+            activeTab === 'review' 
+              ? 'bg-white shadow-sm border border-gray-200' 
+              : 'bg-gray-100 hover:bg-gray-200'
+          }`}
+          onClick={() => setActiveTab('review')}
+        >
+          <FileText className="h-4 w-4 text-secondary-500" />
+          <span className="font-medium text-sm">For Review</span>
+          <span className="ml-auto bg-secondary-100 text-secondary-800 rounded-full w-5 h-5 flex items-center justify-center text-xs">
+            {reviewCount}
           </span>
         </div>
       </div>
@@ -402,6 +628,19 @@ const Laboratory: React.FC = () => {
             <ChevronDown className="h-3 w-3 text-gray-500" />
           </div>
         </div>
+        
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="assignedToMe"
+            checked={assignedToMe}
+            onChange={(e) => setAssignedToMe(e.target.checked)}
+            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+          />
+          <label htmlFor="assignedToMe" className="ml-2 text-xs text-gray-700">
+            Assigned to me ({assignedToMeCount})
+          </label>
+        </div>
       </div>
 
       <div className="flex space-x-3">
@@ -410,71 +649,188 @@ const Laboratory: React.FC = () => {
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             {filteredResults.length === 0 ? (
               <div className="p-6 text-center">
-                <div className="mx-auto w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-3">
-                  <Flask className="h-8 w-8 text-gray-400" />
+                <div className="mx-auto w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                  <Flask className="h-7 w-7 text-gray-400" />
                 </div>
-                <h3 className="text-base font-medium text-gray-900 mb-1">No tests {activeTab === 'pending' ? 'pending' : 'in progress'}</h3>
-                <p className="text-sm text-gray-500 max-w-md mx-auto">There are currently no tests in this category. New tests will appear here when ordered by physicians.</p>
+                <h3 className="text-base font-medium text-gray-900 mb-1">No tests {
+                  activeTab === 'pending' ? 'pending' : 
+                  activeTab === 'in_progress' ? 'in progress' : 
+                  'for review'
+                }</h3>
+                <p className="text-sm text-gray-500 max-w-md mx-auto">
+                  {activeTab === 'pending' 
+                    ? "There are currently no pending tests. New tests will appear here when ordered by physicians."
+                    : activeTab === 'in_progress'
+                    ? "There are currently no tests in progress. Start processing tests from the pending queue."
+                    : "There are currently no tests awaiting review. Tests will appear here after processing is complete."
+                  }
+                </p>
               </div>
             ) : (
-              <div>
-                {filteredResults.map((result, index) => (
-                  <div key={result.id} className={`p-4 ${index !== filteredResults.length - 1 ? 'border-b border-gray-200' : ''} hover:bg-gray-50 transition-colors ${result.is_emergency ? 'bg-error-50/50' : ''}`}>
-                    <div className="flex items-center">
+              <div className="divide-y divide-gray-200">
+                {filteredResults.map((result) => (
+                  <div key={result.id} className={`p-4 hover:bg-gray-50 transition-colors ${result.is_emergency ? 'bg-error-50/50' : ''}`}>
+                    <div className="flex items-start">
                       <div className="flex-shrink-0 h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-medium text-sm">
                         {result.patient.first_name.charAt(0)}
                       </div>
                       <div className="ml-4 flex-1">
-                        <div className="flex items-center justify-between">
+                        <div className="flex items-start justify-between">
                           <div>
                             <h3 className="text-base font-medium text-gray-900">
                               {result.patient.first_name} {result.patient.last_name}
                             </h3>
-                            <div className="flex items-center text-xs text-gray-500">
+                            <div className="flex items-center text-xs text-gray-500 mt-0.5">
+                              <div className="flex items-center">
+                                {getWorkflowStageIcon(result.workflow_stage)}
+                                <span className="ml-1">{getWorkflowStageLabel(result.workflow_stage)}</span>
+                              </div>
+                              <span className="mx-1.5">•</span>
                               <Clock className="h-3 w-3 mr-1" />
-                              <span>{new Date(result.test_date).toLocaleDateString()}</span>
-                              {result.workflow_stage && result.workflow_stage !== 'pending' && (
+                              <span>{getTimeAgo(result.last_updated || result.test_date)}</span>
+                              
+                              {result.sample_info && (
                                 <>
-                                  <span className="mx-1">•</span>
-                                  <span>{getWorkflowStageLabel(result.workflow_stage)}</span>
+                                  <span className="mx-1.5">•</span>
+                                  <span className="text-primary-600 font-medium">{result.sample_info.sample_id}</span>
                                 </>
                               )}
                             </div>
                           </div>
                           <div className="flex items-center space-x-2">
                             {result.is_emergency && (
-                              <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-error-100 text-error-800">
+                              <span className="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-error-100 text-error-800">
                                 <AlertTriangle className="h-3 w-3 mr-1" />
-                                EMERGENCY
+                                URGENT
                               </span>
                             )}
+                            
+                            {result.assigned_to && result.assigned_to !== user?.id && (
+                              <span className="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-gray-100 text-gray-800">
+                                Assigned
+                              </span>
+                            )}
+                            
                             {activeTab === 'pending' ? (
-                              <button 
-                                onClick={() => handleStartTest(result.id)}
-                                className="btn btn-primary inline-flex items-center text-xs py-1.5 px-3 rounded-lg"
-                              >
-                                Start Test <Beaker className="h-3 w-3 ml-1.5" />
-                              </button>
+                              <div className="flex space-x-1">
+                                {!result.assigned_to && (
+                                  <button 
+                                    onClick={() => handleAssignToMe(result.id)}
+                                    className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    title="Assign to me"
+                                  >
+                                    Assign to me
+                                  </button>
+                                )}
+                                
+                                {result.assigned_to === user?.id && (
+                                  <>
+                                    <button 
+                                      onClick={() => handleStartTest(result.id)}
+                                      className="btn btn-primary inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    >
+                                      Collect Sample <Beaker className="h-3 w-3 ml-1.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleReleaseAssignment(result.id)}
+                                      className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                      title="Release assignment"
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            ) : activeTab === 'in_progress' ? (
+                              <div className="flex space-x-1">
+                                {result.assigned_to === user?.id ? (
+                                  <>
+                                    <button 
+                                      onClick={() => handleProcessTest(result.id)}
+                                      className="btn btn-primary inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    >
+                                      {result.workflow_stage === 'sample_collected' ? 'Start Testing' : 'Continue Testing'}
+                                      <ArrowRight className="h-3 w-3 ml-1.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleReleaseAssignment(result.id)}
+                                      className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                      title="Release assignment"
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button 
+                                    onClick={() => handleAssignToMe(result.id)}
+                                    className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    title="Take over this test"
+                                  >
+                                    Take over
+                                  </button>
+                                )}
+                              </div>
                             ) : (
-                              <button 
-                                onClick={() => handleProcessTest(result.id)}
-                                className="btn btn-primary inline-flex items-center text-xs py-1.5 px-3 rounded-lg"
-                              >
-                                {result.workflow_stage === 'sample_collected' ? 'Enter Results' : 
-                                 result.workflow_stage === 'testing' ? 'Continue Testing' : 
-                                 result.workflow_stage === 'review' ? 'Review Results' : 'Process Test'}
-                                <ArrowRight className="h-3 w-3 ml-1.5" />
-                              </button>
+                              <div className="flex space-x-1">
+                                {result.assigned_to === user?.id ? (
+                                  <>
+                                    <button 
+                                      onClick={() => handleProcessTest(result.id)}
+                                      className="btn btn-primary inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    >
+                                      Review Results
+                                      <CheckCircle className="h-3 w-3 ml-1.5" />
+                                    </button>
+                                    <button 
+                                      onClick={() => handleReleaseAssignment(result.id)}
+                                      className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                      title="Release assignment"
+                                    >
+                                      <XCircle className="h-3.5 w-3.5" />
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button 
+                                    onClick={() => handleAssignToMe(result.id)}
+                                    className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    title="Take over this review"
+                                  >
+                                    Review
+                                  </button>
+                                )}
+                              </div>
                             )}
                           </div>
                         </div>
-                        <div className="mt-1 flex items-center">
-                          <span className="text-xs font-medium text-gray-700 bg-gray-100 px-2 py-0.5 rounded-full">
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-800">
+                            <Beaker className="h-3 w-3 mr-1 text-primary-500" />
                             {getTestTypeLabel(result.test_type)}
                           </span>
-                          {result.sample_info && (
-                            <span className="ml-2 text-xs text-gray-500">
-                              Sample ID: {result.sample_info.sample_id}
+                          
+                          {result.sample_info?.sample_type && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-800">
+                              {getSampleTypeLabel(result.sample_info.sample_type)}
+                            </span>
+                          )}
+                          
+                          {result.sample_info?.container_type && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-xs font-medium text-gray-800">
+                              {getContainerTypeLabel(result.sample_info.container_type)}
+                            </span>
+                          )}
+                          
+                          {result.workflow_stage === 'testing' && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-md bg-primary-100 text-xs font-medium text-primary-800">
+                              <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                              Processing
+                            </span>
+                          )}
+                          
+                          {result.workflow_stage === 'review' && (
+                            <span className="inline-flex items-center px-2 py-1 rounded-md bg-secondary-100 text-xs font-medium text-secondary-800">
+                              <FileText className="h-3 w-3 mr-1" />
+                              Results Ready
                             </span>
                           )}
                         </div>
@@ -489,12 +845,83 @@ const Laboratory: React.FC = () => {
 
         {/* Right Section - Overview and Quick Actions */}
         <div className="w-1/3 space-y-3">
+          {/* My Work Queue */}
+          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div className="flex items-center">
+                <Layers className="h-4 w-4 text-primary-500 mr-1.5" />
+                <h2 className="text-sm font-medium text-gray-900">My Work Queue</h2>
+              </div>
+              <span className="text-xs text-gray-500">{labResults.filter(r => r.assigned_to === user?.id).length} tests</span>
+            </div>
+            <div className="p-3">
+              {labResults.filter(r => r.assigned_to === user?.id).length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">No tests currently assigned to you</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {labResults
+                    .filter(r => r.assigned_to === user?.id)
+                    .sort((a, b) => {
+                      // Sort by emergency first, then by workflow stage
+                      if (a.is_emergency && !b.is_emergency) return -1;
+                      if (!a.is_emergency && b.is_emergency) return 1;
+                      
+                      // Then sort by workflow stage
+                      const stageOrder = {
+                        'pending': 0,
+                        'sample_collected': 1,
+                        'testing': 2,
+                        'review': 3,
+                        'completed': 4
+                      };
+                      
+                      return (stageOrder[a.workflow_stage || 'pending'] || 0) - (stageOrder[b.workflow_stage || 'pending'] || 0);
+                    })
+                    .slice(0, 5)
+                    .map(test => (
+                      <div key={test.id} className={`p-2 rounded-lg border ${test.is_emergency ? 'border-error-200 bg-error-50' : 'border-gray-200'} flex items-center justify-between`}>
+                        <div className="flex items-center">
+                          <div className="mr-2">
+                            {getWorkflowStageIcon(test.workflow_stage)}
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-gray-900 line-clamp-1">
+                              {test.patient.first_name} {test.patient.last_name}
+                            </p>
+                            <p className="text-xs text-gray-500 line-clamp-1">
+                              {getTestTypeLabel(test.test_type)}
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleProcessTest(test.id)}
+                          className="text-xs text-primary-600 hover:text-primary-800 font-medium"
+                        >
+                          Continue
+                        </button>
+                      </div>
+                    ))}
+                  
+                  {labResults.filter(r => r.assigned_to === user?.id).length > 5 && (
+                    <div className="text-center pt-1">
+                      <button className="text-xs text-primary-600 hover:text-primary-800">
+                        View all ({labResults.filter(r => r.assigned_to === user?.id).length})
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Quick Actions Card */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-              <h2 className="text-base font-medium text-gray-900">Quick Actions</h2>
+              <h2 className="text-sm font-medium text-gray-900">Quick Actions</h2>
             </div>
-            <div className="p-4 grid grid-cols-2 gap-2">
+            <div className="p-3 grid grid-cols-2 gap-2">
               <Link to="/laboratory/new-test" className="flex items-center p-2 rounded-md hover:bg-gray-50 border border-gray-200 transition-colors">
                 <Plus className="h-4 w-4 text-primary-500 mr-1.5" />
                 <span className="text-xs text-gray-700">New Test</span>
@@ -519,26 +946,26 @@ const Laboratory: React.FC = () => {
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
               <div className="flex items-center">
                 <Flask className="h-4 w-4 text-primary-500 mr-1.5" />
-                <h2 className="text-base font-medium text-gray-900">Test Reference</h2>
+                <h2 className="text-sm font-medium text-gray-900">Test Reference</h2>
               </div>
               <ChevronDown className="h-4 w-4 text-gray-400" />
             </div>
-            <div className="p-4">
+            <div className="p-3">
               <h3 className="text-xs font-medium text-gray-700 mb-2">Common Tests</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center p-2 rounded-md hover:bg-gray-50">
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center p-1.5 rounded-md hover:bg-gray-50">
                   <span className="text-xs text-gray-600">CBC</span>
                   <span className="text-xs text-gray-600">Complete Blood Count</span>
                 </div>
-                <div className="flex justify-between items-center p-2 rounded-md hover:bg-gray-50">
+                <div className="flex justify-between items-center p-1.5 rounded-md hover:bg-gray-50">
                   <span className="text-xs text-gray-600">LFT</span>
                   <span className="text-xs text-gray-600">Liver Function Test</span>
                 </div>
-                <div className="flex justify-between items-center p-2 rounded-md hover:bg-gray-50">
+                <div className="flex justify-between items-center p-1.5 rounded-md hover:bg-gray-50">
                   <span className="text-xs text-gray-600">RFT</span>
                   <span className="text-xs text-gray-600">Renal Function Test</span>
                 </div>
-                <div className="flex justify-between items-center p-2 rounded-md hover:bg-gray-50">
+                <div className="flex justify-between items-center p-1.5 rounded-md hover:bg-gray-50">
                   <span className="text-xs text-gray-600">HbA1c</span>
                   <span className="text-xs text-gray-600">Glycated Hemoglobin</span>
                 </div>
@@ -549,12 +976,12 @@ const Laboratory: React.FC = () => {
           {/* Workflow Stages Card */}
           <div className="bg-white rounded-xl shadow-sm overflow-hidden">
             <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
-              <h2 className="text-base font-medium text-gray-900">Workflow Stages</h2>
+              <h2 className="text-sm font-medium text-gray-900">Workflow Stages</h2>
             </div>
-            <div className="p-4">
-              <div className="space-y-3">
+            <div className="p-3">
+              <div className="space-y-2">
                 <div className="flex items-center p-2 rounded-md bg-gray-50">
-                  <div className="w-6 h-6 rounded-full bg-warning-100 flex items-center justify-center mr-2">
+                  <div className="w-5 h-5 rounded-full bg-warning-100 flex items-center justify-center mr-2">
                     <span className="text-xs font-medium text-warning-700">1</span>
                   </div>
                   <div>
@@ -564,7 +991,7 @@ const Laboratory: React.FC = () => {
                 </div>
                 
                 <div className="flex items-center p-2 rounded-md bg-gray-50">
-                  <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center mr-2">
+                  <div className="w-5 h-5 rounded-full bg-primary-100 flex items-center justify-center mr-2">
                     <span className="text-xs font-medium text-primary-700">2</span>
                   </div>
                   <div>
@@ -574,7 +1001,7 @@ const Laboratory: React.FC = () => {
                 </div>
                 
                 <div className="flex items-center p-2 rounded-md bg-gray-50">
-                  <div className="w-6 h-6 rounded-full bg-secondary-100 flex items-center justify-center mr-2">
+                  <div className="w-5 h-5 rounded-full bg-secondary-100 flex items-center justify-center mr-2">
                     <span className="text-xs font-medium text-secondary-700">3</span>
                   </div>
                   <div>
@@ -584,7 +1011,7 @@ const Laboratory: React.FC = () => {
                 </div>
                 
                 <div className="flex items-center p-2 rounded-md bg-gray-50">
-                  <div className="w-6 h-6 rounded-full bg-success-100 flex items-center justify-center mr-2">
+                  <div className="w-5 h-5 rounded-full bg-success-100 flex items-center justify-center mr-2">
                     <span className="text-xs font-medium text-success-700">4</span>
                   </div>
                   <div>
