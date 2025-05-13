@@ -17,7 +17,12 @@ import {
   Layers,
   MoreHorizontal,
   XCircle,
-  Loader2
+  Loader2,
+  Flask,
+  Microscope,
+  DollarSign,
+  Pill,
+  Building2
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -33,6 +38,9 @@ interface Patient {
   assigned_to?: string;
   last_updated?: string;
   chief_complaint?: string;
+  external_location?: string; // lab, radiology, pharmacy, billing, etc.
+  external_status?: string;
+  expected_return_time?: string;
 }
 
 const GeneralMedicine: React.FC = () => {
@@ -89,7 +97,10 @@ const GeneralMedicine: React.FC = () => {
           arrival_time: '08:45 AM',
           wait_time: '45 min',
           last_updated: '2025-05-15T08:45:00Z',
-          chief_complaint: 'Persistent cough for 1 week'
+          chief_complaint: 'Persistent cough for 1 week',
+          external_location: 'laboratory',
+          external_status: 'sample_collected',
+          expected_return_time: '2025-05-15T10:15:00Z'
         },
         {
           id: '00000000-0000-0000-0000-000000000004',
@@ -101,7 +112,10 @@ const GeneralMedicine: React.FC = () => {
           arrival_time: '10:00 AM',
           wait_time: '5 min',
           last_updated: '2025-05-15T10:00:00Z',
-          chief_complaint: 'Abdominal pain and nausea'
+          chief_complaint: 'Abdominal pain and nausea',
+          external_location: 'radiology',
+          external_status: 'in_progress',
+          expected_return_time: '2025-05-15T11:30:00Z'
         },
         {
           id: '00000000-0000-0000-0000-000000000005',
@@ -126,7 +140,10 @@ const GeneralMedicine: React.FC = () => {
           arrival_time: '10:30 AM',
           wait_time: '10 min',
           last_updated: '2025-05-15T10:30:00Z',
-          chief_complaint: 'High fever and rash'
+          chief_complaint: 'High fever and rash',
+          external_location: 'pharmacy',
+          external_status: 'dispensing',
+          expected_return_time: '2025-05-15T10:45:00Z'
         },
         {
           id: '00000000-0000-0000-0000-000000000007',
@@ -140,6 +157,36 @@ const GeneralMedicine: React.FC = () => {
           assigned_to: user?.id,
           last_updated: '2025-05-15T10:45:00Z',
           chief_complaint: 'Joint pain and stiffness'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000008',
+          first_name: 'Lisa',
+          last_name: 'Taylor',
+          date_of_birth: '1979-03-15',
+          current_flow_step: 'waiting_consultation',
+          priority_level: 'normal',
+          arrival_time: '11:00 AM',
+          wait_time: '20 min',
+          last_updated: '2025-05-15T11:00:00Z',
+          chief_complaint: 'Dizziness and fatigue',
+          external_location: 'billing',
+          external_status: 'processing',
+          expected_return_time: '2025-05-15T11:20:00Z'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000009',
+          first_name: 'Thomas',
+          last_name: 'Anderson',
+          date_of_birth: '1995-11-22',
+          current_flow_step: 'waiting_consultation',
+          priority_level: 'normal',
+          arrival_time: '11:15 AM',
+          wait_time: '5 min',
+          last_updated: '2025-05-15T11:15:00Z',
+          chief_complaint: 'Sore throat and ear pain',
+          external_location: 'cardiology',
+          external_status: 'consultation',
+          expected_return_time: '2025-05-15T12:00:00Z'
         }
       ];
       
@@ -205,6 +252,76 @@ const GeneralMedicine: React.FC = () => {
     return `${diffDays}d ago`;
   };
 
+  const getExternalLocationIcon = (location?: string) => {
+    switch (location) {
+      case 'laboratory':
+        return <Flask className="h-3.5 w-3.5 text-primary-500" />;
+      case 'radiology':
+        return <Microscope className="h-3.5 w-3.5 text-secondary-500" />;
+      case 'pharmacy':
+        return <Pill className="h-3.5 w-3.5 text-success-500" />;
+      case 'billing':
+        return <DollarSign className="h-3.5 w-3.5 text-warning-500" />;
+      default:
+        if (location?.includes('department') || location?.includes('clinic')) {
+          return <Building2 className="h-3.5 w-3.5 text-accent-500" />;
+        }
+        return null;
+    }
+  };
+
+  const getExternalLocationLabel = (location?: string, status?: string) => {
+    if (!location) return null;
+    
+    const locations: Record<string, string> = {
+      'laboratory': 'Lab',
+      'radiology': 'Radiology',
+      'pharmacy': 'Pharmacy',
+      'billing': 'Billing',
+      'cardiology': 'Cardiology',
+      'orthopedic': 'Orthopedics',
+      'dental': 'Dental',
+      'eye': 'Eye Clinic',
+      'physiotherapy': 'Physiotherapy'
+    };
+    
+    const statuses: Record<string, string> = {
+      'sample_collected': 'Sample Collected',
+      'testing': 'Testing',
+      'in_progress': 'In Progress',
+      'processing': 'Processing',
+      'dispensing': 'Dispensing',
+      'consultation': 'In Consultation'
+    };
+    
+    const locationLabel = locations[location] || location;
+    const statusLabel = status ? (statuses[status] || status) : '';
+    
+    return `${locationLabel}${statusLabel ? `: ${statusLabel}` : ''}`;
+  };
+
+  const getTimeUntilReturn = (dateString?: string) => {
+    if (!dateString) return null;
+    
+    const returnTime = new Date(dateString);
+    const now = new Date();
+    
+    // If the return time is in the past, show "Expected soon"
+    if (returnTime <= now) {
+      return "Expected soon";
+    }
+    
+    const diffMs = returnTime.getTime() - now.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    
+    if (diffMins < 60) {
+      return `Expected in ${diffMins}m`;
+    }
+    
+    const diffHours = Math.floor(diffMins / 60);
+    return `Expected in ${diffHours}h`;
+  };
+
   // Filter patients based on their current flow step and the active tab
   const filteredPatients = patients.filter(patient => {
     const matchesSearch = patient.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -225,6 +342,7 @@ const GeneralMedicine: React.FC = () => {
   const completedCount = patients.filter(p => p.current_flow_step === 'post_consultation').length;
   const urgentCount = patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length;
   const assignedToMeCount = patients.filter(p => p.assigned_to === user?.id).length;
+  const externalCount = patients.filter(p => p.external_location).length;
 
   const handleAssignToMe = (patientId: string) => {
     // Update the patient to assign it to the current user
@@ -449,7 +567,7 @@ const GeneralMedicine: React.FC = () => {
                             
                             {activeTab === 'waiting' ? (
                               <div className="flex space-x-1">
-                                {!patient.assigned_to && (
+                                {!patient.assigned_to && !patient.external_location && (
                                   <button 
                                     onClick={() => handleAssignToMe(patient.id)}
                                     className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
@@ -459,7 +577,7 @@ const GeneralMedicine: React.FC = () => {
                                   </button>
                                 )}
                                 
-                                {patient.assigned_to === user?.id && (
+                                {patient.assigned_to === user?.id && !patient.external_location && (
                                   <>
                                     <button 
                                       onClick={() => handleStartConsultation(patient.id)}
@@ -475,6 +593,13 @@ const GeneralMedicine: React.FC = () => {
                                       <XCircle className="h-3.5 w-3.5" />
                                     </button>
                                   </>
+                                )}
+                                
+                                {patient.external_location && (
+                                  <div className="px-2 py-1 inline-flex items-center text-xs rounded-lg bg-gray-100 text-gray-700">
+                                    <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                                    At {getExternalLocationLabel(patient.external_location, patient.external_status)}
+                                  </div>
                                 )}
                               </div>
                             ) : (
@@ -508,13 +633,25 @@ const GeneralMedicine: React.FC = () => {
                             )}
                           </div>
                         </div>
-                        <div className="mt-0.5">
+                        <div className="mt-0.5 flex items-center">
                           <span className="text-xs">{calculateAge(patient.date_of_birth)} years</span>
                           {patient.chief_complaint && (
                             <>
                               <span className="mx-1">•</span>
                               <span className="text-xs text-primary-600 font-medium">{patient.chief_complaint}</span>
                             </>
+                          )}
+                          
+                          {/* External location indicator */}
+                          {patient.external_location && (
+                            <div className="ml-auto flex items-center">
+                              <div className="flex items-center px-2 py-0.5 rounded-full bg-blue-50 border border-blue-100">
+                                {getExternalLocationIcon(patient.external_location)}
+                                <span className="ml-1 text-xs text-blue-700">
+                                  {getTimeUntilReturn(patient.expected_return_time)}
+                                </span>
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
@@ -604,6 +741,59 @@ const GeneralMedicine: React.FC = () => {
             </div>
           </div>
 
+          {/* External Patients Card */}
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="px-4 py-3 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
+              <div className="flex items-center">
+                <Activity className="h-4 w-4 text-secondary-500 mr-1.5" />
+                <h2 className="text-sm font-medium text-gray-900">Patients at Other Services</h2>
+              </div>
+              <span className="text-xs text-gray-500">{externalCount} patients</span>
+            </div>
+            <div className="p-3">
+              {externalCount === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">No patients currently at other services</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {patients
+                    .filter(p => p.external_location)
+                    .map(patient => (
+                      <div key={patient.id} className="p-2 rounded-lg border border-gray-200 flex items-center justify-between">
+                        <div className="flex items-center">
+                          <div className="mr-2">
+                            {getExternalLocationIcon(patient.external_location)}
+                          </div>
+                          <div>
+                            <p className="text-xs font-medium text-gray-900 line-clamp-1">
+                              {patient.first_name} {patient.last_name}
+                            </p>
+                            <div className="flex items-center">
+                              <p className="text-xs text-gray-500 line-clamp-1">
+                                {getExternalLocationLabel(patient.external_location, patient.external_status)}
+                              </p>
+                              {patient.expected_return_time && (
+                                <p className="text-xs text-blue-600 ml-1">
+                                  • {getTimeUntilReturn(patient.expected_return_time)}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        <Link
+                          to={`/patients/${patient.id}`}
+                          className="text-xs text-primary-600 hover:text-primary-800 font-medium"
+                        >
+                          View
+                        </Link>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+          </div>
+
           {/* Overview Card */}
           <div className="bg-white rounded-lg shadow-sm p-3">
             <div className="flex items-center justify-between mb-2">
@@ -638,6 +828,13 @@ const GeneralMedicine: React.FC = () => {
                   <span className="text-sm text-gray-700">Urgent</span>
                 </div>
                 <span className="font-medium text-sm">{urgentCount}</span>
+              </div>
+              <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
+                <div className="flex items-center">
+                  <Activity className="h-4 w-4 text-secondary-500 mr-1.5" />
+                  <span className="text-sm text-gray-700">At Other Services</span>
+                </div>
+                <span className="font-medium text-sm">{externalCount}</span>
               </div>
             </div>
           </div>
