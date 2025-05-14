@@ -529,7 +529,7 @@ const DashboardLayout: React.FC = () => {
                   {user?.email?.charAt(0).toUpperCase() || 'U'}
                 </div>
                 <span className="text-sm font-medium text-gray-700 hidden md:block">
-                  {user?.email || 'dev@hms.dev'}
+                  {user?.email}
                 </span>
               </div>
             </div>
