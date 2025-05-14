@@ -51,6 +51,7 @@ import PatientDetails from './pages/PatientDetails';
 import ReceptionDashboard from './pages/ReceptionDashboard';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
 import NotificationToast from './components/common/NotificationToast';
+import HospitalOnboarding from './pages/HospitalOnboarding';
 
 // Import department pages
 import GeneralMedicine from './pages/departments/GeneralMedicine';
@@ -131,6 +132,7 @@ const App: React.FC = () => {
           <Route path="support-tickets" element={<SupportTickets />} />
           <Route path="support-settings" element={<SupportSettings />} />
           <Route path="settings/system" element={<SystemSettings />} />
+          <Route path="hospital-onboarding" element={<HospitalOnboarding />} />
         </Route>
         
         {/* Regular User Routes */}

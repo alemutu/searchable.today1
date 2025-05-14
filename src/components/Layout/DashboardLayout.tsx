@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
-import { Users, Calendar, FileText, Activity, Pill, DollarSign, LogOut, Menu, X, Bell, Building2, Settings, LayoutDashboard, BedDouble, FlaskRound as Flask, Microscope, Heart, Baby, UserRound, Syringe, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Stethoscope, ClipboardList, Cog, Building, Users2, Wrench, CreditCard, Key, LifeBuoy, ChevronDown, ChevronRight, TicketCheck, Box, Home, Search, LayoutList, WifiOff } from 'lucide-react';
+import { Users, Calendar, FileText, Activity, Pill, DollarSign, LogOut, Menu, X, Bell, Building2, Settings, LayoutDashboard, BedDouble, FlaskRound as Flask, Microscope, Heart, Baby, UserRound, Syringe, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Stethoscope, ClipboardList, Cog, Building, Users2, Wrench, CreditCard, Key, LifeBuoy, ChevronDown, ChevronRight, TicketCheck, Box, Home, Search, LayoutList, WifiOff, Plus } from 'lucide-react';
 import { syncAllData } from '../../lib/storage';
 
 const DashboardLayout: React.FC = () => {
@@ -148,6 +148,14 @@ const DashboardLayout: React.FC = () => {
                     >
                       <LifeBuoy className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
                       Support Settings
+                    </Link>
+                    
+                    <Link
+                      to="/super-admin/hospital-onboarding"
+                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+                    >
+                      <Plus className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                      Add Hospital
                     </Link>
                   </div>
                 )}

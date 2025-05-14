@@ -239,6 +239,10 @@ const SuperAdminDashboard: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Super Admin Dashboard</h1>
+        <Link to="/super-admin/hospital-onboarding" className="btn btn-primary inline-flex items-center">
+          <Plus className="h-5 w-5 mr-2" />
+          Add Hospital
+        </Link>
       </div>
 
       {/* Stats Grid */}
@@ -335,13 +339,10 @@ const SuperAdminDashboard: React.FC = () => {
       <div className="card">
         <div className="card-header flex justify-between items-center">
           <h2 className="text-lg font-medium text-gray-900">Hospitals</h2>
-          <button
-            onClick={() => setShowAddHospital(true)}
-            className="btn btn-primary inline-flex items-center"
-          >
+          <Link to="/super-admin/hospital-onboarding" className="btn btn-primary inline-flex items-center">
             <Plus className="h-5 w-5 mr-2" />
             Add Hospital
-          </button>
+          </Link>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -504,158 +505,6 @@ const SuperAdminDashboard: React.FC = () => {
           </table>
         </div>
       </div>
-
-      {/* Add Hospital Modal */}
-      {showAddHospital && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-gray-900">Add New Hospital</h2>
-              <button
-                onClick={() => {
-                  setShowAddHospital(false);
-                  setValidationError(null);
-                  setNewHospital({});
-                }}
-                className="text-gray-400 hover:text-gray-500"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            {validationError && (
-              <div className="mb-4 p-4 bg-error-50 border border-error-200 rounded-md">
-                <p className="text-error-600">{validationError}</p>
-              </div>
-            )}
-            
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-              <div className="col-span-2">
-                <label className="form-label required">Hospital Name</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Building2 className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    className="form-input pl-10"
-                    placeholder="Enter hospital name"
-                    value={newHospital.name || ''}
-                    onChange={e => setNewHospital({ ...newHospital, name: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="col-span-2">
-                <label className="form-label required">Subdomain</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Globe className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    className="form-input pl-10"
-                    placeholder="hospital-name"
-                    value={newHospital.subdomain || ''}
-                    onChange={e => setNewHospital({ ...newHospital, subdomain: e.target.value.toLowerCase() })}
-                  />
-                </div>
-                <div className="mt-2 flex items-center">
-                  <p className="text-sm text-gray-500">
-                    Only lowercase letters, numbers, and hyphens allowed
-                  </p>
-                </div>
-                {newHospital.subdomain && (
-                  <div className="mt-2 p-2 bg-gray-50 rounded border border-gray-200">
-                    <p className="text-sm font-medium text-gray-700">Full domain:</p>
-                    <p className="text-sm font-mono text-primary-600">{subdomainPreview}</p>
-                  </div>
-                )}
-                <div className="mt-2 flex items-center">
-                  <input
-                    type="checkbox"
-                    id="domainEnabled"
-                    checked={newHospital.domain_enabled !== false}
-                    onChange={e => setNewHospital({ ...newHospital, domain_enabled: e.target.checked })}
-                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="domainEnabled" className="ml-2 block text-sm text-gray-900">
-                    Enable domain access
-                  </label>
-                </div>
-              </div>
-
-              <div className="col-span-2">
-                <label className="form-label required">Address</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <MapPin className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <textarea
-                    className="form-input pl-10"
-                    rows={2}
-                    placeholder="Enter complete address"
-                    value={newHospital.address || ''}
-                    onChange={e => setNewHospital({ ...newHospital, address: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="form-label required">Phone Number</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Phone className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="tel"
-                    className="form-input pl-10"
-                    placeholder="+1 (555) 000-0000"
-                    value={newHospital.phone || ''}
-                    onChange={e => setNewHospital({ ...newHospital, phone: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="form-label">Email Address</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="email"
-                    className="form-input pl-10"
-                    placeholder="hospital@example.com"
-                    value={newHospital.email || ''}
-                    onChange={e => setNewHospital({ ...newHospital, email: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  setShowAddHospital(false);
-                  setValidationError(null);
-                  setNewHospital({});
-                }}
-                className="btn btn-outline"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddHospital}
-                className="btn btn-primary inline-flex items-center"
-              >
-                <Plus className="h-5 w-5 mr-2" />
-                Add Hospital
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
