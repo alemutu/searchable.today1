@@ -1,38 +1,50 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { useAuthStore, useNotificationStore } from '../lib/store';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import { 
   Building2, 
   Mail, 
   Phone, 
-  User, 
-  MapPin, 
   Globe, 
-  Package, 
-  CreditCard, 
+  MapPin, 
+  User, 
   Key, 
   CheckCircle, 
+  Calendar, 
+  DollarSign, 
+  Box, 
   ArrowRight, 
-  ArrowLeft,
-  Eye,
-  EyeOff,
-  Copy,
-  Check
+  ArrowLeft, 
+  Eye, 
+  EyeOff, 
+  Copy, 
+  Check, 
+  AlertCircle,
+  Loader2,
+  Pill,
+  BedDouble,
+  Flask,
+  Microscope,
+  FileText,
+  CreditCard,
+  LayoutDashboard,
+  Stethoscope,
+  Activity,
+  Users
 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { useAuthStore, useNotificationStore } from '../lib/store';
 
-// Step interfaces
 interface HospitalProfile {
   name: string;
+  subdomain: string;
+  address: string;
+  phone: string;
   email: string;
   contactPerson: string;
-  phone: string;
-  address: string;
-  subdomain: string;
+  logo_url?: string;
 }
 
 interface AdminSetup {
-  generatePassword: boolean;
   password: string;
   forcePasswordChange: boolean;
   sendCredentials: boolean;
@@ -43,11 +55,10 @@ interface ModuleSelection {
   inpatient: string[];
   shared: string[];
   addons: string[];
-  template: string;
 }
 
 interface PricingPlan {
-  plan: 'starter' | 'pro' | 'enterprise' | 'custom';
+  plan: string;
   customModules?: string[];
 }
 
@@ -59,38 +70,65 @@ interface LicenseDetails {
   notes: string;
 }
 
+interface SystemModule {
+  id: string;
+  name: string;
+  key: string;
+  category: string;
+  is_core: boolean;
+  is_active: boolean;
+  version: string;
+  description: string;
+}
+
+interface PricingPlanOption {
+  id: string;
+  name: string;
+  key: string;
+  description: string;
+  price: number;
+  billing_cycle: string;
+  features: any[];
+  max_users: number;
+  max_storage_gb: number;
+}
+
 const HospitalOnboarding: React.FC = () => {
   const navigate = useNavigate();
   const { isAdmin } = useAuthStore();
   const { addNotification } = useNotificationStore();
   const [currentStep, setCurrentStep] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [passwordCopied, setPasswordCopied] = useState(false);
+  const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
+  const [isCheckingSubdomain, setIsCheckingSubdomain] = useState(false);
+  const [modules, setModules] = useState<SystemModule[]>([]);
+  const [plans, setPlans] = useState<PricingPlanOption[]>([]);
+  const [mainDomain, setMainDomain] = useState('searchable.today');
   
   // Form state
   const [hospitalProfile, setHospitalProfile] = useState<HospitalProfile>({
     name: '',
-    email: '',
-    contactPerson: '',
-    phone: '',
+    subdomain: '',
     address: '',
-    subdomain: ''
+    phone: '',
+    email: '',
+    contactPerson: ''
   });
   
   const [adminSetup, setAdminSetup] = useState<AdminSetup>({
-    generatePassword: true,
     password: generateRandomPassword(),
     forcePasswordChange: true,
     sendCredentials: true
   });
   
   const [moduleSelection, setModuleSelection] = useState<ModuleSelection>({
-    outpatient: ['patient_registration', 'consultations', 'pharmacy', 'billing', 'queue'],
+    outpatient: [],
     inpatient: [],
-    shared: ['lab'],
-    addons: [],
-    template: 'starter'
+    shared: [],
+    addons: []
   });
   
   const [pricingPlan, setPricingPlan] = useState<PricingPlan>({
@@ -105,16 +143,168 @@ const HospitalOnboarding: React.FC = () => {
     notes: ''
   });
   
-  // Redirect if not admin
-  if (!isAdmin) {
-    navigate('/super-admin');
-    return null;
-  }
+  // Validation state
+  const [errors, setErrors] = useState<{
+    hospitalProfile?: Record<string, string>;
+    adminSetup?: Record<string, string>;
+    moduleSelection?: string;
+    pricingPlan?: string;
+    licenseDetails?: Record<string, string>;
+  }>({});
+
+  useEffect(() => {
+    // Redirect non-admin users
+    if (!isAdmin) {
+      navigate('/dashboard');
+    }
+    
+    fetchModules();
+    fetchPlans();
+    fetchMainDomain();
+  }, [isAdmin, navigate]);
   
-  // Helper functions
+  useEffect(() => {
+    // Update subdomain when hospital name changes
+    if (hospitalProfile.name && !hospitalProfile.subdomain) {
+      const generatedSubdomain = hospitalProfile.name
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '');
+      
+      setHospitalProfile(prev => ({
+        ...prev,
+        subdomain: generatedSubdomain
+      }));
+    }
+  }, [hospitalProfile.name]);
+  
+  useEffect(() => {
+    // Check subdomain availability with debounce
+    const timer = setTimeout(() => {
+      if (hospitalProfile.subdomain) {
+        checkSubdomainAvailability(hospitalProfile.subdomain);
+      }
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [hospitalProfile.subdomain]);
+  
+  const fetchMainDomain = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'system.main_domain')
+        .single();
+
+      if (error) throw error;
+      
+      if (data && data.value) {
+        // Remove quotes from the JSON string if needed
+        const domain = typeof data.value === 'string' 
+          ? data.value.replace(/"/g, '') 
+          : data.value;
+        
+        setMainDomain(domain);
+      }
+    } catch (error) {
+      console.error('Error fetching main domain:', error);
+      // Keep default value if there's an error
+    }
+  };
+  
+  const fetchModules = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('system_modules')
+        .select('*')
+        .order('name');
+        
+      if (error) throw error;
+      
+      setModules(data || []);
+      
+      // Pre-select core modules
+      const outpatientCore = data
+        .filter(m => m.category === 'outpatient' && m.is_core)
+        .map(m => m.key);
+        
+      const inpatientCore = data
+        .filter(m => m.category === 'inpatient' && m.is_core)
+        .map(m => m.key);
+        
+      const sharedCore = data
+        .filter(m => m.category === 'shared' && m.is_core)
+        .map(m => m.key);
+      
+      setModuleSelection({
+        outpatient: outpatientCore,
+        inpatient: [],
+        shared: sharedCore,
+        addons: []
+      });
+      
+    } catch (error) {
+      console.error('Error fetching modules:', error);
+      addNotification({
+        message: 'Failed to load system modules',
+        type: 'error'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
+  const fetchPlans = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('pricing_plans')
+        .select('*')
+        .eq('is_active', true)
+        .order('price');
+        
+      if (error) throw error;
+      
+      setPlans(data || []);
+    } catch (error) {
+      console.error('Error fetching pricing plans:', error);
+      addNotification({
+        message: 'Failed to load pricing plans',
+        type: 'error'
+      });
+    }
+  };
+  
+  const checkSubdomainAvailability = async (subdomain: string) => {
+    if (!subdomain) {
+      setSubdomainAvailable(null);
+      return;
+    }
+    
+    setIsCheckingSubdomain(true);
+    try {
+      const { data, error } = await supabase
+        .from('hospitals')
+        .select('id')
+        .eq('subdomain', subdomain)
+        .maybeSingle();
+        
+      if (error) throw error;
+      
+      setSubdomainAvailable(!data);
+    } catch (error) {
+      console.error('Error checking subdomain:', error);
+      setSubdomainAvailable(null);
+    } finally {
+      setIsCheckingSubdomain(false);
+    }
+  };
+  
   function generateRandomPassword(length = 12) {
-    const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+";
-    let password = "";
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+';
+    let password = '';
     for (let i = 0; i < length; i++) {
       const randomIndex = Math.floor(Math.random() * charset.length);
       password += charset[randomIndex];
@@ -128,245 +318,250 @@ const HospitalOnboarding: React.FC = () => {
     setTimeout(() => setPasswordCopied(false), 2000);
   };
   
-  const handleNextStep = () => {
-    // Validate current step
-    if (currentStep === 1) {
-      if (!hospitalProfile.name || !hospitalProfile.email || !hospitalProfile.phone || !hospitalProfile.address) {
-        addNotification({
-          message: 'Please fill in all required fields',
-          type: 'error'
-        });
-        return;
+  const regeneratePassword = () => {
+    setAdminSetup(prev => ({
+      ...prev,
+      password: generateRandomPassword()
+    }));
+  };
+  
+  const validateStep = (step: number): boolean => {
+    const newErrors: any = {};
+    
+    if (step === 1) {
+      // Validate hospital profile
+      const profileErrors: Record<string, string> = {};
+      
+      if (!hospitalProfile.name) {
+        profileErrors.name = 'Hospital name is required';
       }
       
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(hospitalProfile.email)) {
-        addNotification({
-          message: 'Please enter a valid email address',
-          type: 'error'
-        });
-        return;
+      if (!hospitalProfile.subdomain) {
+        profileErrors.subdomain = 'Subdomain is required';
+      } else if (subdomainAvailable === false) {
+        profileErrors.subdomain = 'This subdomain is already taken';
       }
       
-      // Validate subdomain format if provided
-      if (hospitalProfile.subdomain) {
-        const subdomainRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-        if (!subdomainRegex.test(hospitalProfile.subdomain)) {
-          addNotification({
-            message: 'Subdomain must contain only lowercase letters, numbers, and hyphens',
-            type: 'error'
-          });
-          return;
-        }
+      if (!hospitalProfile.address) {
+        profileErrors.address = 'Address is required';
+      }
+      
+      if (!hospitalProfile.phone) {
+        profileErrors.phone = 'Phone number is required';
+      }
+      
+      if (!hospitalProfile.email) {
+        profileErrors.email = 'Email is required';
+      } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(hospitalProfile.email)) {
+        profileErrors.email = 'Invalid email address';
+      }
+      
+      if (!hospitalProfile.contactPerson) {
+        profileErrors.contactPerson = 'Contact person is required';
+      }
+      
+      if (Object.keys(profileErrors).length > 0) {
+        newErrors.hospitalProfile = profileErrors;
+      }
+    } else if (step === 2) {
+      // Validate admin setup
+      const adminErrors: Record<string, string> = {};
+      
+      if (!adminSetup.password) {
+        adminErrors.password = 'Password is required';
+      } else if (adminSetup.password.length < 8) {
+        adminErrors.password = 'Password must be at least 8 characters';
+      }
+      
+      if (Object.keys(adminErrors).length > 0) {
+        newErrors.adminSetup = adminErrors;
+      }
+    } else if (step === 3) {
+      // Validate module selection
+      if (
+        moduleSelection.outpatient.length === 0 &&
+        moduleSelection.inpatient.length === 0 &&
+        moduleSelection.shared.length === 0
+      ) {
+        newErrors.moduleSelection = 'At least one module must be selected';
+      }
+    } else if (step === 4) {
+      // Validate pricing plan
+      if (!pricingPlan.plan) {
+        newErrors.pricingPlan = 'Please select a pricing plan';
+      }
+    } else if (step === 5) {
+      // Validate license details
+      const licenseErrors: Record<string, string> = {};
+      
+      if (!licenseDetails.startDate) {
+        licenseErrors.startDate = 'Start date is required';
+      }
+      
+      if (Object.keys(licenseErrors).length > 0) {
+        newErrors.licenseDetails = licenseErrors;
       }
     }
     
-    // Move to next step
-    setCurrentStep(currentStep + 1);
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
   
-  const handlePreviousStep = () => {
-    setCurrentStep(currentStep - 1);
-  };
-  
-  const applyTemplate = (template: string) => {
-    switch (template) {
-      case 'starter':
-        setModuleSelection({
-          ...moduleSelection,
-          outpatient: ['patient_registration', 'consultations', 'pharmacy', 'billing', 'queue'],
-          inpatient: [],
-          shared: ['lab'],
-          addons: [],
-          template: 'starter'
-        });
-        setPricingPlan({ plan: 'starter' });
-        break;
-      case 'pro':
-        setModuleSelection({
-          ...moduleSelection,
-          outpatient: ['patient_registration', 'consultations', 'pharmacy', 'billing', 'queue', 'appointments'],
-          inpatient: ['admission', 'beds', 'nurse_care', 'discharge'],
-          shared: ['lab', 'radiology', 'reports'],
-          addons: [],
-          template: 'pro'
-        });
-        setPricingPlan({ plan: 'pro' });
-        break;
-      case 'enterprise':
-        setModuleSelection({
-          ...moduleSelection,
-          outpatient: ['patient_registration', 'consultations', 'pharmacy', 'billing', 'queue', 'appointments'],
-          inpatient: ['admission', 'beds', 'nurse_care', 'discharge'],
-          shared: ['lab', 'radiology', 'ambulance', 'reports', 'hr', 'finance'],
-          addons: ['pos', 'ai_assistant', 'insurance', 'inventory', 'doctor_portal'],
-          template: 'enterprise'
-        });
-        setPricingPlan({ plan: 'enterprise' });
-        break;
-      default:
-        break;
+  const handleNext = () => {
+    if (validateStep(currentStep)) {
+      setCurrentStep(prev => prev + 1);
     }
+  };
+  
+  const handleBack = () => {
+    setCurrentStep(prev => prev - 1);
   };
   
   const handleSubmit = async () => {
-    setIsLoading(true);
+    if (!validateStep(currentStep)) {
+      return;
+    }
+    
+    setIsSubmitting(true);
     
     try {
-      // 1. Create hospital record
-      const { data: hospitalData, error: hospitalError } = await supabase
-        .from('hospitals')
-        .insert([{
-          name: hospitalProfile.name,
-          subdomain: hospitalProfile.subdomain || hospitalProfile.name.toLowerCase().replace(/\s+/g, '-'),
-          address: hospitalProfile.address,
-          phone: hospitalProfile.phone,
-          email: hospitalProfile.email,
-          domain_enabled: true
-        }])
-        .select()
-        .single();
-      
-      if (hospitalError) throw hospitalError;
-      
-      // 2. Create admin user
-      const { data: userData, error: userError } = await supabase.auth.admin.createUser({
-        email: hospitalProfile.email,
-        password: adminSetup.password,
-        email_confirm: true,
-        user_metadata: {
-          first_name: hospitalProfile.contactPerson.split(' ')[0] || 'Admin',
-          last_name: hospitalProfile.contactPerson.split(' ').slice(1).join(' ') || 'User',
-          role: 'admin',
-          hospital_id: hospitalData.id
-        }
+      // Call the Supabase Edge Function to create the hospital
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/hospital-onboarding/hospitals`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          hospitalProfile,
+          adminSetup,
+          moduleSelection,
+          pricingPlan,
+          licenseDetails
+        })
       });
       
-      if (userError) throw userError;
-      
-      // 3. Create profile for admin
-      const { error: profileError } = await supabase
-        .from('profiles')
-        .insert([{
-          id: userData.user.id,
-          first_name: hospitalProfile.contactPerson.split(' ')[0] || 'Admin',
-          last_name: hospitalProfile.contactPerson.split(' ').slice(1).join(' ') || 'User',
-          role: 'admin',
-          hospital_id: hospitalData.id,
-          email: hospitalProfile.email
-        }]);
-      
-      if (profileError) throw profileError;
-      
-      // 4. Store selected modules
-      const allModules = [
-        ...moduleSelection.outpatient.map(m => ({ module: m, category: 'outpatient' })),
-        ...moduleSelection.inpatient.map(m => ({ module: m, category: 'inpatient' })),
-        ...moduleSelection.shared.map(m => ({ module: m, category: 'shared' })),
-        ...moduleSelection.addons.map(m => ({ module: m, category: 'addon' }))
-      ];
-      
-      const { error: modulesError } = await supabase
-        .from('hospital_modules')
-        .insert(allModules.map(m => ({
-          hospital_id: hospitalData.id,
-          module_key: m.module,
-          category: m.category,
-          is_active: true
-        })));
-      
-      if (modulesError) throw modulesError;
-      
-      // 5. Create license
-      const { error: licenseError } = await supabase
-        .from('licenses')
-        .insert([{
-          hospital_id: hospitalData.id,
-          plan_id: getPlanId(pricingPlan.plan),
-          start_date: licenseDetails.startDate,
-          end_date: licenseDetails.type !== 'lifetime' ? calculateEndDate(licenseDetails.startDate, licenseDetails.type) : null,
-          status: 'active',
-          max_users: getPlanUserLimit(pricingPlan.plan),
-          current_users: 1, // Admin user
-          features: {},
-          billing_info: {
-            billing_cycle: licenseDetails.type,
-            auto_renew: licenseDetails.autoRenew,
-            payment_status: 'paid',
-            notes: licenseDetails.notes
-          }
-        }]);
-      
-      if (licenseError) throw licenseError;
-      
-      // 6. Send email if enabled
-      if (adminSetup.sendCredentials) {
-        // In a real app, this would send an email
-        console.log('Sending email to:', hospitalProfile.email);
-        console.log('Password:', adminSetup.password);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create hospital');
       }
       
-      // Success notification
+      const data = await response.json();
+      
       addNotification({
-        message: `Hospital ${hospitalProfile.name} created successfully!`,
+        message: 'Hospital created successfully',
         type: 'success'
       });
       
-      // Navigate back to super admin dashboard
+      // Navigate to the hospital list
       navigate('/super-admin');
       
     } catch (error: any) {
       console.error('Error creating hospital:', error);
       addNotification({
-        message: `Error: ${error.message}`,
+        message: `Failed to create hospital: ${error.message}`,
         type: 'error'
       });
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
   
-  // Helper functions for license and plan
-  const getPlanId = (plan: string): string => {
-    // In a real app, this would fetch the actual plan IDs from the database
-    const planIds: Record<string, string> = {
-      'starter': '00000000-0000-0000-0000-000000000001',
-      'pro': '00000000-0000-0000-0000-000000000002',
-      'enterprise': '00000000-0000-0000-0000-000000000003',
-      'custom': '00000000-0000-0000-0000-000000000004'
-    };
-    return planIds[plan] || planIds.starter;
+  const handleModuleToggle = (category: keyof ModuleSelection, key: string) => {
+    setModuleSelection(prev => {
+      const currentModules = [...prev[category]];
+      
+      if (currentModules.includes(key)) {
+        return {
+          ...prev,
+          [category]: currentModules.filter(m => m !== key)
+        };
+      } else {
+        return {
+          ...prev,
+          [category]: [...currentModules, key]
+        };
+      }
+    });
   };
   
-  const getPlanUserLimit = (plan: string): number => {
-    const limits: Record<string, number> = {
-      'starter': 5,
-      'pro': 20,
-      'enterprise': 100,
-      'custom': 10
-    };
-    return limits[plan] || limits.starter;
-  };
-  
-  const calculateEndDate = (startDate: string, licenseType: 'monthly' | 'yearly'): string => {
-    const date = new Date(startDate);
-    if (licenseType === 'monthly') {
-      date.setMonth(date.getMonth() + 1);
+  const handleTemplateSelection = (template: 'starter' | 'full' | 'custom') => {
+    if (template === 'starter') {
+      // Basic outpatient setup
+      setModuleSelection({
+        outpatient: modules
+          .filter(m => m.category === 'outpatient' && m.is_core)
+          .map(m => m.key),
+        inpatient: [],
+        shared: modules
+          .filter(m => m.category === 'shared' && m.is_core)
+          .map(m => m.key),
+        addons: []
+      });
+      setPricingPlan({ plan: 'starter' });
+    } else if (template === 'full') {
+      // Complete setup with all modules
+      setModuleSelection({
+        outpatient: modules
+          .filter(m => m.category === 'outpatient')
+          .map(m => m.key),
+        inpatient: modules
+          .filter(m => m.category === 'inpatient')
+          .map(m => m.key),
+        shared: modules
+          .filter(m => m.category === 'shared')
+          .map(m => m.key),
+        addons: modules
+          .filter(m => m.category === 'addon')
+          .map(m => m.key)
+      });
+      setPricingPlan({ plan: 'enterprise' });
     } else {
-      date.setFullYear(date.getFullYear() + 1);
+      // Custom - reset to core modules only
+      setModuleSelection({
+        outpatient: modules
+          .filter(m => m.category === 'outpatient' && m.is_core)
+          .map(m => m.key),
+        inpatient: [],
+        shared: modules
+          .filter(m => m.category === 'shared' && m.is_core)
+          .map(m => m.key),
+        addons: []
+      });
+      setPricingPlan({ plan: 'custom' });
     }
-    return date.toISOString().split('T')[0];
   };
   
-  // Render the current step
-  const renderStep = () => {
+  const getModuleIcon = (category: string, moduleKey: string) => {
+    // Return appropriate icon based on module key or category
+    if (category === 'outpatient') {
+      if (moduleKey.includes('patient')) return <Users className="h-5 w-5" />;
+      if (moduleKey.includes('appointment')) return <Calendar className="h-5 w-5" />;
+      if (moduleKey.includes('consultation')) return <Stethoscope className="h-5 w-5" />;
+      if (moduleKey.includes('pharmacy')) return <Pill className="h-5 w-5" />;
+      if (moduleKey.includes('billing')) return <DollarSign className="h-5 w-5" />;
+      return <LayoutDashboard className="h-5 w-5" />;
+    } else if (category === 'inpatient') {
+      if (moduleKey.includes('bed')) return <BedDouble className="h-5 w-5" />;
+      return <BedDouble className="h-5 w-5" />;
+    } else if (category === 'shared') {
+      if (moduleKey.includes('lab')) return <Flask className="h-5 w-5" />;
+      if (moduleKey.includes('radio')) return <Microscope className="h-5 w-5" />;
+      if (moduleKey.includes('report')) return <FileText className="h-5 w-5" />;
+      return <Activity className="h-5 w-5" />;
+    } else {
+      // Add-ons
+      return <Box className="h-5 w-5" />;
+    }
+  };
+  
+  const renderStepContent = () => {
     switch (currentStep) {
       case 1:
         return (
           <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-gray-900">Hospital Profile Setup</h2>
-            <p className="text-sm text-gray-600">Enter the basic information about the hospital.</p>
+            <h2 className="text-xl font-semibold text-gray-900">Hospital Profile</h2>
+            <p className="text-gray-600">Enter the basic information about the hospital.</p>
             
             <div className="space-y-4">
               <div>
@@ -377,29 +572,111 @@ const HospitalOnboarding: React.FC = () => {
                   </div>
                   <input
                     type="text"
-                    value={hospitalProfile.name}
-                    onChange={(e) => setHospitalProfile({...hospitalProfile, name: e.target.value})}
-                    className="form-input pl-10"
+                    className={`form-input pl-10 ${errors.hospitalProfile?.name ? 'border-error-300' : ''}`}
                     placeholder="Enter hospital name"
+                    value={hospitalProfile.name}
+                    onChange={e => setHospitalProfile({...hospitalProfile, name: e.target.value})}
                   />
                 </div>
+                {errors.hospitalProfile?.name && (
+                  <p className="mt-1 text-sm text-error-600">{errors.hospitalProfile.name}</p>
+                )}
               </div>
               
               <div>
-                <label className="form-label required">Hospital Email</label>
+                <label className="form-label required">Subdomain</label>
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Mail className="h-5 w-5 text-gray-400" />
+                    <Globe className="h-5 w-5 text-gray-400" />
                   </div>
                   <input
-                    type="email"
-                    value={hospitalProfile.email}
-                    onChange={(e) => setHospitalProfile({...hospitalProfile, email: e.target.value})}
-                    className="form-input pl-10"
-                    placeholder="hospital@example.com"
+                    type="text"
+                    className={`form-input pl-10 ${errors.hospitalProfile?.subdomain ? 'border-error-300' : ''}`}
+                    placeholder="hospital-name"
+                    value={hospitalProfile.subdomain}
+                    onChange={e => setHospitalProfile({...hospitalProfile, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '-')})}
+                  />
+                  {isCheckingSubdomain && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                      <Loader2 className="h-5 w-5 text-gray-400 animate-spin" />
+                    </div>
+                  )}
+                  {!isCheckingSubdomain && subdomainAvailable !== null && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                      {subdomainAvailable ? (
+                        <CheckCircle className="h-5 w-5 text-success-500" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-error-500" />
+                      )}
+                    </div>
+                  )}
+                </div>
+                {errors.hospitalProfile?.subdomain ? (
+                  <p className="mt-1 text-sm text-error-600">{errors.hospitalProfile.subdomain}</p>
+                ) : (
+                  <p className="mt-1 text-sm text-gray-500">
+                    {hospitalProfile.subdomain ? `${hospitalProfile.subdomain}.${mainDomain}` : 'Your hospital URL will appear here'}
+                  </p>
+                )}
+              </div>
+              
+              <div>
+                <label className="form-label required">Address</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <MapPin className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <textarea
+                    className={`form-input pl-10 ${errors.hospitalProfile?.address ? 'border-error-300' : ''}`}
+                    placeholder="Enter complete address"
+                    rows={3}
+                    value={hospitalProfile.address}
+                    onChange={e => setHospitalProfile({...hospitalProfile, address: e.target.value})}
                   />
                 </div>
-                <p className="mt-1 text-xs text-gray-500">This email will be used for admin login.</p>
+                {errors.hospitalProfile?.address && (
+                  <p className="mt-1 text-sm text-error-600">{errors.hospitalProfile.address}</p>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <label className="form-label required">Phone Number</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Phone className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="tel"
+                      className={`form-input pl-10 ${errors.hospitalProfile?.phone ? 'border-error-300' : ''}`}
+                      placeholder="+1 (555) 000-0000"
+                      value={hospitalProfile.phone}
+                      onChange={e => setHospitalProfile({...hospitalProfile, phone: e.target.value})}
+                    />
+                  </div>
+                  {errors.hospitalProfile?.phone && (
+                    <p className="mt-1 text-sm text-error-600">{errors.hospitalProfile.phone}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="form-label required">Email Address</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Mail className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="email"
+                      className={`form-input pl-10 ${errors.hospitalProfile?.email ? 'border-error-300' : ''}`}
+                      placeholder="hospital@example.com"
+                      value={hospitalProfile.email}
+                      onChange={e => setHospitalProfile({...hospitalProfile, email: e.target.value})}
+                    />
+                  </div>
+                  {errors.hospitalProfile?.email && (
+                    <p className="mt-1 text-sm text-error-600">{errors.hospitalProfile.email}</p>
+                  )}
+                </div>
               </div>
               
               <div>
@@ -410,891 +687,795 @@ const HospitalOnboarding: React.FC = () => {
                   </div>
                   <input
                     type="text"
-                    value={hospitalProfile.contactPerson}
-                    onChange={(e) => setHospitalProfile({...hospitalProfile, contactPerson: e.target.value})}
-                    className="form-input pl-10"
+                    className={`form-input pl-10 ${errors.hospitalProfile?.contactPerson ? 'border-error-300' : ''}`}
                     placeholder="Full name of primary contact"
+                    value={hospitalProfile.contactPerson}
+                    onChange={e => setHospitalProfile({...hospitalProfile, contactPerson: e.target.value})}
                   />
                 </div>
-              </div>
-              
-              <div>
-                <label className="form-label required">Phone Number</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Phone className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="tel"
-                    value={hospitalProfile.phone}
-                    onChange={(e) => setHospitalProfile({...hospitalProfile, phone: e.target.value})}
-                    className="form-input pl-10"
-                    placeholder="+1 (555) 000-0000"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="form-label required">Address</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <MapPin className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <textarea
-                    value={hospitalProfile.address}
-                    onChange={(e) => setHospitalProfile({...hospitalProfile, address: e.target.value})}
-                    className="form-input pl-10"
-                    rows={3}
-                    placeholder="Full address of the hospital"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="form-label">Subdomain (Optional)</label>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <Globe className="h-5 w-5 text-gray-400" />
-                  </div>
-                  <input
-                    type="text"
-                    value={hospitalProfile.subdomain}
-                    onChange={(e) => setHospitalProfile({...hospitalProfile, subdomain: e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '')})}
-                    className="form-input pl-10"
-                    placeholder="hospital-name"
-                  />
-                </div>
-                <p className="mt-1 text-xs text-gray-500">
-                  {hospitalProfile.subdomain ? 
-                    `Hospital will be accessible at ${hospitalProfile.subdomain}.searchable.today` : 
-                    'If not provided, a subdomain will be generated from the hospital name.'}
+                {errors.hospitalProfile?.contactPerson && (
+                  <p className="mt-1 text-sm text-error-600">{errors.hospitalProfile.contactPerson}</p>
+                )}
+                <p className="mt-1 text-sm text-gray-500">
+                  This person will be set up as the initial admin user.
                 </p>
               </div>
             </div>
           </div>
         );
-      
+        
       case 2:
         return (
           <div className="space-y-6">
             <h2 className="text-xl font-semibold text-gray-900">Admin Login Setup</h2>
-            <p className="text-sm text-gray-600">Configure the admin account for this hospital.</p>
+            <p className="text-gray-600">Configure the login credentials for the hospital admin.</p>
             
             <div className="space-y-4">
-              <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <p className="text-sm text-gray-700">
-                  <span className="font-medium">Admin Email:</span> {hospitalProfile.email}
+              <div>
+                <label className="form-label">Admin Email</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="email"
+                    className="form-input pl-10 bg-gray-50"
+                    value={hospitalProfile.email}
+                    readOnly
+                  />
+                </div>
+                <p className="mt-1 text-sm text-gray-500">
+                  The hospital email will be used as the admin login.
                 </p>
-              </div>
-              
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="generatePassword"
-                  checked={adminSetup.generatePassword}
-                  onChange={(e) => setAdminSetup({...adminSetup, generatePassword: e.target.checked})}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                />
-                <label htmlFor="generatePassword" className="ml-2 block text-sm text-gray-900">
-                  Auto-generate secure password
-                </label>
               </div>
               
               <div>
                 <label className="form-label required">Password</label>
                 <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Key className="h-5 w-5 text-gray-400" />
+                  </div>
                   <input
                     type={showPassword ? "text" : "password"}
+                    className={`form-input pl-10 pr-20 ${errors.adminSetup?.password ? 'border-error-300' : ''}`}
                     value={adminSetup.password}
-                    onChange={(e) => setAdminSetup({...adminSetup, password: e.target.value})}
-                    disabled={adminSetup.generatePassword}
-                    className={`form-input pr-20 ${adminSetup.generatePassword ? 'bg-gray-100' : ''}`}
+                    onChange={e => setAdminSetup({...adminSetup, password: e.target.value})}
                   />
-                  <div className="absolute inset-y-0 right-0 flex items-center pr-3 space-x-1">
+                  <div className="absolute inset-y-0 right-0 flex items-center space-x-1 pr-2">
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="text-gray-400 hover:text-gray-500"
+                      className="p-1 text-gray-400 hover:text-gray-600"
                     >
                       {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                     </button>
                     <button
                       type="button"
                       onClick={copyPasswordToClipboard}
-                      className="text-gray-400 hover:text-gray-500"
+                      className="p-1 text-gray-400 hover:text-gray-600"
+                      title="Copy password"
                     >
-                      {passwordCopied ? <Check className="h-5 w-5 text-green-500" /> : <Copy className="h-5 w-5" />}
+                      {passwordCopied ? <Check className="h-5 w-5 text-success-500" /> : <Copy className="h-5 w-5" />}
                     </button>
                   </div>
                 </div>
-                {passwordCopied && (
-                  <p className="mt-1 text-xs text-green-600">Password copied to clipboard!</p>
+                {errors.adminSetup?.password && (
+                  <p className="mt-1 text-sm text-error-600">{errors.adminSetup.password}</p>
                 )}
+                <div className="mt-2 flex justify-between items-center">
+                  <p className="text-sm text-gray-500">
+                    Auto-generated secure password
+                  </p>
+                  <button
+                    type="button"
+                    onClick={regeneratePassword}
+                    className="text-sm text-primary-600 hover:text-primary-800"
+                  >
+                    Regenerate
+                  </button>
+                </div>
               </div>
               
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="forcePasswordChange"
-                  checked={adminSetup.forcePasswordChange}
-                  onChange={(e) => setAdminSetup({...adminSetup, forcePasswordChange: e.target.checked})}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                />
-                <label htmlFor="forcePasswordChange" className="ml-2 block text-sm text-gray-900">
-                  Force password change on first login
-                </label>
+              <div className="space-y-3 mt-6">
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="forcePasswordChange"
+                    checked={adminSetup.forcePasswordChange}
+                    onChange={e => setAdminSetup({...adminSetup, forcePasswordChange: e.target.checked})}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="forcePasswordChange" className="ml-2 block text-sm text-gray-900">
+                    Force password change on first login
+                  </label>
+                </div>
+                
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="sendCredentials"
+                    checked={adminSetup.sendCredentials}
+                    onChange={e => setAdminSetup({...adminSetup, sendCredentials: e.target.checked})}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="sendCredentials" className="ml-2 block text-sm text-gray-900">
+                    Send login credentials via email
+                  </label>
+                </div>
               </div>
               
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="sendCredentials"
-                  checked={adminSetup.sendCredentials}
-                  onChange={(e) => setAdminSetup({...adminSetup, sendCredentials: e.target.checked})}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                />
-                <label htmlFor="sendCredentials" className="ml-2 block text-sm text-gray-900">
-                  Send login credentials via email
-                </label>
-              </div>
-              
-              {adminSetup.sendCredentials && (
-                <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                  <h3 className="text-sm font-medium text-blue-800 mb-2">Email Preview</h3>
-                  <div className="bg-white p-3 rounded border border-blue-100 text-sm">
-                    <p><strong>Subject:</strong> Your Hospital Management System Access</p>
-                    <p><strong>To:</strong> {hospitalProfile.email}</p>
-                    <hr className="my-2 border-blue-100" />
-                    <p>Dear {hospitalProfile.contactPerson},</p>
-                    <p className="my-2">Your hospital ({hospitalProfile.name}) has been set up in our system. You can access your dashboard using the following credentials:</p>
-                    <p><strong>URL:</strong> https://{hospitalProfile.subdomain || hospitalProfile.name.toLowerCase().replace(/\s+/g, '-')}.searchable.today</p>
-                    <p><strong>Email:</strong> {hospitalProfile.email}</p>
-                    <p><strong>Password:</strong> [Your temporary password]</p>
-                    <p className="my-2">For security reasons, you will be required to change your password upon first login.</p>
-                    <p>If you have any questions, please contact our support team.</p>
+              <div className="bg-blue-50 p-4 rounded-lg mt-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <AlertCircle className="h-5 w-5 text-blue-400" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-blue-800">Email Content Preview</h3>
+                    <div className="mt-2 text-sm text-blue-700">
+                      <p>Subject: Your Hospital Management System Account</p>
+                      <p className="mt-1">Hello {hospitalProfile.contactPerson},</p>
+                      <p className="mt-1">Your hospital ({hospitalProfile.name}) has been set up on our platform. You can access your dashboard at:</p>
+                      <p className="mt-1 font-medium">{hospitalProfile.subdomain}.{mainDomain}</p>
+                      <p className="mt-1">Login credentials:</p>
+                      <p className="mt-1">Email: {hospitalProfile.email}</p>
+                      <p className="mt-1">Password: {showPassword ? adminSetup.password : '••••••••••••'}</p>
+                      {adminSetup.forcePasswordChange && (
+                        <p className="mt-1">You will be required to change your password on first login.</p>
+                      )}
+                    </div>
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         );
-      
+        
       case 3:
         return (
           <div className="space-y-6">
             <h2 className="text-xl font-semibold text-gray-900">Select Modules</h2>
-            <p className="text-sm text-gray-600">Choose which modules to enable for this hospital.</p>
+            <p className="text-gray-600">Choose which modules to enable for this hospital.</p>
             
             <div className="space-y-4">
-              <div className="flex space-x-4 mb-4">
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="button"
-                  onClick={() => applyTemplate('starter')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    moduleSelection.template === 'starter' 
-                      ? 'bg-primary-100 text-primary-700 border border-primary-300' 
-                      : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                  }`}
+                  onClick={() => handleTemplateSelection('starter')}
+                  className="btn btn-outline py-1 px-3 text-sm"
                 >
                   Starter Template
                 </button>
                 <button
                   type="button"
-                  onClick={() => applyTemplate('pro')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    moduleSelection.template === 'pro' 
-                      ? 'bg-primary-100 text-primary-700 border border-primary-300' 
-                      : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                  }`}
+                  onClick={() => handleTemplateSelection('full')}
+                  className="btn btn-outline py-1 px-3 text-sm"
                 >
-                  Pro Template
+                  Full Setup
                 </button>
                 <button
                   type="button"
-                  onClick={() => applyTemplate('enterprise')}
-                  className={`px-4 py-2 rounded-md text-sm font-medium ${
-                    moduleSelection.template === 'enterprise' 
-                      ? 'bg-primary-100 text-primary-700 border border-primary-300' 
-                      : 'bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200'
-                  }`}
+                  onClick={() => handleTemplateSelection('custom')}
+                  className="btn btn-outline py-1 px-3 text-sm"
                 >
-                  Enterprise Template
+                  Custom Selection
                 </button>
               </div>
+              
+              {errors.moduleSelection && (
+                <div className="p-3 bg-error-50 text-error-700 rounded-md">
+                  {errors.moduleSelection}
+                </div>
+              )}
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {/* Outpatient Modules */}
                 <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <h3 className="text-base font-medium text-gray-900 mb-3">Outpatient Modules</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">Outpatient Modules</h3>
                   <div className="space-y-2">
-                    {[
-                      { id: 'patient_registration', label: 'Patient Registration' },
-                      { id: 'consultations', label: 'Consultations' },
-                      { id: 'pharmacy', label: 'Pharmacy' },
-                      { id: 'billing', label: 'Billing' },
-                      { id: 'queue', label: 'Queue Management' },
-                      { id: 'appointments', label: 'Appointments' }
-                    ].map(module => (
-                      <div key={module.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`outpatient-${module.id}`}
-                          checked={moduleSelection.outpatient.includes(module.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setModuleSelection({
-                                ...moduleSelection,
-                                outpatient: [...moduleSelection.outpatient, module.id],
-                                template: 'custom'
-                              });
-                            } else {
-                              setModuleSelection({
-                                ...moduleSelection,
-                                outpatient: moduleSelection.outpatient.filter(m => m !== module.id),
-                                template: 'custom'
-                              });
-                            }
-                          }}
-                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`outpatient-${module.id}`} className="ml-2 block text-sm text-gray-900">
-                          {module.label}
-                        </label>
-                      </div>
-                    ))}
+                    {modules
+                      .filter(module => module.category === 'outpatient')
+                      .map(module => (
+                        <div key={module.key} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`outpatient-${module.key}`}
+                            checked={moduleSelection.outpatient.includes(module.key)}
+                            onChange={() => handleModuleToggle('outpatient', module.key)}
+                            disabled={module.is_core} // Core modules cannot be disabled
+                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor={`outpatient-${module.key}`} className="ml-2 flex items-center">
+                            <span className="text-gray-700 text-sm">{module.name}</span>
+                            {module.is_core && (
+                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary-100 text-primary-800">
+                                Core
+                              </span>
+                            )}
+                          </label>
+                        </div>
+                      ))
+                    }
                   </div>
                 </div>
                 
                 {/* Inpatient Modules */}
                 <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <h3 className="text-base font-medium text-gray-900 mb-3">Inpatient Modules</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">Inpatient Modules</h3>
                   <div className="space-y-2">
-                    {[
-                      { id: 'admission', label: 'Admission' },
-                      { id: 'beds', label: 'Bed Management' },
-                      { id: 'nurse_care', label: 'Nurse Care' },
-                      { id: 'discharge', label: 'Discharge' }
-                    ].map(module => (
-                      <div key={module.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`inpatient-${module.id}`}
-                          checked={moduleSelection.inpatient.includes(module.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setModuleSelection({
-                                ...moduleSelection,
-                                inpatient: [...moduleSelection.inpatient, module.id],
-                                template: 'custom'
-                              });
-                            } else {
-                              setModuleSelection({
-                                ...moduleSelection,
-                                inpatient: moduleSelection.inpatient.filter(m => m !== module.id),
-                                template: 'custom'
-                              });
-                            }
-                          }}
-                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`inpatient-${module.id}`} className="ml-2 block text-sm text-gray-900">
-                          {module.label}
-                        </label>
-                      </div>
-                    ))}
+                    {modules
+                      .filter(module => module.category === 'inpatient')
+                      .map(module => (
+                        <div key={module.key} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`inpatient-${module.key}`}
+                            checked={moduleSelection.inpatient.includes(module.key)}
+                            onChange={() => handleModuleToggle('inpatient', module.key)}
+                            disabled={module.is_core && moduleSelection.inpatient.length > 0} // Core modules cannot be disabled if any inpatient module is selected
+                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor={`inpatient-${module.key}`} className="ml-2 flex items-center">
+                            <span className="text-gray-700 text-sm">{module.name}</span>
+                            {module.is_core && (
+                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary-100 text-primary-800">
+                                Core
+                              </span>
+                            )}
+                          </label>
+                        </div>
+                      ))
+                    }
                   </div>
                 </div>
                 
-                {/* Shared/General Modules */}
+                {/* Shared Modules */}
                 <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <h3 className="text-base font-medium text-gray-900 mb-3">Shared/General Modules</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">Shared Modules</h3>
                   <div className="space-y-2">
-                    {[
-                      { id: 'lab', label: 'Laboratory' },
-                      { id: 'radiology', label: 'Radiology' },
-                      { id: 'ambulance', label: 'Ambulance' },
-                      { id: 'reports', label: 'Reports' },
-                      { id: 'hr', label: 'HR Management' },
-                      { id: 'finance', label: 'Finance' }
-                    ].map(module => (
-                      <div key={module.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`shared-${module.id}`}
-                          checked={moduleSelection.shared.includes(module.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setModuleSelection({
-                                ...moduleSelection,
-                                shared: [...moduleSelection.shared, module.id],
-                                template: 'custom'
-                              });
-                            } else {
-                              setModuleSelection({
-                                ...moduleSelection,
-                                shared: moduleSelection.shared.filter(m => m !== module.id),
-                                template: 'custom'
-                              });
-                            }
-                          }}
-                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`shared-${module.id}`} className="ml-2 block text-sm text-gray-900">
-                          {module.label}
-                        </label>
-                      </div>
-                    ))}
+                    {modules
+                      .filter(module => module.category === 'shared')
+                      .map(module => (
+                        <div key={module.key} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`shared-${module.key}`}
+                            checked={moduleSelection.shared.includes(module.key)}
+                            onChange={() => handleModuleToggle('shared', module.key)}
+                            disabled={module.is_core} // Core modules cannot be disabled
+                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor={`shared-${module.key}`} className="ml-2 flex items-center">
+                            <span className="text-gray-700 text-sm">{module.name}</span>
+                            {module.is_core && (
+                              <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-primary-100 text-primary-800">
+                                Core
+                              </span>
+                            )}
+                          </label>
+                        </div>
+                      ))
+                    }
                   </div>
                 </div>
                 
-                {/* Optional Add-ons */}
+                {/* Add-on Modules */}
                 <div className="bg-white p-4 rounded-lg border border-gray-200">
-                  <h3 className="text-base font-medium text-gray-900 mb-3">Optional Add-ons</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-3">Add-on Modules</h3>
                   <div className="space-y-2">
-                    {[
-                      { id: 'pos', label: 'Point of Sale (POS)' },
-                      { id: 'ai_assistant', label: 'AI Assistant' },
-                      { id: 'insurance', label: 'Insurance Management' },
-                      { id: 'inventory', label: 'Inventory Management' },
-                      { id: 'doctor_portal', label: 'Doctor Portal' }
-                    ].map(module => (
-                      <div key={module.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          id={`addon-${module.id}`}
-                          checked={moduleSelection.addons.includes(module.id)}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setModuleSelection({
-                                ...moduleSelection,
-                                addons: [...moduleSelection.addons, module.id],
-                                template: 'custom'
-                              });
-                            } else {
-                              setModuleSelection({
-                                ...moduleSelection,
-                                addons: moduleSelection.addons.filter(m => m !== module.id),
-                                template: 'custom'
-                              });
-                            }
-                          }}
-                          className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                        />
-                        <label htmlFor={`addon-${module.id}`} className="ml-2 block text-sm text-gray-900">
-                          {module.label}
-                        </label>
-                      </div>
-                    ))}
+                    {modules
+                      .filter(module => module.category === 'addon')
+                      .map(module => (
+                        <div key={module.key} className="flex items-center">
+                          <input
+                            type="checkbox"
+                            id={`addon-${module.key}`}
+                            checked={moduleSelection.addons.includes(module.key)}
+                            onChange={() => handleModuleToggle('addons', module.key)}
+                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                          />
+                          <label htmlFor={`addon-${module.key}`} className="ml-2 flex items-center">
+                            <span className="text-gray-700 text-sm">{module.name}</span>
+                            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-accent-100 text-accent-800">
+                              Premium
+                            </span>
+                          </label>
+                        </div>
+                      ))
+                    }
                   </div>
                 </div>
               </div>
             </div>
           </div>
         );
-      
+        
       case 4:
         return (
           <div className="space-y-6">
             <h2 className="text-xl font-semibold text-gray-900">Select Pricing Plan</h2>
-            <p className="text-sm text-gray-600">Choose a pricing plan based on the hospital's needs.</p>
+            <p className="text-gray-600">Choose a pricing plan for this hospital.</p>
+            
+            {errors.pricingPlan && (
+              <div className="p-3 bg-error-50 text-error-700 rounded-md">
+                {errors.pricingPlan}
+              </div>
+            )}
             
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div 
-                className={`bg-white p-6 rounded-lg border-2 cursor-pointer transition-all ${
-                  pricingPlan.plan === 'starter' 
-                    ? 'border-primary-500 shadow-md' 
-                    : 'border-gray-200 hover:border-gray-300 hover:shadow'
-                }`}
-                onClick={() => setPricingPlan({ plan: 'starter' })}
-              >
-                <div className="flex justify-between items-start">
-                  <h3 className="text-lg font-medium text-gray-900">Starter Plan</h3>
-                  {pricingPlan.plan === 'starter' && (
-                    <CheckCircle className="h-5 w-5 text-primary-500" />
-                  )}
-                </div>
-                <p className="mt-2 text-sm text-gray-500">Outpatient modules only</p>
-                <div className="mt-4">
-                  <span className="text-2xl font-bold text-gray-900">$99</span>
-                  <span className="text-gray-500">/month</span>
-                </div>
-                <ul className="mt-4 space-y-2">
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-gray-600">Up to 5 users</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-gray-600">Basic patient management</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-gray-600">Consultations & billing</span>
-                  </li>
-                </ul>
-              </div>
-              
-              <div 
-                className={`bg-white p-6 rounded-lg border-2 cursor-pointer transition-all ${
-                  pricingPlan.plan === 'pro' 
-                    ? 'border-primary-500 shadow-md' 
-                    : 'border-gray-200 hover:border-gray-300 hover:shadow'
-                }`}
-                onClick={() => setPricingPlan({ plan: 'pro' })}
-              >
-                <div className="flex justify-between items-start">
-                  <h3 className="text-lg font-medium text-gray-900">Pro Plan</h3>
-                  {pricingPlan.plan === 'pro' && (
-                    <CheckCircle className="h-5 w-5 text-primary-500" />
-                  )}
-                </div>
-                <p className="mt-2 text-sm text-gray-500">Outpatient + Inpatient</p>
-                <div className="mt-4">
-                  <span className="text-2xl font-bold text-gray-900">$299</span>
-                  <span className="text-gray-500">/month</span>
-                </div>
-                <ul className="mt-4 space-y-2">
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-gray-600">Up to 20 users</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-gray-600">Full patient management</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-gray-600">Inpatient ward management</span>
-                  </li>
-                </ul>
-              </div>
-              
-              <div 
-                className={`bg-white p-6 rounded-lg border-2 cursor-pointer transition-all ${
-                  pricingPlan.plan === 'enterprise' 
-                    ? 'border-primary-500 shadow-md' 
-                    : 'border-gray-200 hover:border-gray-300 hover:shadow'
-                }`}
-                onClick={() => setPricingPlan({ plan: 'enterprise' })}
-              >
-                <div className="flex justify-between items-start">
-                  <h3 className="text-lg font-medium text-gray-900">Enterprise</h3>
-                  {pricingPlan.plan === 'enterprise' && (
-                    <CheckCircle className="h-5 w-5 text-primary-500" />
-                  )}
-                </div>
-                <p className="mt-2 text-sm text-gray-500">All modules + Add-ons</p>
-                <div className="mt-4">
-                  <span className="text-2xl font-bold text-gray-900">$599</span>
-                  <span className="text-gray-500">/month</span>
-                </div>
-                <ul className="mt-4 space-y-2">
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-gray-600">Up to 100 users</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-gray-600">All modules included</span>
-                  </li>
-                  <li className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-gray-600">Priority support</span>
-                  </li>
-                </ul>
-              </div>
-            </div>
-            
-            {moduleSelection.template === 'custom' && (
-              <div className="mt-6">
+              {plans.map(plan => (
                 <div 
-                  className={`bg-white p-6 rounded-lg border-2 cursor-pointer transition-all ${
-                    pricingPlan.plan === 'custom' 
+                  key={plan.id}
+                  className={`bg-white p-6 rounded-lg border-2 transition-all cursor-pointer ${
+                    pricingPlan.plan === plan.key 
                       ? 'border-primary-500 shadow-md' 
-                      : 'border-gray-200 hover:border-gray-300 hover:shadow'
+                      : 'border-gray-200 hover:border-gray-300'
                   }`}
-                  onClick={() => setPricingPlan({ plan: 'custom' })}
+                  onClick={() => setPricingPlan({ plan: plan.key })}
                 >
                   <div className="flex justify-between items-start">
-                    <h3 className="text-lg font-medium text-gray-900">Custom Plan</h3>
-                    {pricingPlan.plan === 'custom' && (
+                    <h3 className="text-lg font-medium text-gray-900">{plan.name}</h3>
+                    {pricingPlan.plan === plan.key && (
                       <CheckCircle className="h-5 w-5 text-primary-500" />
                     )}
                   </div>
-                  <p className="mt-2 text-sm text-gray-500">Based on selected modules</p>
+                  
+                  <p className="mt-2 text-sm text-gray-500">{plan.description}</p>
+                  
                   <div className="mt-4">
-                    <span className="text-2xl font-bold text-gray-900">Custom</span>
-                    <span className="text-gray-500"> pricing</span>
+                    <span className="text-2xl font-bold text-gray-900">${plan.price}</span>
+                    <span className="text-gray-500">/{plan.billing_cycle}</span>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700">Selected Modules:</h4>
-                      <p className="text-sm text-gray-600">
-                        {moduleSelection.outpatient.length} Outpatient, {moduleSelection.inpatient.length} Inpatient, 
-                        {moduleSelection.shared.length} Shared, {moduleSelection.addons.length} Add-ons
-                      </p>
+                  
+                  <ul className="mt-4 space-y-2">
+                    {plan.features.map((feature: any, index: number) => (
+                      <li key={index} className="flex items-start">
+                        <CheckCircle className="h-5 w-5 text-success-500 mr-2 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm text-gray-600">{feature.feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  
+                  <div className="mt-4 pt-4 border-t border-gray-200">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-500">Max Users</span>
+                      <span className="font-medium text-gray-900">{plan.max_users}</span>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-700">User Limit:</h4>
-                      <p className="text-sm text-gray-600">10 users (customizable)</p>
+                    <div className="flex justify-between text-sm mt-1">
+                      <span className="text-gray-500">Storage</span>
+                      <span className="font-medium text-gray-900">{plan.max_storage_gb}GB</span>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         );
-      
+        
       case 5:
         return (
           <div className="space-y-6">
             <h2 className="text-xl font-semibold text-gray-900">License Management</h2>
-            <p className="text-sm text-gray-600">Configure the license details for this hospital.</p>
+            <p className="text-gray-600">Configure the license details for this hospital.</p>
             
             <div className="space-y-4">
               <div>
                 <label className="form-label">License Type</label>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-                  <div 
-                    className={`p-4 border rounded-lg cursor-pointer ${
-                      licenseDetails.type === 'monthly' 
-                        ? 'border-primary-500 bg-primary-50' 
-                        : 'border-gray-200 hover:border-gray-300'
+                  <div
+                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                      licenseDetails.type === 'monthly' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
                     }`}
                     onClick={() => setLicenseDetails({...licenseDetails, type: 'monthly'})}
                   >
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-base font-medium text-gray-900">Monthly</h3>
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-lg font-medium text-gray-900">Monthly</h3>
                       {licenseDetails.type === 'monthly' && (
                         <CheckCircle className="h-5 w-5 text-primary-500" />
                       )}
                     </div>
-                    <p className="mt-1 text-sm text-gray-500">Billed monthly</p>
-                    <div className="mt-2">
-                      <span className="text-lg font-bold text-gray-900">
-                        {pricingPlan.plan === 'starter' ? '$99' : 
-                         pricingPlan.plan === 'pro' ? '$299' : 
-                         pricingPlan.plan === 'enterprise' ? '$599' : 'Custom'}
-                      </span>
-                      <span className="text-gray-500">/month</span>
-                    </div>
+                    <p className="text-sm text-gray-500 mt-1">Billed monthly</p>
                   </div>
                   
-                  <div 
-                    className={`p-4 border rounded-lg cursor-pointer ${
-                      licenseDetails.type === 'yearly' 
-                        ? 'border-primary-500 bg-primary-50' 
-                        : 'border-gray-200 hover:border-gray-300'
+                  <div
+                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                      licenseDetails.type === 'yearly' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
                     }`}
                     onClick={() => setLicenseDetails({...licenseDetails, type: 'yearly'})}
                   >
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-base font-medium text-gray-900">Yearly</h3>
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-lg font-medium text-gray-900">Yearly</h3>
                       {licenseDetails.type === 'yearly' && (
                         <CheckCircle className="h-5 w-5 text-primary-500" />
                       )}
                     </div>
-                    <p className="mt-1 text-sm text-gray-500">Save 20% with annual billing</p>
-                    <div className="mt-2">
-                      <span className="text-lg font-bold text-gray-900">
-                        {pricingPlan.plan === 'starter' ? '$950' : 
-                         pricingPlan.plan === 'pro' ? '$2,870' : 
-                         pricingPlan.plan === 'enterprise' ? '$5,750' : 'Custom'}
-                      </span>
-                      <span className="text-gray-500">/year</span>
-                    </div>
-                    <span className="mt-1 inline-block px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
+                    <p className="text-sm text-gray-500 mt-1">Save 20% with annual billing</p>
+                    <span className="mt-2 inline-block px-2 py-1 text-xs font-medium rounded-full bg-success-100 text-success-800">
                       20% off
                     </span>
                   </div>
                   
-                  <div 
-                    className={`p-4 border rounded-lg cursor-pointer ${
-                      licenseDetails.type === 'lifetime' 
-                        ? 'border-primary-500 bg-primary-50' 
-                        : 'border-gray-200 hover:border-gray-300'
+                  <div
+                    className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                      licenseDetails.type === 'lifetime' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
                     }`}
                     onClick={() => setLicenseDetails({...licenseDetails, type: 'lifetime'})}
                   >
-                    <div className="flex justify-between items-center">
-                      <h3 className="text-base font-medium text-gray-900">Lifetime</h3>
+                    <div className="flex justify-between items-start">
+                      <h3 className="text-lg font-medium text-gray-900">Lifetime</h3>
                       {licenseDetails.type === 'lifetime' && (
                         <CheckCircle className="h-5 w-5 text-primary-500" />
                       )}
                     </div>
-                    <p className="mt-1 text-sm text-gray-500">One-time payment</p>
-                    <div className="mt-2">
-                      <span className="text-lg font-bold text-gray-900">
-                        {pricingPlan.plan === 'starter' ? '$2,376' : 
-                         pricingPlan.plan === 'pro' ? '$7,176' : 
-                         pricingPlan.plan === 'enterprise' ? '$14,376' : 'Custom'}
-                      </span>
-                    </div>
-                    <span className="mt-1 inline-block px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                      Best value
+                    <p className="text-sm text-gray-500 mt-1">One-time payment, lifetime access</p>
+                    <span className="mt-2 inline-block px-2 py-1 text-xs font-medium rounded-full bg-success-100 text-success-800">
+                      40% off
                     </span>
                   </div>
                 </div>
               </div>
               
               <div>
-                <label className="form-label">Start Date</label>
-                <input
-                  type="date"
-                  value={licenseDetails.startDate}
-                  onChange={(e) => setLicenseDetails({...licenseDetails, startDate: e.target.value})}
-                  className="form-input"
-                  min={new Date().toISOString().split('T')[0]}
-                />
+                <label className="form-label required">Start Date</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Calendar className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="date"
+                    className={`form-input pl-10 ${errors.licenseDetails?.startDate ? 'border-error-300' : ''}`}
+                    value={licenseDetails.startDate}
+                    onChange={e => setLicenseDetails({...licenseDetails, startDate: e.target.value})}
+                    min={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+                {errors.licenseDetails?.startDate && (
+                  <p className="mt-1 text-sm text-error-600">{errors.licenseDetails.startDate}</p>
+                )}
               </div>
               
-              {licenseDetails.type !== 'lifetime' && (
+              <div className="space-y-3 mt-6">
                 <div className="flex items-center">
                   <input
                     type="checkbox"
                     id="autoRenew"
                     checked={licenseDetails.autoRenew}
-                    onChange={(e) => setLicenseDetails({...licenseDetails, autoRenew: e.target.checked})}
+                    onChange={e => setLicenseDetails({...licenseDetails, autoRenew: e.target.checked})}
                     className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    disabled={licenseDetails.type === 'lifetime'}
                   />
                   <label htmlFor="autoRenew" className="ml-2 block text-sm text-gray-900">
-                    Auto-renew subscription
+                    Auto-renew license
                   </label>
                 </div>
-              )}
-              
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  id="sendInvoice"
-                  checked={licenseDetails.sendInvoice}
-                  onChange={(e) => setLicenseDetails({...licenseDetails, sendInvoice: e.target.checked})}
-                  className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                />
-                <label htmlFor="sendInvoice" className="ml-2 block text-sm text-gray-900">
-                  Send invoice/receipt via email
-                </label>
+                
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id="sendInvoice"
+                    checked={licenseDetails.sendInvoice}
+                    onChange={e => setLicenseDetails({...licenseDetails, sendInvoice: e.target.checked})}
+                    className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="sendInvoice" className="ml-2 block text-sm text-gray-900">
+                    Send invoice/receipt
+                  </label>
+                </div>
               </div>
               
               <div>
                 <label className="form-label">Notes</label>
                 <textarea
-                  value={licenseDetails.notes}
-                  onChange={(e) => setLicenseDetails({...licenseDetails, notes: e.target.value})}
                   className="form-input"
+                  placeholder="Any additional notes about this license"
                   rows={3}
-                  placeholder="Any special notes about this license (e.g., discounts applied)"
+                  value={licenseDetails.notes}
+                  onChange={e => setLicenseDetails({...licenseDetails, notes: e.target.value})}
                 />
               </div>
             </div>
           </div>
         );
-      
+        
       case 6:
         return (
           <div className="space-y-6">
-            <h2 className="text-xl font-semibold text-gray-900">Final Confirmation</h2>
-            <p className="text-sm text-gray-600">Review the information before creating the hospital.</p>
+            <h2 className="text-xl font-semibold text-gray-900">Review & Confirm</h2>
+            <p className="text-gray-600">Review the information before creating the hospital.</p>
             
-            <div className="bg-white p-6 rounded-lg border border-gray-200 space-y-6">
-              <div>
-                <h3 className="text-base font-medium text-gray-900 mb-2">Hospital Information</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Name</p>
-                    <p className="text-sm font-medium text-gray-900">{hospitalProfile.name}</p>
+            <div className="space-y-6">
+              <div className="bg-white p-4 rounded-lg border border-gray-200">
+                <h3 className="text-md font-medium text-gray-900 mb-3">Hospital Profile</h3>
+                <dl className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">Hospital Name</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{hospitalProfile.name}</dd>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Email</p>
-                    <p className="text-sm font-medium text-gray-900">{hospitalProfile.email}</p>
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">Subdomain</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{hospitalProfile.subdomain}.{mainDomain}</dd>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Contact Person</p>
-                    <p className="text-sm font-medium text-gray-900">{hospitalProfile.contactPerson}</p>
+                  <div className="sm:col-span-2">
+                    <dt className="text-sm font-medium text-gray-500">Address</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{hospitalProfile.address}</dd>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Phone</p>
-                    <p className="text-sm font-medium text-gray-900">{hospitalProfile.phone}</p>
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">Phone</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{hospitalProfile.phone}</dd>
                   </div>
-                  <div className="col-span-2">
-                    <p className="text-sm text-gray-500">Address</p>
-                    <p className="text-sm font-medium text-gray-900">{hospitalProfile.address}</p>
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">Email</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{hospitalProfile.email}</dd>
                   </div>
-                  <div className="col-span-2">
-                    <p className="text-sm text-gray-500">Subdomain</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {hospitalProfile.subdomain || hospitalProfile.name.toLowerCase().replace(/\s+/g, '-')}.searchable.today
-                    </p>
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">Contact Person</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{hospitalProfile.contactPerson}</dd>
                   </div>
-                </div>
+                </dl>
               </div>
               
-              <div className="border-t border-gray-200 pt-4">
-                <h3 className="text-base font-medium text-gray-900 mb-2">Admin Setup</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Admin Email</p>
-                    <p className="text-sm font-medium text-gray-900">{hospitalProfile.email}</p>
+              <div className="bg-white p-4 rounded-lg border border-gray-200">
+                <h3 className="text-md font-medium text-gray-900 mb-3">Admin Setup</h3>
+                <dl className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">Admin Email</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{hospitalProfile.email}</dd>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Password</p>
-                    <p className="text-sm font-medium text-gray-900">
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">Password</dt>
+                    <dd className="mt-1 text-sm text-gray-900 flex items-center">
                       {showPassword ? adminSetup.password : '••••••••••••'}
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="ml-2 text-gray-400 hover:text-gray-500"
+                        className="ml-2 text-gray-400 hover:text-gray-600"
                       >
-                        {showPassword ? <EyeOff className="h-4 w-4 inline" /> : <Eye className="h-4 w-4 inline" />}
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                       </button>
-                    </p>
+                    </dd>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Force Password Change</p>
-                    <p className="text-sm font-medium text-gray-900">{adminSetup.forcePasswordChange ? 'Yes' : 'No'}</p>
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">Force Password Change</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{adminSetup.forcePasswordChange ? 'Yes' : 'No'}</dd>
                   </div>
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">Send Credentials</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{adminSetup.sendCredentials ? 'Yes' : 'No'}</dd>
+                  </div>
+                </dl>
+              </div>
+              
+              <div className="bg-white p-4 rounded-lg border border-gray-200">
+                <h3 className="text-md font-medium text-gray-900 mb-3">Modules</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-gray-500">Send Credentials Email</p>
-                    <p className="text-sm font-medium text-gray-900">{adminSetup.sendCredentials ? 'Yes' : 'No'}</p>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Outpatient Modules</h4>
+                    <ul className="space-y-1">
+                      {moduleSelection.outpatient.length > 0 ? (
+                        moduleSelection.outpatient.map(key => {
+                          const module = modules.find(m => m.key === key);
+                          return module ? (
+                            <li key={key} className="flex items-center text-sm text-gray-600">
+                              <CheckCircle className="h-4 w-4 text-success-500 mr-2" />
+                              {module.name}
+                            </li>
+                          ) : null;
+                        })
+                      ) : (
+                        <li className="text-sm text-gray-500">No outpatient modules selected</li>
+                      )}
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Inpatient Modules</h4>
+                    <ul className="space-y-1">
+                      {moduleSelection.inpatient.length > 0 ? (
+                        moduleSelection.inpatient.map(key => {
+                          const module = modules.find(m => m.key === key);
+                          return module ? (
+                            <li key={key} className="flex items-center text-sm text-gray-600">
+                              <CheckCircle className="h-4 w-4 text-success-500 mr-2" />
+                              {module.name}
+                            </li>
+                          ) : null;
+                        })
+                      ) : (
+                        <li className="text-sm text-gray-500">No inpatient modules selected</li>
+                      )}
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Shared Modules</h4>
+                    <ul className="space-y-1">
+                      {moduleSelection.shared.length > 0 ? (
+                        moduleSelection.shared.map(key => {
+                          const module = modules.find(m => m.key === key);
+                          return module ? (
+                            <li key={key} className="flex items-center text-sm text-gray-600">
+                              <CheckCircle className="h-4 w-4 text-success-500 mr-2" />
+                              {module.name}
+                            </li>
+                          ) : null;
+                        })
+                      ) : (
+                        <li className="text-sm text-gray-500">No shared modules selected</li>
+                      )}
+                    </ul>
+                  </div>
+                  
+                  <div>
+                    <h4 className="text-sm font-medium text-gray-700 mb-2">Add-on Modules</h4>
+                    <ul className="space-y-1">
+                      {moduleSelection.addons.length > 0 ? (
+                        moduleSelection.addons.map(key => {
+                          const module = modules.find(m => m.key === key);
+                          return module ? (
+                            <li key={key} className="flex items-center text-sm text-gray-600">
+                              <CheckCircle className="h-4 w-4 text-success-500 mr-2" />
+                              {module.name}
+                            </li>
+                          ) : null;
+                        })
+                      ) : (
+                        <li className="text-sm text-gray-500">No add-on modules selected</li>
+                      )}
+                    </ul>
                   </div>
                 </div>
               </div>
               
-              <div className="border-t border-gray-200 pt-4">
-                <h3 className="text-base font-medium text-gray-900 mb-2">Modules & Plan</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">Template</p>
-                    <p className="text-sm font-medium text-gray-900 capitalize">{moduleSelection.template}</p>
+              <div className="bg-white p-4 rounded-lg border border-gray-200">
+                <h3 className="text-md font-medium text-gray-900 mb-3">Pricing & License</h3>
+                <dl className="grid grid-cols-1 gap-x-4 gap-y-2 sm:grid-cols-2">
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">Plan</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {plans.find(p => p.key === pricingPlan.plan)?.name || pricingPlan.plan}
+                    </dd>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Pricing Plan</p>
-                    <p className="text-sm font-medium text-gray-900 capitalize">{pricingPlan.plan}</p>
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">License Type</dt>
+                    <dd className="mt-1 text-sm text-gray-900 capitalize">{licenseDetails.type}</dd>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Outpatient Modules</p>
-                    <p className="text-sm font-medium text-gray-900">{moduleSelection.outpatient.length}</p>
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">Start Date</dt>
+                    <dd className="mt-1 text-sm text-gray-900">{licenseDetails.startDate}</dd>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Inpatient Modules</p>
-                    <p className="text-sm font-medium text-gray-900">{moduleSelection.inpatient.length}</p>
+                  <div className="sm:col-span-1">
+                    <dt className="text-sm font-medium text-gray-500">Auto-Renew</dt>
+                    <dd className="mt-1 text-sm text-gray-900">
+                      {licenseDetails.type === 'lifetime' ? 'N/A' : (licenseDetails.autoRenew ? 'Yes' : 'No')}
+                    </dd>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Shared Modules</p>
-                    <p className="text-sm font-medium text-gray-900">{moduleSelection.shared.length}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Add-ons</p>
-                    <p className="text-sm font-medium text-gray-900">{moduleSelection.addons.length}</p>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="border-t border-gray-200 pt-4">
-                <h3 className="text-base font-medium text-gray-900 mb-2">License Details</h3>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-500">License Type</p>
-                    <p className="text-sm font-medium text-gray-900 capitalize">{licenseDetails.type}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-500">Start Date</p>
-                    <p className="text-sm font-medium text-gray-900">{licenseDetails.startDate}</p>
-                  </div>
-                  {licenseDetails.type !== 'lifetime' && (
-                    <>
-                      <div>
-                        <p className="text-sm text-gray-500">End Date</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          {calculateEndDate(licenseDetails.startDate, licenseDetails.type as 'monthly' | 'yearly')}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-500">Auto-Renew</p>
-                        <p className="text-sm font-medium text-gray-900">{licenseDetails.autoRenew ? 'Yes' : 'No'}</p>
-                      </div>
-                    </>
+                  {licenseDetails.notes && (
+                    <div className="sm:col-span-2">
+                      <dt className="text-sm font-medium text-gray-500">Notes</dt>
+                      <dd className="mt-1 text-sm text-gray-900">{licenseDetails.notes}</dd>
+                    </div>
                   )}
-                  <div className="col-span-2">
-                    <p className="text-sm text-gray-500">Notes</p>
-                    <p className="text-sm font-medium text-gray-900">{licenseDetails.notes || 'None'}</p>
-                  </div>
-                </div>
+                </dl>
               </div>
             </div>
           </div>
         );
-      
+        
       default:
         return null;
     }
   };
   
+  // If not admin, don't render the page
+  if (!isAdmin) {
+    return null;
+  }
+  
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="max-w-5xl mx-auto">
+      <div className="flex items-center mb-6">
+        <Link to="/super-admin" className="mr-4 text-gray-500 hover:text-gray-700">
+          <ArrowLeft className="h-5 w-5" />
+        </Link>
+        <h1 className="text-2xl font-bold text-gray-900">Hospital Onboarding</h1>
+      </div>
+      
+      {/* Progress Steps */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div className="w-full flex items-center">
+            {[1, 2, 3, 4, 5, 6].map((step) => (
+              <React.Fragment key={step}>
+                <div className="relative flex flex-col items-center">
+                  <div
+                    className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                      currentStep >= step
+                        ? 'bg-primary-600 text-white'
+                        : 'bg-gray-200 text-gray-600'
+                    }`}
+                  >
+                    {step < currentStep ? (
+                      <CheckCircle className="h-6 w-6" />
+                    ) : (
+                      <span>{step}</span>
+                    )}
+                  </div>
+                  <span className="text-xs mt-1 text-center">
+                    {step === 1 && 'Profile'}
+                    {step === 2 && 'Admin'}
+                    {step === 3 && 'Modules'}
+                    {step === 4 && 'Plan'}
+                    {step === 5 && 'License'}
+                    {step === 6 && 'Review'}
+                  </span>
+                </div>
+                {step < 6 && (
+                  <div
+                    className={`flex-1 h-0.5 ${
+                      currentStep > step ? 'bg-primary-600' : 'bg-gray-200'
+                    }`}
+                  ></div>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+      </div>
+      
+      {/* Step Content */}
       <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Hospital Onboarding</h1>
-          <div className="text-sm text-gray-500">Step {currentStep} of 6</div>
-        </div>
+        {isLoading ? (
+          <div className="flex justify-center items-center py-12">
+            <Loader2 className="h-8 w-8 text-primary-500 animate-spin" />
+            <span className="ml-2 text-gray-600">Loading...</span>
+          </div>
+        ) : (
+          renderStepContent()
+        )}
+      </div>
+      
+      {/* Navigation Buttons */}
+      <div className="flex justify-between">
+        <button
+          type="button"
+          onClick={handleBack}
+          disabled={currentStep === 1}
+          className={`btn ${
+            currentStep === 1 ? 'btn-disabled opacity-50 cursor-not-allowed' : 'btn-outline'
+          }`}
+        >
+          <ArrowLeft className="h-5 w-5 mr-2" />
+          Back
+        </button>
         
-        {/* Progress bar */}
-        <div className="w-full bg-gray-200 rounded-full h-2.5 mb-6">
-          <div 
-            className="bg-primary-500 h-2.5 rounded-full" 
-            style={{ width: `${(currentStep / 6) * 100}%` }}
-          ></div>
-        </div>
-        
-        {/* Step content */}
-        {renderStep()}
-        
-        {/* Navigation buttons */}
-        <div className="flex justify-between mt-8">
+        {currentStep < 6 ? (
           <button
             type="button"
-            onClick={handlePreviousStep}
-            disabled={currentStep === 1}
-            className={`btn ${
-              currentStep === 1 
-                ? 'btn-outline opacity-50 cursor-not-allowed' 
-                : 'btn-outline'
-            } inline-flex items-center`}
+            onClick={handleNext}
+            className="btn btn-primary"
           >
-            <ArrowLeft className="h-5 w-5 mr-2" />
-            Previous
+            Next
+            <ArrowRight className="h-5 w-5 ml-2" />
           </button>
-          
-          {currentStep < 6 ? (
-            <button
-              type="button"
-              onClick={handleNextStep}
-              className="btn btn-primary inline-flex items-center"
-            >
-              Next
-              <ArrowRight className="h-5 w-5 ml-2" />
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isLoading}
-              className="btn btn-primary inline-flex items-center"
-            >
-              {isLoading ? (
-                <>
-                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
-                  Creating...
-                </>
-              ) : (
-                <>
-                  Create Hospital
-                  <CheckCircle className="h-5 w-5 ml-2" />
-                </>
-              )}
-            </button>
-          )}
-        </div>
+        ) : (
+          <button
+            type="button"
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="btn btn-primary"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="h-5 w-5 mr-2 animate-spin" />
+                Creating Hospital...
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-5 w-5 mr-2" />
+                Create Hospital
+              </>
+            )}
+          </button>
+        )}
       </div>
     </div>
   );
