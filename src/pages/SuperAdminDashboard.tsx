@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Building2, Users, Activity, Settings, Plus, Trash2, Edit, Check, X, Box, CreditCard, Key, TicketCheck, Mail, Phone, Globe, MapPin, AlertCircle, BarChart4, LineChart, PieChart, BarChart, FileBarChart2, LifeBuoy, Wrench } from 'lucide-react';
+import { Building2, Users, Activity, Settings, Plus, Trash2, Edit, Check, X, Box, CreditCard, Key, TicketCheck, Mail, Phone, Globe, MapPin, AlertCircle, BarChart4, LineChart, PieChart, BarChart, FileBarChart2, LifeBuoy, Wrench, DollarSign } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../lib/store';
 
