@@ -1,5 +1,9 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.39.7';
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import express from 'npm:express@4.18.2';
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { v4 as uuidv4 } from 'npm:uuid@9.0.1';
+
+const app = express();
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,34 +12,39 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 };
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      status: 204,
-      headers: corsHeaders
-    });
-  }
+// Initialize Supabase client
+const supabaseClient = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+);
 
+// Middleware to parse JSON bodies
+app.use(express.json());
+
+// Handle CORS preflight requests
+app.options('*', (req, res) => {
+  res.set(corsHeaders).status(204).send();
+});
+
+// Add CORS middleware
+app.use((req, res, next) => {
+  res.set(corsHeaders);
+  next();
+});
+
+// Create a new hospital with all related resources
+app.post('/hospital-onboarding', async (req, res) => {
   try {
-    // Initialize Supabase client with environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-
-    if (!supabaseUrl || !supabaseServiceKey) {
-      throw new Error('Missing required environment variables');
-    }
-
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
-
-    // Parse request body
-    const { hospitalProfile, adminSetup, moduleSelection, pricingPlan, licenseDetails } = await req.json();
+    const { 
+      hospitalProfile, 
+      adminSetup, 
+      moduleSelection, 
+      pricingPlan, 
+      licenseDetails 
+    } = req.body;
 
     if (!hospitalProfile || !adminSetup || !moduleSelection || !pricingPlan || !licenseDetails) {
-      return new Response(
-        JSON.stringify({ error: 'Missing required data' }),
-        { status: 400, headers: corsHeaders }
-      );
+      return res.status(400).json({ error: 'Missing required data' });
     }
 
     // 1. Create hospital record
@@ -53,7 +62,7 @@ serve(async (req) => {
       .single();
 
     if (hospitalError) {
-      throw new Error(`Failed to create hospital: ${hospitalError.message}`);
+      return res.status(500).json({ error: hospitalError.message });
     }
 
     // 2. Create admin user
@@ -72,7 +81,7 @@ serve(async (req) => {
     if (userError) {
       // Rollback hospital creation
       await supabaseClient.from('hospitals').delete().eq('id', hospital.id);
-      throw new Error(`Failed to create admin user: ${userError.message}`);
+      return res.status(500).json({ error: userError.message });
     }
 
     // 3. Create profile for admin
@@ -91,7 +100,7 @@ serve(async (req) => {
       // Rollback user and hospital creation
       await supabaseClient.auth.admin.deleteUser(user.user.id);
       await supabaseClient.from('hospitals').delete().eq('id', hospital.id);
-      throw new Error(`Failed to create admin profile: ${profileError.message}`);
+      return res.status(500).json({ error: profileError.message });
     }
 
     // 4. Store selected modules
@@ -115,7 +124,7 @@ serve(async (req) => {
       // Rollback previous creations
       await supabaseClient.auth.admin.deleteUser(user.user.id);
       await supabaseClient.from('hospitals').delete().eq('id', hospital.id);
-      throw new Error(`Failed to create hospital modules: ${modulesError.message}`);
+      return res.status(500).json({ error: modulesError.message });
     }
 
     // 5. Get pricing plan
@@ -126,7 +135,7 @@ serve(async (req) => {
       .single();
 
     if (planError) {
-      throw new Error(`Failed to fetch pricing plan: ${planError.message}`);
+      return res.status(500).json({ error: planError.message });
     }
 
     // Calculate end date
@@ -162,7 +171,7 @@ serve(async (req) => {
       }]);
 
     if (licenseError) {
-      throw new Error(`Failed to create license: ${licenseError.message}`);
+      return res.status(500).json({ error: licenseError.message });
     }
 
     // 7. Create default departments
@@ -187,23 +196,21 @@ serve(async (req) => {
       // Non-critical error, continue
     }
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        hospital: hospital,
-        message: 'Hospital created successfully'
-      }),
-      { status: 201, headers: corsHeaders }
-    );
+    // 8. Send email if enabled
+    if (adminSetup.sendCredentials) {
+      // In a real implementation, this would send an email
+      console.log('Would send email to:', hospitalProfile.email);
+    }
 
+    res.status(201).json({
+      success: true,
+      hospital: hospital,
+      message: 'Hospital created successfully'
+    });
   } catch (error) {
     console.error('Error in hospital onboarding:', error);
-    
-    return new Response(
-      JSON.stringify({
-        error: error.message || 'An error occurred during hospital onboarding'
-      }),
-      { status: 500, headers: corsHeaders }
-    );
+    res.status(500).json({ error: error.message });
   }
 });
+
+serve(app.callback());

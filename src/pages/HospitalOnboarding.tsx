@@ -416,11 +416,12 @@ const HospitalOnboarding: React.FC = () => {
         body: JSON.stringify(onboardingData)
       });
 
-      const result = await response.json();
-
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to onboard hospital');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to onboard hospital');
       }
+
+      const result = await response.json();
       
       // Show success notification
       addNotification({
@@ -433,7 +434,7 @@ const HospitalOnboarding: React.FC = () => {
       
     } catch (error: any) {
       console.error('Error onboarding hospital:', error);
-      setError(error.message || 'Failed to onboard hospital. Please try again.');
+      setError(error.message);
     } finally {
       setIsLoading(false);
     }
