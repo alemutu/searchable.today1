@@ -170,7 +170,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { user } = get();
       if (!user) return;
 
-      // Get user metadata from auth.users
+      // Get user metadata directly from auth.users
       const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
       
       if (userError) {
@@ -218,7 +218,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           .eq('id', hospitalId)
           .single();
         
-        if (hospitalError) throw hospitalError;
+        if (hospitalError) {
+          console.error('Error fetching hospital:', hospitalError);
+          return;
+        }
         
         if (hospital) {
           set({ hospital });
