@@ -1,28 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../lib/store';
-import { 
-  BarChart, 
-  PieChart, 
-  LineChart, 
-  FileText, 
-  Calendar, 
-  Download, 
-  Plus, 
-  Filter, 
-  Search, 
-  Clock, 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle,
-  RefreshCw,
-  ChevronDown,
-  FileSpreadsheet,
-  FilePdf,
-  Share2,
-  Mail,
-  Bell
-} from 'lucide-react';
+import { BarChart, PieChart, LineChart, FileText, Calendar, Download, Plus, Filter, Search, Clock, CheckCircle, XCircle, AlertTriangle, RefreshCw, ChevronDown, FileSpreadsheet, File as FilePdf, Share2, Mail, Bell } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 interface Report {
