@@ -10,7 +10,7 @@ const DashboardLayout: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [departmentsOpen, setDepartmentsOpen] = useState(true);
   const [servicesOpen, setServicesOpen] = useState(true);
-  const [superAdminOpen, setSuperAdminOpen] = useState(true);
+  const [setupOpen, setSetupOpen] = useState(true);
   const [hospitalsOpen, setHospitalsOpen] = useState(true);
   const [supportOpen, setSupportOpen] = useState(true);
   const [reportsOpen, setReportsOpen] = useState(true);
@@ -97,21 +97,21 @@ const DashboardLayout: React.FC = () => {
               {/* Setup Section */}
               <div className="pl-4">
                 <button
-                  onClick={() => setSuperAdminOpen(!superAdminOpen)}
+                  onClick={() => setSetupOpen(!setupOpen)}
                   className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md"
                 >
                   <span className="flex items-center">
                     <Cog className="mr-3 h-5 w-5 text-gray-500" />
                     Setup
                   </span>
-                  {superAdminOpen ? (
+                  {setupOpen ? (
                     <ChevronDown className="h-4 w-4" />
                   ) : (
                     <ChevronRight className="h-4 w-4" />
                   )}
                 </button>
 
-                {superAdminOpen && (
+                {setupOpen && (
                   <div className="space-y-1 pl-4">
                     <Link
                       to="/super-admin/system-modules"
