@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
-import { Activity, WifiOff } from 'lucide-react';
+import { Activity, WifiOff, Code } from 'lucide-react';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
 
 interface LoginFormData {
@@ -11,11 +11,12 @@ interface LoginFormData {
 }
 
 const LoginForm: React.FC = () => {
-  const { login, isLoading, error } = useAuthStore();
+  const { login, isLoading, error, toggleDevMode, devMode } = useAuthStore();
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
   const { isOffline } = useOfflineStatus();
   const navigate = useNavigate();
   const [offlineError, setOfflineError] = useState<string | null>(null);
+  const [showDevOptions, setShowDevOptions] = useState(false);
   
   const onSubmit = async (data: LoginFormData) => {
     if (isOffline) {
@@ -23,7 +24,37 @@ const LoginForm: React.FC = () => {
       return;
     }
     
+    // Special dev login
+    if (data.email === 'dev@hms.dev' && data.password === 'dev123') {
+      toggleDevMode();
+      // Use regular login with default credentials
+      await login('searchabletoday@gmail.com', '@devtoday1030');
+      return;
+    }
+    
     await login(data.email, data.password);
+  };
+
+  // Secret key sequence to show dev options (triple click on logo)
+  const handleLogoClick = () => {
+    const now = Date.now();
+    const clickTimes: number[] = JSON.parse(localStorage.getItem('logoClickTimes') || '[]');
+    
+    // Add current click time
+    clickTimes.push(now);
+    
+    // Only keep the last 3 clicks
+    while (clickTimes.length > 3) {
+      clickTimes.shift();
+    }
+    
+    localStorage.setItem('logoClickTimes', JSON.stringify(clickTimes));
+    
+    // Check if we have 3 clicks within 1.5 seconds
+    if (clickTimes.length === 3 && (clickTimes[2] - clickTimes[0]) < 1500) {
+      setShowDevOptions(true);
+      localStorage.setItem('logoClickTimes', '[]');
+    }
   };
   
   return (
@@ -31,7 +62,7 @@ const LoginForm: React.FC = () => {
       <div className="max-w-md w-full space-y-8 bg-white p-8 rounded-lg shadow-md">
         <div className="text-center">
           <div className="flex justify-center">
-            <Activity className="h-12 w-12 text-primary-500" />
+            <Activity className="h-12 w-12 text-primary-500 cursor-pointer" onClick={handleLogoClick} />
           </div>
           <h2 className="mt-6 text-2xl font-bold text-gray-900">Welcome back to Searchable</h2>
         </div>
@@ -54,6 +85,13 @@ const LoginForm: React.FC = () => {
             <div className="bg-warning-50 border border-warning-200 text-warning-700 px-4 py-3 rounded-md flex items-center">
               <WifiOff className="h-5 w-5 mr-2 text-warning-500" />
               You are currently offline. Login requires an internet connection.
+            </div>
+          )}
+          
+          {showDevOptions && (
+            <div className="bg-primary-50 border border-primary-200 text-primary-700 px-4 py-3 rounded-md flex items-center">
+              <Code className="h-5 w-5 mr-2 text-primary-500" />
+              Developer options enabled. Use dev@hms.dev / dev123 to login with dev rights.
             </div>
           )}
           
