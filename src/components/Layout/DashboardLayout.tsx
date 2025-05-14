@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
-import { Users, Calendar, FileText, Activity, Pill, DollarSign, LogOut, Menu, X, Bell, Building2, Settings, LayoutDashboard, BedDouble, FlaskRound as Flask, Microscope, Heart, Baby, UserRound, Syringe, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Stethoscope, ClipboardList, Cog, Building, Users2, Wrench, CreditCard, Key, LifeBuoy, ChevronDown, ChevronRight, TicketCheck, Box, Home, Search, LayoutList, WifiOff, Code, Database, Trash } from 'lucide-react';
-import { syncAllData, clearAllData, generateMockData } from '../../lib/storage';
+import { Users, Calendar, FileText, Activity, Pill, DollarSign, LogOut, Menu, X, Bell, Building2, Settings, LayoutDashboard, BedDouble, FlaskRound as Flask, Microscope, Heart, Baby, UserRound, Syringe, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Stethoscope, ClipboardList, Cog, Building, Users2, Wrench, CreditCard, Key, LifeBuoy, ChevronDown, ChevronRight, TicketCheck, Box, Home, Search, LayoutList, WifiOff, Code } from 'lucide-react';
+import { syncAllData } from '../../lib/storage';
 
 const DashboardLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -11,7 +11,6 @@ const DashboardLayout: React.FC = () => {
   const [departmentsOpen, setDepartmentsOpen] = useState(true);
   const [servicesOpen, setServicesOpen] = useState(true);
   const [superAdminOpen, setSuperAdminOpen] = useState(false);
-  const [devToolsOpen, setDevToolsOpen] = useState(false);
   const { user, hospital, logout, isAdmin, devMode, toggleDevMode } = useAuthStore();
   const { isOffline } = useOfflineStatus();
   const navigate = useNavigate();
@@ -29,20 +28,6 @@ const DashboardLayout: React.FC = () => {
   const handleSync = async () => {
     await syncAllData();
     alert('Data synchronized successfully!');
-  };
-  
-  const handleClearData = () => {
-    if (confirm('Are you sure you want to clear all local data? This cannot be undone.')) {
-      clearAllData();
-      alert('All local data has been cleared.');
-    }
-  };
-  
-  const handleGenerateMockData = () => {
-    if (confirm('Generate mock data for testing? This will add sample patients to your local storage.')) {
-      generateMockData();
-      alert('Mock data has been generated.');
-    }
   };
 
   return (
@@ -489,45 +474,6 @@ const DashboardLayout: React.FC = () => {
               </Link>
             </div>
           )}
-          
-          {/* Developer Tools Section */}
-          {devMode && (
-            <>
-              <div className="pt-4 pb-2">
-                <button
-                  onClick={() => setDevToolsOpen(!devToolsOpen)}
-                  className="w-full flex items-center justify-between px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-500"
-                >
-                  Developer Tools
-                  {devToolsOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-              
-              {devToolsOpen && (
-                <div className="space-y-1 pl-4">
-                  <button
-                    onClick={handleGenerateMockData}
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group w-full text-left"
-                  >
-                    <Database className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Generate Mock Data
-                  </button>
-                  
-                  <button
-                    onClick={handleClearData}
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-error-50 hover:text-error-700 rounded-md group w-full text-left"
-                  >
-                    <Trash className="mr-3 h-5 w-5 text-gray-500 group-hover:text-error-500" />
-                    Clear Local Data
-                  </button>
-                </div>
-              )}
-            </>
-          )}
         </nav>
 
         <div className="mt-auto p-4 space-y-2">
@@ -580,7 +526,7 @@ const DashboardLayout: React.FC = () => {
               
               <div className="flex items-center space-x-2">
                 <div className="h-8 w-8 rounded-full bg-primary-500 flex items-center justify-center text-white font-medium">
-                  {user?.email?.charAt(0).toUpperCase() || 'D'}
+                  {user?.email?.charAt(0).toUpperCase() || 'U'}
                 </div>
                 <span className="text-sm font-medium text-gray-700 hidden md:block">
                   {user?.email || 'dev@hms.dev'}
