@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
@@ -11,13 +11,25 @@ interface AdminLoginFormData {
 }
 
 const AdminLoginForm: React.FC = () => {
-  const { login, isLoading, error } = useAuthStore();
+  const { login, isLoading, error, isAdmin } = useAuthStore();
   const { register, handleSubmit, formState: { errors } } = useForm<AdminLoginFormData>();
   const { isOffline } = useOfflineStatus();
   const navigate = useNavigate();
   const location = useLocation();
   const [offlineError, setOfflineError] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
+  
+  // Check if user is already logged in and redirect accordingly
+  useEffect(() => {
+    const { user, isAdmin } = useAuthStore.getState();
+    if (user) {
+      if (isAdmin) {
+        navigate('/super-admin');
+      } else {
+        navigate('/dashboard');
+      }
+    }
+  }, [navigate]);
   
   const onSubmit = async (data: AdminLoginFormData) => {
     if (isOffline) {
