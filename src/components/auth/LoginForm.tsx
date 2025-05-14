@@ -46,7 +46,7 @@ const LoginForm: React.FC = () => {
       const { isAdmin } = useAuthStore.getState();
       
       if (isAdmin) {
-        setRoleError("Use the admin login portal.");
+        setRoleError("This login is for regular users only. Super admins should use the admin login portal.");
         // Logout the user since they should use the admin login
         await useAuthStore.getState().logout();
         return;
