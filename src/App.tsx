@@ -63,39 +63,59 @@ import EyeClinic from './pages/departments/EyeClinic';
 import Physiotherapy from './pages/departments/Physiotherapy';
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isLoading } = useAuthStore();
-  const navigate = useNavigate();
-  const location = useLocation();
-  
-  useEffect(() => {
-    if (!isLoading && !user) {
-      navigate('/login', { state: { from: location } });
-    }
-  }, [user, isLoading, navigate, location]);
-  
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
-      </div>
-    );
-  }
-  
-  return user ? <>{children}</> : null;
+  // In dev mode, we'll bypass authentication
+  return <>{children}</>;
 };
 
 const App: React.FC = () => {
-  const { initialize } = useAuthStore();
+  const { initialize, toggleDevMode } = useAuthStore();
 
   useEffect(() => {
     initialize();
-  }, [initialize]);
+    
+    // Auto-enable dev mode on startup
+    toggleDevMode();
+    
+    // Set a mock user and hospital in the store
+    const mockUser = {
+      id: 'dev-user-id',
+      email: 'dev@hms.dev',
+    };
+    
+    const mockHospital = {
+      id: 'dev-hospital-id',
+      name: 'Development Hospital',
+      subdomain: 'dev',
+      address: '123 Dev Street',
+      phone: '123-456-7890',
+      email: 'dev@hms.dev',
+      logo_url: '',
+      patient_id_format: 'prefix_number',
+      patient_id_prefix: 'DEV',
+      patient_id_digits: 6,
+      patient_id_auto_increment: true,
+      patient_id_last_number: 0,
+      domain_enabled: true
+    };
+    
+    // @ts-ignore - We're bypassing the normal auth flow
+    useAuthStore.setState({ 
+      user: mockUser, 
+      hospital: mockHospital,
+      isAdmin: true,
+      isDoctor: true,
+      isNurse: true,
+      isReceptionist: true,
+      devMode: true,
+      isLoading: false
+    });
+  }, [initialize, toggleDevMode]);
 
   return (
     <>
       <Routes>
-        <Route path="/login" element={<LoginForm />} />
-        <Route path="/register" element={<RegisterForm />} />
+        <Route path="/login" element={<Navigate to="/dashboard" replace />} />
+        <Route path="/register" element={<Navigate to="/dashboard" replace />} />
         
         <Route path="/" element={
           <ProtectedRoute>
@@ -173,7 +193,7 @@ const App: React.FC = () => {
           <Route path="departments/physiotherapy" element={<Physiotherapy />} />
         </Route>
         
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       
       {/* Offline indicator */}
