@@ -33,7 +33,7 @@ app.use((req, res, next) => {
 });
 
 // Create a new hospital with all related resources
-app.post('/hospitals', async (req, res) => {
+app.post('/hospital-onboarding', async (req, res) => {
   try {
     const { 
       hospitalProfile, 
@@ -209,78 +209,6 @@ app.post('/hospitals', async (req, res) => {
     });
   } catch (error) {
     console.error('Error in hospital onboarding:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get all hospitals
-app.get('/hospitals', async (req, res) => {
-  try {
-    const { data, error } = await supabaseClient
-      .from('hospitals')
-      .select('*')
-      .order('name');
-
-    if (error) throw error;
-    res.json(data);
-  } catch (error) {
-    console.error('Error fetching hospitals:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get hospital by ID
-app.get('/hospitals/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { data, error } = await supabaseClient
-      .from('hospitals')
-      .select(`
-        *,
-        licenses (
-          id,
-          plan_id,
-          start_date,
-          end_date,
-          status,
-          max_users,
-          current_users,
-          features,
-          billing_info
-        ),
-        hospital_modules (
-          id,
-          module_key,
-          category,
-          is_active
-        )
-      `)
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-    res.json(data);
-  } catch (error) {
-    console.error('Error fetching hospital:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Check if subdomain is available
-app.get('/check-subdomain/:subdomain', async (req, res) => {
-  try {
-    const { subdomain } = req.params;
-    const { data, error } = await supabaseClient
-      .from('hospitals')
-      .select('id')
-      .eq('subdomain', subdomain)
-      .maybeSingle();
-
-    if (error) throw error;
-    
-    res.json({ available: !data });
-  } catch (error) {
-    console.error('Error checking subdomain:', error);
     res.status(500).json({ error: error.message });
   }
 });
