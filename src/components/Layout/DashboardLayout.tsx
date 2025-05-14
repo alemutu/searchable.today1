@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
-import { Users, Calendar, FileText, Activity, Pill, DollarSign, LogOut, Menu, X, Bell, Building2, Settings, LayoutDashboard, BedDouble, FlaskRound as Flask, Microscope, Heart, Baby, UserRound, Syringe, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Stethoscope, ClipboardList, Cog, Building, Users2, Wrench, CreditCard, Key, LifeBuoy, ChevronDown, ChevronRight, TicketCheck, Box, Home, Search, LayoutList, WifiOff, Plus } from 'lucide-react';
+import { Users, Calendar, FileText, Activity, Pill, DollarSign, LogOut, Menu, X, Bell, Building2, Settings, LayoutDashboard, BedDouble, FlaskRound as Flask, Microscope, Heart, Baby, UserRound, Syringe, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Stethoscope, ClipboardList, Cog, Building, Users2, Wrench, CreditCard, Key, LifeBuoy, ChevronDown, ChevronRight, TicketCheck, Box, Home, Search, LayoutList, WifiOff, Plus, BarChart4, LineChart, PieChart, BarChart, FileBarChart2 } from 'lucide-react';
 import { syncAllData } from '../../lib/storage';
 
 const DashboardLayout: React.FC = () => {
@@ -10,7 +10,10 @@ const DashboardLayout: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [departmentsOpen, setDepartmentsOpen] = useState(true);
   const [servicesOpen, setServicesOpen] = useState(true);
-  const [superAdminOpen, setSuperAdminOpen] = useState(false);
+  const [superAdminOpen, setSuperAdminOpen] = useState(true);
+  const [hospitalsOpen, setHospitalsOpen] = useState(true);
+  const [supportOpen, setSupportOpen] = useState(true);
+  const [reportsOpen, setReportsOpen] = useState(true);
   const { user, hospital, logout, isAdmin } = useAuthStore();
   const { isOffline } = useOfflineStatus();
   const navigate = useNavigate();
@@ -88,18 +91,18 @@ const DashboardLayout: React.FC = () => {
                 }`}
               >
                 <LayoutDashboard className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                Super Admin
+                Super Admin Dashboard
               </Link>
 
-              {/* Super Admin Collapsible Menu */}
+              {/* Setup Section */}
               <div className="pl-4">
                 <button
                   onClick={() => setSuperAdminOpen(!superAdminOpen)}
                   className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md"
                 >
                   <span className="flex items-center">
-                    <Box className="mr-3 h-5 w-5 text-gray-500" />
-                    System Management
+                    <Cog className="mr-3 h-5 w-5 text-gray-500" />
+                    Setup
                   </span>
                   {superAdminOpen ? (
                     <ChevronDown className="h-4 w-4" />
@@ -112,31 +115,103 @@ const DashboardLayout: React.FC = () => {
                   <div className="space-y-1 pl-4">
                     <Link
                       to="/super-admin/system-modules"
-                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/system-modules' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
                     >
-                      <Cog className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                      <Box className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
                       System Modules
                     </Link>
 
                     <Link
                       to="/super-admin/pricing-plans"
-                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/pricing-plans' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
                     >
                       <CreditCard className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
                       Pricing Plans
                     </Link>
 
                     <Link
+                      to="/super-admin/settings/system"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/settings/system' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
+                    >
+                      <Settings className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                      System Settings
+                    </Link>
+                  </div>
+                )}
+              </div>
+
+              {/* Hospitals Section */}
+              <div className="pl-4">
+                <button
+                  onClick={() => setHospitalsOpen(!hospitalsOpen)}
+                  className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md"
+                >
+                  <span className="flex items-center">
+                    <Building2 className="mr-3 h-5 w-5 text-gray-500" />
+                    Hospitals
+                  </span>
+                  {hospitalsOpen ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+
+                {hospitalsOpen && (
+                  <div className="space-y-1 pl-4">
+                    <Link
+                      to="/super-admin/hospital-onboarding"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/hospital-onboarding' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
+                    >
+                      <Plus className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                      Onboard Hospital
+                    </Link>
+
+                    <Link
                       to="/super-admin/licenses"
-                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/licenses' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
                     >
                       <Key className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
                       Licenses
                     </Link>
+                  </div>
+                )}
+              </div>
 
+              {/* Support Section */}
+              <div className="pl-4">
+                <button
+                  onClick={() => setSupportOpen(!supportOpen)}
+                  className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md"
+                >
+                  <span className="flex items-center">
+                    <LifeBuoy className="mr-3 h-5 w-5 text-gray-500" />
+                    Support & Issues
+                  </span>
+                  {supportOpen ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+
+                {supportOpen && (
+                  <div className="space-y-1 pl-4">
                     <Link
                       to="/super-admin/support-tickets"
-                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/support-tickets' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
                     >
                       <TicketCheck className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
                       Support Tickets
@@ -144,18 +219,94 @@ const DashboardLayout: React.FC = () => {
 
                     <Link
                       to="/super-admin/support-settings"
-                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/support-settings' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
                     >
-                      <LifeBuoy className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                      <Wrench className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
                       Support Settings
                     </Link>
-                    
+                  </div>
+                )}
+              </div>
+
+              {/* Reports & Analytics Section */}
+              <div className="pl-4">
+                <button
+                  onClick={() => setReportsOpen(!reportsOpen)}
+                  className="w-full flex items-center justify-between px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-md"
+                >
+                  <span className="flex items-center">
+                    <BarChart className="mr-3 h-5 w-5 text-gray-500" />
+                    Reports & Analytics
+                  </span>
+                  {reportsOpen ? (
+                    <ChevronDown className="h-4 w-4" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4" />
+                  )}
+                </button>
+
+                {reportsOpen && (
+                  <div className="space-y-1 pl-4">
                     <Link
-                      to="/super-admin/hospital-onboarding"
-                      className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+                      to="/super-admin/reports/overview"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/reports/overview' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
                     >
-                      <Plus className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                      Add Hospital
+                      <BarChart4 className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                      Overview
+                    </Link>
+
+                    <Link
+                      to="/super-admin/reports/hospitals"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/reports/hospitals' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
+                    >
+                      <Building2 className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                      Hospital Reports
+                    </Link>
+
+                    <Link
+                      to="/super-admin/reports/licenses"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/reports/licenses' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
+                    >
+                      <Key className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                      License Reports
+                    </Link>
+
+                    <Link
+                      to="/super-admin/reports/modules"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/reports/modules' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
+                    >
+                      <Box className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                      Module Usage
+                    </Link>
+
+                    <Link
+                      to="/super-admin/reports/revenue"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/reports/revenue' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
+                    >
+                      <DollarSign className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                      Revenue Reports
+                    </Link>
+
+                    <Link
+                      to="/super-admin/reports/support"
+                      className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                        location.pathname === '/super-admin/reports/support' ? 'bg-primary-50 text-primary-700' : ''
+                      }`}
+                    >
+                      <LifeBuoy className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                      Support Reports
                     </Link>
                   </div>
                 )}

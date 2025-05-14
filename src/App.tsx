@@ -133,6 +133,14 @@ const App: React.FC = () => {
           <Route path="support-settings" element={<SupportSettings />} />
           <Route path="settings/system" element={<SystemSettings />} />
           <Route path="hospital-onboarding" element={<HospitalOnboarding />} />
+          
+          {/* Reports Routes */}
+          <Route path="reports/overview" element={<div>Reports Overview</div>} />
+          <Route path="reports/hospitals" element={<div>Hospital Reports</div>} />
+          <Route path="reports/licenses" element={<div>License Reports</div>} />
+          <Route path="reports/modules" element={<div>Module Usage</div>} />
+          <Route path="reports/revenue" element={<div>Revenue Reports</div>} />
+          <Route path="reports/support" element={<div>Support Reports</div>} />
         </Route>
         
         {/* Regular User Routes */}
