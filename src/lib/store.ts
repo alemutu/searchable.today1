@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
-import { initializeStorage, syncAllData } from './storage';
+import { initializeStorage, syncAllData, clearAllData, generateMockData } from './storage';
 
 interface AuthState {
   user: User | null;
@@ -74,6 +74,46 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       // Initialize storage system
       initializeStorage();
+      
+      // Check if dev mode is enabled in localStorage
+      const devMode = localStorage.getItem('devMode') === 'true';
+      set({ devMode });
+      
+      if (devMode) {
+        // In dev mode, set up mock data
+        const mockUser = {
+          id: 'dev-user-id',
+          email: 'dev@hms.dev',
+        };
+        
+        const mockHospital = {
+          id: 'dev-hospital-id',
+          name: 'Development Hospital',
+          subdomain: 'dev',
+          address: '123 Dev Street',
+          phone: '123-456-7890',
+          email: 'dev@hms.dev',
+          logo_url: '',
+          patient_id_format: 'prefix_number',
+          patient_id_prefix: 'DEV',
+          patient_id_digits: 6,
+          patient_id_auto_increment: true,
+          patient_id_last_number: 0,
+          domain_enabled: true
+        };
+        
+        set({ 
+          user: mockUser as User, 
+          hospital: mockHospital,
+          isAdmin: true,
+          isDoctor: true,
+          isNurse: true,
+          isReceptionist: true,
+          isLoading: false
+        });
+        
+        return;
+      }
       
       // Get current session
       const { data: { session } } = await supabase.auth.getSession();
@@ -160,6 +200,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isReceptionist: false,
         devMode: false
       });
+      
+      // Clear dev mode in localStorage
+      localStorage.removeItem('devMode');
     } catch (error: any) {
       console.error('Error logging out:', error.message);
       set({ error: error.message });
@@ -239,12 +282,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       isAdmin: get().isAdmin || !currentDevMode
     });
     
+    // Store dev mode state in localStorage
+    localStorage.setItem('devMode', (!currentDevMode).toString());
+    
     // Show console message for developers
     if (!currentDevMode) {
       console.log('%c🔓 Developer Mode Enabled', 'background: #222; color: #bada55; font-size: 16px; padding: 4px;');
       console.log('You now have access to all roles and features for testing');
+      
+      // Set up mock data if needed
+      if (localStorage.getItem('devModeInitialized') !== 'true') {
+        generateMockData();
+        localStorage.setItem('devModeInitialized', 'true');
+      }
     } else {
       console.log('%c🔒 Developer Mode Disabled', 'background: #222; color: #ff6b6b; font-size: 16px; padding: 4px;');
+      
+      // Ask if user wants to clear dev data
+      if (confirm('Do you want to clear all development data?')) {
+        clearAllData();
+        localStorage.removeItem('devModeInitialized');
+      }
     }
   }
 }));
