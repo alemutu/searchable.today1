@@ -182,9 +182,9 @@ const LoginForm: React.FC = () => {
         
         <div className="mt-4 text-center">
           <p className="text-sm text-gray-600">
-            Don't have an account?{' '}
-            <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500">
-              Sign up
+            Are you a Super Admin?{' '}
+            <Link to="/admin-login" className="font-medium text-primary-600 hover:text-primary-500">
+              Admin Login
             </Link>
           </p>
         </div>
