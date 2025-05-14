@@ -169,25 +169,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { user } = get();
       if (!user) return;
+
+      // Get user metadata from auth.users instead of profiles table
+      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
       
-      // Use a direct query to avoid RLS recursion
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching user profile:', error);
-        throw error;
+      if (userError) {
+        console.error('Error fetching user data:', userError);
+        throw userError;
       }
-      
-      if (data) {
+
+      if (currentUser?.user_metadata) {
+        const { role } = currentUser.user_metadata;
+        
         set({
-          isAdmin: data.role === 'super_admin',
-          isDoctor: data.role === 'doctor',
-          isNurse: data.role === 'nurse',
-          isReceptionist: data.role === 'receptionist'
+          isAdmin: role === 'super_admin',
+          isDoctor: role === 'doctor',
+          isNurse: role === 'nurse',
+          isReceptionist: role === 'receptionist'
         });
         
         await get().fetchCurrentHospital();
@@ -202,19 +200,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { user } = get();
       if (!user) return;
       
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('hospital_id')
-        .eq('id', user.id)
-        .single();
+      // Get hospital_id from user metadata instead of profiles table
+      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
       
-      if (profileError) throw profileError;
+      if (userError) throw userError;
       
-      if (profile && profile.hospital_id) {
+      if (currentUser?.user_metadata?.hospital_id) {
         const { data: hospital, error: hospitalError } = await supabase
           .from('hospitals')
           .select('*')
-          .eq('id', profile.hospital_id)
+          .eq('id', currentUser.user_metadata.hospital_id)
           .single();
         
         if (hospitalError) throw hospitalError;
