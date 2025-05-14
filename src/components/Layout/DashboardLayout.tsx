@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
-import { Users, Calendar, FileText, Activity, Pill, DollarSign, LogOut, Menu, X, Bell, Building2, Settings, LayoutDashboard, BedDouble, FlaskRound as Flask, Microscope, Heart, Baby, UserRound, Syringe, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Stethoscope, ClipboardList, Cog, Building, Users2, Wrench, CreditCard, Key, LifeBuoy, ChevronDown, ChevronRight, TicketCheck, Box, Home, Search, LayoutList, WifiOff, Code } from 'lucide-react';
+import { Users, Calendar, FileText, Activity, Pill, DollarSign, LogOut, Menu, X, Bell, Building2, Settings, LayoutDashboard, BedDouble, FlaskRound as Flask, Microscope, Heart, Baby, UserRound, Syringe, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Stethoscope, ClipboardList, Cog, Building, Users2, Wrench, CreditCard, Key, LifeBuoy, ChevronDown, ChevronRight, TicketCheck, Box, Home, Search, LayoutList, WifiOff } from 'lucide-react';
 import { syncAllData } from '../../lib/storage';
 
 const DashboardLayout: React.FC = () => {
@@ -11,7 +11,7 @@ const DashboardLayout: React.FC = () => {
   const [departmentsOpen, setDepartmentsOpen] = useState(true);
   const [servicesOpen, setServicesOpen] = useState(true);
   const [superAdminOpen, setSuperAdminOpen] = useState(false);
-  const { user, hospital, logout, isAdmin, devMode, toggleDevMode } = useAuthStore();
+  const { user, hospital, logout, isAdmin } = useAuthStore();
   const { isOffline } = useOfflineStatus();
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,26 +75,6 @@ const DashboardLayout: React.FC = () => {
               <p className="text-xs font-medium text-warning-700">Offline Mode</p>
             </div>
           )}
-          
-          {/* Developer Mode Toggle */}
-          <div className="mt-2 py-2 px-3 bg-gray-50 rounded-md flex items-center justify-between">
-            <div className="flex items-center">
-              <Code className="h-4 w-4 text-gray-500 mr-2" />
-              <p className="text-xs font-medium text-gray-700">Developer Mode</p>
-            </div>
-            <button
-              onClick={toggleDevMode}
-              className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
-                devMode ? 'bg-primary-600' : 'bg-gray-200'
-              }`}
-            >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${
-                  devMode ? 'translate-x-4' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
         </div>
 
         <nav className="mt-4 px-4 space-y-1">
@@ -509,13 +489,6 @@ const DashboardLayout: React.FC = () => {
                 <div className="flex items-center text-warning-600">
                   <WifiOff className="h-5 w-5 mr-1" />
                   <span className="text-sm font-medium">Offline Mode</span>
-                </div>
-              )}
-              
-              {devMode && (
-                <div className="flex items-center text-primary-600">
-                  <Code className="h-5 w-5 mr-1" />
-                  <span className="text-sm font-medium">Dev Mode</span>
                 </div>
               )}
               

@@ -12,7 +12,6 @@ interface AuthState {
   isNurse: boolean;
   isReceptionist: boolean;
   error: string | null;
-  devMode: boolean;
   
   initialize: () => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
@@ -20,7 +19,6 @@ interface AuthState {
   logout: () => Promise<void>;
   fetchUserProfile: () => Promise<void>;
   fetchCurrentHospital: () => Promise<void>;
-  toggleDevMode: () => void;
 }
 
 interface Hospital {
@@ -66,7 +64,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isNurse: false,
   isReceptionist: false,
   error: null,
-  devMode: false,
   
   initialize: async () => {
     try {
@@ -157,8 +154,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAdmin: false,
         isDoctor: false,
         isNurse: false,
-        isReceptionist: false,
-        devMode: false
+        isReceptionist: false
       });
     } catch (error: any) {
       console.error('Error logging out:', error.message);
@@ -184,9 +180,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (data) {
         set({
           isAdmin: data.role === 'admin' || data.role === 'super_admin',
-          isDoctor: data.role === 'doctor' || get().devMode,
-          isNurse: data.role === 'nurse' || get().devMode,
-          isReceptionist: data.role === 'receptionist' || get().devMode
+          isDoctor: data.role === 'doctor',
+          isNurse: data.role === 'nurse',
+          isReceptionist: data.role === 'receptionist'
         });
         
         await get().fetchCurrentHospital();
@@ -226,25 +222,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch (error: any) {
       console.error('Error fetching hospital:', error.message);
-    }
-  },
-  
-  toggleDevMode: () => {
-    const currentDevMode = get().devMode;
-    set({ 
-      devMode: !currentDevMode,
-      isDoctor: get().isDoctor || !currentDevMode,
-      isNurse: get().isNurse || !currentDevMode,
-      isReceptionist: get().isReceptionist || !currentDevMode,
-      isAdmin: get().isAdmin || !currentDevMode
-    });
-    
-    // Show console message for developers
-    if (!currentDevMode) {
-      console.log('%c🔓 Developer Mode Enabled', 'background: #222; color: #bada55; font-size: 16px; padding: 4px;');
-      console.log('You now have access to all roles and features for testing');
-    } else {
-      console.log('%c🔒 Developer Mode Disabled', 'background: #222; color: #ff6b6b; font-size: 16px; padding: 4px;');
     }
   }
 }));
