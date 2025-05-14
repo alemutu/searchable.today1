@@ -169,27 +169,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { user } = get();
       if (!user) return;
       
-      // First fetch the profile with minimal data to avoid policy recursion
-      const { data: profile, error } = await supabase
+      const { data, error } = await supabase
         .from('profiles')
-        .select('role, hospital_id')
+        .select('*')
         .eq('id', user.id)
         .single();
       
       if (error) throw error;
       
-      if (profile) {
+      if (data) {
         set({
-          isAdmin: profile.role === 'super_admin',
-          isDoctor: profile.role === 'doctor',
-          isNurse: profile.role === 'nurse',
-          isReceptionist: profile.role === 'receptionist'
+          isAdmin: data.role === 'super_admin',
+          isDoctor: data.role === 'doctor',
+          isNurse: data.role === 'nurse',
+          isReceptionist: data.role === 'receptionist'
         });
         
-        // If we have a hospital ID, fetch the hospital details separately
-        if (profile.hospital_id) {
-          await get().fetchCurrentHospital();
-        }
+        await get().fetchCurrentHospital();
       }
     } catch (error: any) {
       console.error('Error fetching user profile:', error.message);
@@ -201,7 +197,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { user } = get();
       if (!user) return;
       
-      // Get the hospital_id from the minimal profile data
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
         .select('hospital_id')
