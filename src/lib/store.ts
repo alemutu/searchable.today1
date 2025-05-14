@@ -179,7 +179,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       if (data) {
         set({
-          isAdmin: data.role === 'admin' || data.role === 'super_admin',
+          isAdmin: data.role === 'super_admin',
           isDoctor: data.role === 'doctor',
           isNurse: data.role === 'nurse',
           isReceptionist: data.role === 'receptionist'

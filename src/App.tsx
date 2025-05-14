@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './lib/store';
 import LoginForm from './components/auth/LoginForm';
+import AdminLoginForm from './components/auth/AdminLoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import DashboardLayout from './components/Layout/DashboardLayout';
 import Dashboard from './pages/Dashboard';
@@ -62,16 +63,30 @@ import Dental from './pages/departments/Dental';
 import EyeClinic from './pages/departments/EyeClinic';
 import Physiotherapy from './pages/departments/Physiotherapy';
 
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isLoading } = useAuthStore();
+interface ProtectedRouteProps {
+  children: React.ReactNode;
+  requiredRole?: 'super_admin' | 'non_super_admin';
+}
+
+const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
+  const { user, isLoading, isAdmin } = useAuthStore();
   const navigate = useNavigate();
   const location = useLocation();
   
   useEffect(() => {
-    if (!isLoading && !user) {
-      navigate('/login', { state: { from: location } });
+    if (!isLoading) {
+      if (!user) {
+        // Not logged in, redirect to login
+        navigate('/login', { state: { from: location } });
+      } else if (requiredRole === 'super_admin' && !isAdmin) {
+        // Not a super admin but trying to access super admin pages
+        navigate('/dashboard', { state: { from: location } });
+      } else if (requiredRole === 'non_super_admin' && isAdmin) {
+        // Super admin trying to access non-super admin pages
+        navigate('/super-admin', { state: { from: location } });
+      }
     }
-  }, [user, isLoading, navigate, location]);
+  }, [user, isLoading, navigate, location, isAdmin, requiredRole]);
   
   if (isLoading) {
     return (
@@ -81,7 +96,12 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
     );
   }
   
-  return user ? <>{children}</> : null;
+  if (!user) return null;
+  
+  if (requiredRole === 'super_admin' && !isAdmin) return null;
+  if (requiredRole === 'non_super_admin' && isAdmin) return null;
+  
+  return <>{children}</>;
 };
 
 const App: React.FC = () => {
@@ -95,22 +115,33 @@ const App: React.FC = () => {
     <>
       <Routes>
         <Route path="/login" element={<LoginForm />} />
+        <Route path="/admin-login" element={<AdminLoginForm />} />
         <Route path="/register" element={<RegisterForm />} />
         
+        {/* Super Admin Routes */}
+        <Route path="/super-admin" element={
+          <ProtectedRoute requiredRole="super_admin">
+            <DashboardLayout />
+          </ProtectedRoute>
+        }>
+          <Route index element={<SuperAdminDashboard />} />
+          <Route path="system-modules" element={<SystemModules />} />
+          <Route path="pricing-plans" element={<PricingPlans />} />
+          <Route path="licenses" element={<Licenses />} />
+          <Route path="support-tickets" element={<SupportTickets />} />
+          <Route path="support-settings" element={<SupportSettings />} />
+          <Route path="settings/system" element={<SystemSettings />} />
+        </Route>
+        
+        {/* Regular User Routes */}
         <Route path="/" element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredRole="non_super_admin">
             <DashboardLayout />
           </ProtectedRoute>
         }>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="reception" element={<ReceptionDashboard />} />
-          <Route path="super-admin" element={<SuperAdminDashboard />} />
-          <Route path="system-modules" element={<SystemModules />} />
-          <Route path="pricing-plans" element={<PricingPlans />} />
-          <Route path="licenses" element={<Licenses />} />
-          <Route path="support-tickets" element={<SupportTickets />} />
-          <Route path="support-settings" element={<SupportSettings />} />
           
           {/* Settings Routes */}
           <Route path="settings">
@@ -118,7 +149,6 @@ const App: React.FC = () => {
             <Route path="departments" element={<DepartmentSettings />} />
             <Route path="users" element={<UserSettings />} />
             <Route path="clinical" element={<ClinicalSettings />} />
-            <Route path="system" element={<SystemSettings />} />
             <Route path="billing" element={<BillingSettings />} />
             <Route path="license" element={<LicenseSettings />} />
           </Route>
@@ -173,6 +203,7 @@ const App: React.FC = () => {
           <Route path="departments/physiotherapy" element={<Physiotherapy />} />
         </Route>
         
+        {/* Default redirect */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
       
