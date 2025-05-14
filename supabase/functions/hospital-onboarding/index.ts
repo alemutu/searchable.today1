@@ -46,8 +46,7 @@ serve(async (req) => {
         subdomain: hospitalProfile.subdomain || hospitalProfile.name.toLowerCase().replace(/\s+/g, '-'),
         address: hospitalProfile.address,
         phone: hospitalProfile.phone,
-        email: hospitalProfile.email,
-        domain_enabled: true
+        email: hospitalProfile.email
       }])
       .select()
       .single();
