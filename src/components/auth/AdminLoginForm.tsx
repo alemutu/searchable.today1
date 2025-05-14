@@ -1,37 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
 import { Activity, WifiOff } from 'lucide-react';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
 
-interface LoginFormData {
+interface AdminLoginFormData {
   email: string;
   password: string;
 }
 
-const LoginForm: React.FC = () => {
-  const { login, isLoading, error, isAdmin } = useAuthStore();
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
+const AdminLoginForm: React.FC = () => {
+  const { login, isLoading, error } = useAuthStore();
+  const { register, handleSubmit, formState: { errors } } = useForm<AdminLoginFormData>();
   const { isOffline } = useOfflineStatus();
   const navigate = useNavigate();
   const location = useLocation();
   const [offlineError, setOfflineError] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
   
-  // Check if user is already logged in and redirect accordingly
-  useEffect(() => {
-    const { user, isAdmin } = useAuthStore.getState();
-    if (user) {
-      if (isAdmin) {
-        navigate('/super-admin');
-      } else {
-        navigate('/dashboard');
-      }
-    }
-  }, [navigate]);
-  
-  const onSubmit = async (data: LoginFormData) => {
+  const onSubmit = async (data: AdminLoginFormData) => {
     if (isOffline) {
       setOfflineError("Can't log in while offline. Please check your internet connection.");
       return;
@@ -45,15 +33,15 @@ const LoginForm: React.FC = () => {
       // Check if the user is a super_admin
       const { isAdmin } = useAuthStore.getState();
       
-      if (isAdmin) {
-        setRoleError("Use the admin login portal.");
-        // Logout the user since they should use the admin login
+      if (!isAdmin) {
+        setRoleError("This login is for Super Admin only.");
+        // Logout the user since they're not a super_admin
         await useAuthStore.getState().logout();
         return;
       }
       
-      // Redirect to the dashboard
-      const from = location.state?.from?.pathname || '/dashboard';
+      // Redirect to the super admin dashboard
+      const from = location.state?.from?.pathname || '/super-admin';
       navigate(from);
     } catch (error) {
       console.error('Login error:', error);
@@ -67,7 +55,10 @@ const LoginForm: React.FC = () => {
           <div className="flex justify-center">
             <Activity className="h-12 w-12 text-primary-500" />
           </div>
-          <h2 className="mt-6 text-2xl font-bold text-gray-900">Welcome back to Searchable</h2>
+          <h2 className="mt-6 text-2xl font-bold text-gray-900">Admin Login</h2>
+          <p className="mt-2 text-sm text-gray-600">
+            This portal is for Super Admins only.
+          </p>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
@@ -79,7 +70,7 @@ const LoginForm: React.FC = () => {
           
           {roleError && (
             <div className="bg-error-50 border border-error-200 text-error-700 px-4 py-3 rounded-md">
-              {roleError} <Link to="/admin-login" className="font-medium underline">Go to admin login</Link>
+              {roleError}
             </div>
           )}
           
@@ -175,22 +166,16 @@ const LoginForm: React.FC = () => {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               ) : null}
-              Sign in
+              Sign in as Admin
             </button>
           </div>
         </form>
         
         <div className="mt-4 text-center">
           <p className="text-sm text-gray-600">
-            Don't have an account?{' '}
-            <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500">
-              Sign up
-            </Link>
-          </p>
-          <p className="mt-2 text-sm text-gray-600">
-            Are you an admin?{' '}
-            <Link to="/admin-login" className="font-medium text-primary-600 hover:text-primary-500">
-              Admin login
+            Not an admin?{' '}
+            <Link to="/login" className="font-medium text-primary-600 hover:text-primary-500">
+              Go to regular login
             </Link>
           </p>
         </div>
@@ -199,4 +184,4 @@ const LoginForm: React.FC = () => {
   );
 };
 
-export default LoginForm;
+export default AdminLoginForm;
