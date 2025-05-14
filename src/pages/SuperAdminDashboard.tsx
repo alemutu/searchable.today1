@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, Navigate } from 'react-router-dom';
-import { Building2, Users, Activity, Settings, Plus, Trash2, Edit, Check, X, Box, CreditCard, Key, TicketCheck, Mail, Phone, Globe, MapPin, AlertCircle } from 'lucide-react';
+import { Building2, Users, Activity, Settings, Plus, Trash2, Edit, Check, X, Box, CreditCard, Key, TicketCheck, Mail, Phone, Globe, MapPin, AlertCircle, BarChart4, LineChart, PieChart, BarChart, FileBarChart2, LifeBuoy, Wrench } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../lib/store';
 
@@ -237,272 +237,273 @@ const SuperAdminDashboard: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Super Admin Dashboard</h1>
-        <Link to="/super-admin/hospital-onboarding" className="btn btn-primary inline-flex items-center">
-          <Plus className="h-5 w-5 mr-2" />
-          Add Hospital
-        </Link>
-      </div>
+      <div className="bg-gradient-to-r from-primary-600 to-primary-500 rounded-xl p-6 shadow-md">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-2xl font-bold text-white">Super Admin Dashboard</h1>
+            <p className="text-primary-100 text-sm">System management and hospital administration</p>
+          </div>
+          <Link to="/super-admin/hospital-onboarding" className="btn bg-white text-primary-600 hover:bg-gray-100 flex items-center px-3 py-2 rounded-md text-sm font-medium">
+            <Plus className="h-4 w-4 mr-2" />
+            Onboard Hospital
+          </Link>
+        </div>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-        <div className="card p-6">
-          <div className="flex items-center justify-between">
+        {/* Stats Overview */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Total Hospitals</p>
-              <p className="mt-1 text-3xl font-semibold text-gray-900">{stats?.total_hospitals}</p>
+              <p className="text-white text-sm font-medium">Total Hospitals</p>
+              <p className="text-white text-2xl font-bold">{stats?.total_hospitals}</p>
             </div>
-            <div className="p-3 rounded-full bg-primary-100">
+            <div className="p-3 rounded-full bg-white">
               <Building2 className="h-6 w-6 text-primary-500" />
             </div>
           </div>
-        </div>
-
-        <div className="card p-6">
-          <div className="flex items-center justify-between">
+          
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Total Users</p>
-              <p className="mt-1 text-3xl font-semibold text-gray-900">{stats?.total_users}</p>
+              <p className="text-white text-sm font-medium">Total Users</p>
+              <p className="text-white text-2xl font-bold">{stats?.total_users}</p>
             </div>
-            <div className="p-3 rounded-full bg-secondary-100">
-              <Users className="h-6 w-6 text-secondary-500" />
+            <div className="p-3 rounded-full bg-white">
+              <Users className="h-6 w-6 text-primary-500" />
             </div>
           </div>
-        </div>
-
-        <div className="card p-6">
-          <div className="flex items-center justify-between">
+          
+          <div className="bg-white bg-opacity-10 backdrop-blur-sm rounded-lg p-4 flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-500">Total Patients</p>
-              <p className="mt-1 text-3xl font-semibold text-gray-900">{stats?.total_patients}</p>
+              <p className="text-white text-sm font-medium">Total Patients</p>
+              <p className="text-white text-2xl font-bold">{stats?.total_patients}</p>
             </div>
-            <div className="p-3 rounded-full bg-accent-100">
-              <Activity className="h-6 w-6 text-accent-500" />
+            <div className="p-3 rounded-full bg-white">
+              <Activity className="h-6 w-6 text-primary-500" />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Module Navigation */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Link to="/super-admin/system-modules" className="card p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-full bg-primary-100">
-              <Box className="h-6 w-6 text-primary-500" />
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">System Modules</h3>
-              <p className="text-sm text-gray-500">Manage system modules and features</p>
-            </div>
-          </div>
-        </Link>
-
-        <Link to="/super-admin/pricing-plans" className="card p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-full bg-secondary-100">
-              <CreditCard className="h-6 w-6 text-secondary-500" />
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">Pricing Plans</h3>
-              <p className="text-sm text-gray-500">Configure pricing and subscriptions</p>
-            </div>
-          </div>
-        </Link>
-
-        <Link to="/super-admin/licenses" className="card p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-full bg-accent-100">
-              <Key className="h-6 w-6 text-accent-500" />
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">Licenses</h3>
-              <p className="text-sm text-gray-500">Manage hospital licenses</p>
-            </div>
-          </div>
-        </Link>
-
-        <Link to="/super-admin/support-tickets" className="card p-6 hover:shadow-lg transition-shadow">
-          <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-full bg-warning-100">
-              <TicketCheck className="h-6 w-6 text-warning-500" />
-            </div>
-            <div>
-              <h3 className="text-lg font-medium text-gray-900">Support Tickets</h3>
-              <p className="text-sm text-gray-500">Handle support requests</p>
+      {/* Main Content Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - Quick Access */}
+        <div className="space-y-6">
+          {/* Setup Section */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+              <Settings className="h-5 w-5 text-primary-500 mr-2" />
+              Setup
+            </h2>
+            <div className="grid grid-cols-1 gap-3">
+              <Link to="/super-admin/system-modules" className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-primary-200 transition-colors">
+                <Box className="h-5 w-5 text-primary-500 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">System Modules</p>
+                  <p className="text-xs text-gray-500">Manage system modules and features</p>
+                </div>
+              </Link>
+              
+              <Link to="/super-admin/pricing-plans" className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-primary-200 transition-colors">
+                <CreditCard className="h-5 w-5 text-primary-500 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Pricing Plans</p>
+                  <p className="text-xs text-gray-500">Configure pricing and subscriptions</p>
+                </div>
+              </Link>
+              
+              <Link to="/super-admin/settings/system" className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-primary-200 transition-colors">
+                <Settings className="h-5 w-5 text-primary-500 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">System Settings</p>
+                  <p className="text-xs text-gray-500">Configure global system settings</p>
+                </div>
+              </Link>
             </div>
           </div>
-        </Link>
-      </div>
-
-      {/* Hospitals List */}
-      <div className="card">
-        <div className="card-header flex justify-between items-center">
-          <h2 className="text-lg font-medium text-gray-900">Hospitals</h2>
-          <Link to="/super-admin/hospital-onboarding" className="btn btn-primary inline-flex items-center">
-            <Plus className="h-5 w-5 mr-2" />
-            Add Hospital
-          </Link>
+          
+          {/* Support Section */}
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+              <LifeBuoy className="h-5 w-5 text-primary-500 mr-2" />
+              Support & Issues
+            </h2>
+            <div className="grid grid-cols-1 gap-3">
+              <Link to="/super-admin/support-tickets" className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-primary-200 transition-colors">
+                <TicketCheck className="h-5 w-5 text-primary-500 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Support Tickets</p>
+                  <p className="text-xs text-gray-500">Handle support requests</p>
+                </div>
+              </Link>
+              
+              <Link to="/super-admin/support-settings" className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-primary-200 transition-colors">
+                <Wrench className="h-5 w-5 text-primary-500 mr-3" />
+                <div>
+                  <p className="text-sm font-medium text-gray-900">Support Settings</p>
+                  <p className="text-xs text-gray-500">Configure support system</p>
+                </div>
+              </Link>
+            </div>
+          </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Domain
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Address
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Contact
-                </th>
-                <th scope="col" className="relative px-6 py-3">
-                  <span className="sr-only">Actions</span>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {hospitals.map((hospital) => (
-                <tr key={hospital.id}>
-                  <td className="px-6 py-4">
-                    {editingHospital === hospital.id ? (
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={hospital.name}
-                        onChange={(e) => setHospitals(hospitals.map(h => 
-                          h.id === hospital.id ? { ...h, name: e.target.value } : h
-                        ))}
-                      />
-                    ) : (
-                      <div className="text-sm font-medium text-gray-900">{hospital.name}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    {editingHospital === hospital.id ? (
-                      <div className="space-y-1">
-                        <input
-                          type="text"
-                          className="form-input"
-                          value={hospital.subdomain}
-                          onChange={(e) => setHospitals(hospitals.map(h => 
-                            h.id === hospital.id ? { ...h, subdomain: e.target.value.toLowerCase() } : h
-                          ))}
-                        />
-                        <div className="text-xs text-gray-500">
-                          {hospital.subdomain}.{mainDomain}
+        
+        {/* Middle Column - Hospitals */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h2 className="text-lg font-medium text-gray-900 flex items-center">
+                <Building2 className="h-5 w-5 text-primary-500 mr-2" />
+                Hospitals
+              </h2>
+              <Link to="/super-admin/hospital-onboarding" className="btn btn-primary inline-flex items-center text-sm">
+                <Plus className="h-4 w-4 mr-1" />
+                Add Hospital
+              </Link>
+            </div>
+            
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Name
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Domain
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Contact
+                    </th>
+                    <th scope="col" className="relative px-6 py-3">
+                      <span className="sr-only">Actions</span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {hospitals.slice(0, 5).map((hospital) => (
+                    <tr key={hospital.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0 h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center">
+                            <Building2 className="h-5 w-5 text-primary-600" />
+                          </div>
+                          <div className="ml-4">
+                            <div className="text-sm font-medium text-gray-900">{hospital.name}</div>
+                            <div className="text-xs text-gray-500">{hospital.address}</div>
+                          </div>
                         </div>
-                        <div className="flex items-center mt-1">
-                          <input
-                            type="checkbox"
-                            id={`domain-enabled-${hospital.id}`}
-                            checked={hospital.domain_enabled !== false}
-                            onChange={(e) => setHospitals(hospitals.map(h => 
-                              h.id === hospital.id ? { ...h, domain_enabled: e.target.checked } : h
-                            ))}
-                            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                          />
-                          <label htmlFor={`domain-enabled-${hospital.id}`} className="ml-2 block text-xs text-gray-700">
-                            Enable domain access
-                          </label>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">
+                          <span className="font-medium">{hospital.subdomain}</span>
+                          <span className="text-gray-500">.{mainDomain}</span>
                         </div>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-900">
-                        <span className="font-medium">{hospital.subdomain}</span>
-                        <span className="text-gray-500">.{mainDomain}</span>
                         {hospital.domain_enabled === false && (
-                          <span className="ml-2 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
+                          <span className="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-800">
                             Disabled
                           </span>
                         )}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    {editingHospital === hospital.id ? (
-                      <input
-                        type="text"
-                        className="form-input"
-                        value={hospital.address}
-                        onChange={(e) => setHospitals(hospitals.map(h => 
-                          h.id === hospital.id ? { ...h, address: e.target.value } : h
-                        ))}
-                      />
-                    ) : (
-                      <div className="text-sm text-gray-500">{hospital.address}</div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    {editingHospital === hospital.id ? (
-                      <div className="space-y-2">
-                        <input
-                          type="text"
-                          className="form-input"
-                          placeholder="Phone"
-                          value={hospital.phone}
-                          onChange={(e) => setHospitals(hospitals.map(h => 
-                            h.id === hospital.id ? { ...h, phone: e.target.value } : h
-                          ))}
-                        />
-                        <input
-                          type="email"
-                          className="form-input"
-                          placeholder="Email (optional)"
-                          value={hospital.email || ''}
-                          onChange={(e) => setHospitals(hospitals.map(h => 
-                            h.id === hospital.id ? { ...h, email: e.target.value } : h
-                          ))}
-                        />
-                      </div>
-                    ) : (
-                      <div className="text-sm text-gray-500">
-                        <div>{hospital.phone}</div>
-                        {hospital.email && <div>{hospital.email}</div>}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 text-right space-x-2">
-                    {editingHospital === hospital.id ? (
-                      <>
-                        <button
-                          onClick={() => handleUpdateHospital(hospital)}
-                          className="text-success-600 hover:text-success-900"
-                        >
-                          <Check className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => setEditingHospital(null)}
-                          className="text-error-600 hover:text-error-900"
-                        >
-                          <X className="h-5 w-5" />
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          onClick={() => setEditingHospital(hospital.id)}
-                          className="text-primary-600 hover:text-primary-900"
-                        >
-                          <Edit className="h-5 w-5" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteHospital(hospital.id)}
-                          className="text-error-600 hover:text-error-900"
-                        >
-                          <Trash2 className="h-5 w-5" />
-                        </button>
-                      </>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-500">
+                          <div className="flex items-center">
+                            <Phone className="h-3.5 w-3.5 text-gray-400 mr-1" />
+                            {hospital.phone}
+                          </div>
+                          {hospital.email && (
+                            <div className="flex items-center mt-1">
+                              <Mail className="h-3.5 w-3.5 text-gray-400 mr-1" />
+                              {hospital.email}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right text-sm font-medium">
+                        <div className="flex justify-end space-x-2">
+                          <button
+                            onClick={() => setEditingHospital(hospital.id)}
+                            className="text-primary-600 hover:text-primary-900 p-1 rounded-full hover:bg-primary-50"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteHospital(hospital.id)}
+                            className="text-error-600 hover:text-error-900 p-1 rounded-full hover:bg-error-50"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            
+            {hospitals.length > 5 && (
+              <div className="px-6 py-3 border-t border-gray-200 bg-gray-50 text-right">
+                <Link to="/super-admin/hospitals" className="text-sm text-primary-600 hover:text-primary-800 font-medium">
+                  View all {hospitals.length} hospitals
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+      
+      {/* Reports & Analytics Section */}
+      <div className="bg-white rounded-lg shadow-sm p-6">
+        <h2 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+          <BarChart4 className="h-5 w-5 text-primary-500 mr-2" />
+          Reports & Analytics
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <Link to="/super-admin/reports/overview" className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-primary-200 transition-colors">
+            <BarChart4 className="h-5 w-5 text-primary-500 mr-3" />
+            <div>
+              <p className="text-sm font-medium text-gray-900">Overview</p>
+              <p className="text-xs text-gray-500">System-wide metrics and KPIs</p>
+            </div>
+          </Link>
+          
+          <Link to="/super-admin/reports/hospitals" className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-primary-200 transition-colors">
+            <Building2 className="h-5 w-5 text-primary-500 mr-3" />
+            <div>
+              <p className="text-sm font-medium text-gray-900">Hospital Reports</p>
+              <p className="text-xs text-gray-500">Activity and usage by hospital</p>
+            </div>
+          </Link>
+          
+          <Link to="/super-admin/reports/licenses" className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-primary-200 transition-colors">
+            <Key className="h-5 w-5 text-primary-500 mr-3" />
+            <div>
+              <p className="text-sm font-medium text-gray-900">License Reports</p>
+              <p className="text-xs text-gray-500">License status and renewals</p>
+            </div>
+          </Link>
+          
+          <Link to="/super-admin/reports/modules" className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-primary-200 transition-colors">
+            <Box className="h-5 w-5 text-primary-500 mr-3" />
+            <div>
+              <p className="text-sm font-medium text-gray-900">Module Usage</p>
+              <p className="text-xs text-gray-500">Feature adoption and usage</p>
+            </div>
+          </Link>
+          
+          <Link to="/super-admin/reports/revenue" className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-primary-200 transition-colors">
+            <DollarSign className="h-5 w-5 text-primary-500 mr-3" />
+            <div>
+              <p className="text-sm font-medium text-gray-900">Revenue Reports</p>
+              <p className="text-xs text-gray-500">Financial metrics and trends</p>
+            </div>
+          </Link>
+          
+          <Link to="/super-admin/reports/support" className="flex items-center p-3 rounded-lg border border-gray-200 hover:bg-gray-50 hover:border-primary-200 transition-colors">
+            <LifeBuoy className="h-5 w-5 text-primary-500 mr-3" />
+            <div>
+              <p className="text-sm font-medium text-gray-900">Support Reports</p>
+              <p className="text-xs text-gray-500">Ticket metrics and resolution times</p>
+            </div>
+          </Link>
         </div>
       </div>
     </div>
