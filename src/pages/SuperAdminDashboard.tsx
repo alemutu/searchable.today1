@@ -59,21 +59,10 @@ const SuperAdminDashboard: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const { data: statsData, error: statsError } = await supabase
-        .from('super_admin_stats')
-        .select('*');
-
-      if (statsError) throw statsError;
-
-      setStats(statsData?.[0] || {
-        total_hospitals: 0,
-        total_users: 0,
-        total_patients: 0,
-        total_departments: 0,
-        total_doctors: 0,
-        total_nurses: 0
-      });
-
+      // Instead of using the super_admin_stats view, directly query the tables
+      // to avoid the infinite recursion issue with RLS policies
+      
+      // Get hospitals count
       const { data: hospitalsData, error: hospitalsError } = await supabase
         .from('hospitals')
         .select('*')
@@ -81,6 +70,53 @@ const SuperAdminDashboard: React.FC = () => {
 
       if (hospitalsError) throw hospitalsError;
       setHospitals(hospitalsData || []);
+      
+      // Get users count
+      const { count: usersCount, error: usersError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+        
+      if (usersError) throw usersError;
+      
+      // Get patients count
+      const { count: patientsCount, error: patientsError } = await supabase
+        .from('patients')
+        .select('*', { count: 'exact', head: true });
+        
+      if (patientsError) throw patientsError;
+      
+      // Get departments count
+      const { count: departmentsCount, error: departmentsError } = await supabase
+        .from('departments')
+        .select('*', { count: 'exact', head: true });
+        
+      if (departmentsError) throw departmentsError;
+      
+      // Get doctors count
+      const { count: doctorsCount, error: doctorsError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'doctor');
+        
+      if (doctorsError) throw doctorsError;
+      
+      // Get nurses count
+      const { count: nursesCount, error: nursesError } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true })
+        .eq('role', 'nurse');
+        
+      if (nursesError) throw nursesError;
+      
+      // Compile stats
+      setStats({
+        total_hospitals: hospitalsData?.length || 0,
+        total_users: usersCount || 0,
+        total_patients: patientsCount || 0,
+        total_departments: departmentsCount || 0,
+        total_doctors: doctorsCount || 0,
+        total_nurses: nursesCount || 0
+      });
 
       const { data: settingsData, error: settingsError } = await supabase
         .from('system_settings')
@@ -294,7 +330,7 @@ const SuperAdminDashboard: React.FC = () => {
 
       {/* Module Navigation */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Link to="/system-modules" className="card p-6 hover:shadow-lg transition-shadow">
+        <Link to="/super-admin/system-modules" className="card p-6 hover:shadow-lg transition-shadow">
           <div className="flex items-center space-x-4">
             <div className="p-3 rounded-full bg-primary-100">
               <Box className="h-6 w-6 text-primary-500" />
@@ -306,7 +342,7 @@ const SuperAdminDashboard: React.FC = () => {
           </div>
         </Link>
 
-        <Link to="/pricing-plans" className="card p-6 hover:shadow-lg transition-shadow">
+        <Link to="/super-admin/pricing-plans" className="card p-6 hover:shadow-lg transition-shadow">
           <div className="flex items-center space-x-4">
             <div className="p-3 rounded-full bg-secondary-100">
               <CreditCard className="h-6 w-6 text-secondary-500" />
@@ -318,7 +354,7 @@ const SuperAdminDashboard: React.FC = () => {
           </div>
         </Link>
 
-        <Link to="/licenses" className="card p-6 hover:shadow-lg transition-shadow">
+        <Link to="/super-admin/licenses" className="card p-6 hover:shadow-lg transition-shadow">
           <div className="flex items-center space-x-4">
             <div className="p-3 rounded-full bg-accent-100">
               <Key className="h-6 w-6 text-accent-500" />
@@ -330,7 +366,7 @@ const SuperAdminDashboard: React.FC = () => {
           </div>
         </Link>
 
-        <Link to="/support-tickets" className="card p-6 hover:shadow-lg transition-shadow">
+        <Link to="/super-admin/support-tickets" className="card p-6 hover:shadow-lg transition-shadow">
           <div className="flex items-center space-x-4">
             <div className="p-3 rounded-full bg-warning-100">
               <TicketCheck className="h-6 w-6 text-warning-500" />
