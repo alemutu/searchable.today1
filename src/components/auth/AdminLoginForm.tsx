@@ -39,7 +39,7 @@ const AdminLoginForm: React.FC = () => {
       await login(data.email, data.password);
       
       // Check if the user is a super_admin
-      const { isAdmin, user } = useAuthStore.getState();
+      const { isAdmin } = useAuthStore.getState();
       
       if (!isAdmin) {
         setRoleError("This login is for Super Admin only.");
