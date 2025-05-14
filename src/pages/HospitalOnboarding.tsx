@@ -1,36 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { 
-  Building2, 
-  Mail, 
-  Phone, 
-  Globe, 
-  MapPin, 
-  User, 
-  Key, 
-  CheckCircle, 
-  Calendar, 
-  DollarSign, 
-  Box, 
-  ArrowRight, 
-  ArrowLeft, 
-  Eye, 
-  EyeOff, 
-  Copy, 
-  Check, 
-  AlertCircle,
-  Loader2,
-  Pill,
-  BedDouble,
-  Flask,
-  Microscope,
-  FileText,
-  CreditCard,
-  LayoutDashboard,
-  Stethoscope,
-  Activity,
-  Users
-} from 'lucide-react';
+import { Building2, Mail, Phone, Globe, MapPin, User, Key, CheckCircle, Calendar, DollarSign, Box, ArrowRight, ArrowLeft, Eye, EyeOff, Copy, Check, AlertCircle, Loader2, Pill, BedDouble, FlaskRound as Flask, Microscope, FileText, CreditCard, LayoutDashboard, Stethoscope, Activity, Users } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../lib/store';
 
