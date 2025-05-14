@@ -170,7 +170,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { user } = get();
       if (!user) return;
 
-      // Get user metadata from auth.users instead of profiles table
+      // Get user metadata from auth.users
       const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
       
       if (userError) {
@@ -178,41 +178,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw userError;
       }
 
-      // First try to get role from user metadata
+      // Set role from user metadata
       if (currentUser?.user_metadata) {
         const { role } = currentUser.user_metadata;
         
         set({
-          isAdmin: role === 'super_admin',
+          isAdmin: role === 'super_admin' || role === 'admin',
           isDoctor: role === 'doctor',
           isNurse: role === 'nurse',
           isReceptionist: role === 'receptionist'
         });
-      } else {
-        // Fallback to profiles table if metadata doesn't have role
-        // Use a direct query with service role to bypass RLS
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single();
-        
-        if (error) {
-          console.error('Error fetching user profile:', error);
-          throw error;
-        }
-        
-        if (data) {
-          set({
-            isAdmin: data.role === 'super_admin',
-            isDoctor: data.role === 'doctor',
-            isNurse: data.role === 'nurse',
-            isReceptionist: data.role === 'receptionist'
-          });
-        }
       }
       
-      await get().fetchCurrentHospital();
+      // Fetch hospital information if available
+      if (currentUser?.user_metadata?.hospital_id) {
+        await get().fetchCurrentHospital();
+      }
     } catch (error: any) {
       console.error('Error fetching user profile:', error.message);
     }
@@ -223,17 +204,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { user } = get();
       if (!user) return;
       
-      // Get hospital_id from user metadata instead of profiles table
+      // Get hospital_id from user metadata
       const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
       
       if (userError) throw userError;
       
-      // First try to get hospital_id from user metadata
-      if (currentUser?.user_metadata?.hospital_id) {
+      const hospitalId = currentUser?.user_metadata?.hospital_id;
+      
+      if (hospitalId) {
         const { data: hospital, error: hospitalError } = await supabase
           .from('hospitals')
           .select('*')
-          .eq('id', currentUser.user_metadata.hospital_id)
+          .eq('id', hospitalId)
           .single();
         
         if (hospitalError) throw hospitalError;
@@ -242,34 +224,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           set({ hospital });
           // Save hospital to local storage for offline use
           localStorage.setItem(`hospitals_${hospital.id}`, JSON.stringify(hospital));
-        }
-      } else {
-        // Fallback to profiles table if metadata doesn't have hospital_id
-        // Skip for super_admin as they don't have a specific hospital
-        if (get().isAdmin) return;
-        
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('hospital_id')
-          .eq('id', user.id)
-          .single();
-        
-        if (profileError) throw profileError;
-        
-        if (profile && profile.hospital_id) {
-          const { data: hospital, error: hospitalError } = await supabase
-            .from('hospitals')
-            .select('*')
-            .eq('id', profile.hospital_id)
-            .single();
-          
-          if (hospitalError) throw hospitalError;
-          
-          if (hospital) {
-            set({ hospital });
-            // Save hospital to local storage for offline use
-            localStorage.setItem(`hospitals_${hospital.id}`, JSON.stringify(hospital));
-          }
         }
       }
     } catch (error: any) {
