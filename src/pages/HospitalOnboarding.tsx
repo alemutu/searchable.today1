@@ -407,7 +407,7 @@ const HospitalOnboarding: React.FC = () => {
       };
 
       // Call the Edge Function to handle hospital onboarding
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/hospital-onboarding`, {
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/hospitals`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
@@ -439,7 +439,7 @@ const HospitalOnboarding: React.FC = () => {
       setIsLoading(false);
     }
   };
-
+  
   // Navigation between steps
   const nextStep = () => {
     // Validate current step
