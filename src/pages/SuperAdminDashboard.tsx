@@ -49,7 +49,6 @@ const SuperAdminDashboard: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    // Update subdomain preview when subdomain changes
     if (newHospital.subdomain) {
       setSubdomainPreview(`${newHospital.subdomain}.${mainDomain}`);
     } else {
@@ -59,10 +58,7 @@ const SuperAdminDashboard: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      // Instead of using the super_admin_stats view, directly query the tables
-      // to avoid the infinite recursion issue with RLS policies
-      
-      // Get hospitals count
+      // Fetch hospitals first
       const { data: hospitalsData, error: hospitalsError } = await supabase
         .from('hospitals')
         .select('*')
@@ -70,54 +66,42 @@ const SuperAdminDashboard: React.FC = () => {
 
       if (hospitalsError) throw hospitalsError;
       setHospitals(hospitalsData || []);
-      
-      // Get users count
-      const { count: usersCount, error: usersError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true });
-        
-      if (usersError) throw usersError;
-      
-      // Get patients count
-      const { count: patientsCount, error: patientsError } = await supabase
-        .from('patients')
-        .select('*', { count: 'exact', head: true });
-        
-      if (patientsError) throw patientsError;
-      
-      // Get departments count
-      const { count: departmentsCount, error: departmentsError } = await supabase
-        .from('departments')
-        .select('*', { count: 'exact', head: true });
-        
-      if (departmentsError) throw departmentsError;
-      
-      // Get doctors count
-      const { count: doctorsCount, error: doctorsError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('role', 'doctor');
-        
-      if (doctorsError) throw doctorsError;
-      
-      // Get nurses count
-      const { count: nursesCount, error: nursesError } = await supabase
-        .from('profiles')
-        .select('*', { count: 'exact', head: true })
-        .eq('role', 'nurse');
-        
-      if (nursesError) throw nursesError;
-      
-      // Compile stats
+
+      // Fetch counts separately to avoid recursion
+      const fetchCount = async (table: string, role?: string) => {
+        const query = supabase.from(table).select('*', { count: 'exact', head: true });
+        if (role) {
+          query.eq('role', role);
+        }
+        const { count, error } = await query;
+        if (error) throw error;
+        return count || 0;
+      };
+
+      const [
+        usersCount,
+        patientsCount,
+        departmentsCount,
+        doctorsCount,
+        nursesCount
+      ] = await Promise.all([
+        fetchCount('profiles'),
+        fetchCount('patients'),
+        fetchCount('departments'),
+        fetchCount('profiles', 'doctor'),
+        fetchCount('profiles', 'nurse')
+      ]);
+
       setStats({
         total_hospitals: hospitalsData?.length || 0,
-        total_users: usersCount || 0,
-        total_patients: patientsCount || 0,
-        total_departments: departmentsCount || 0,
-        total_doctors: doctorsCount || 0,
-        total_nurses: nursesCount || 0
+        total_users: usersCount,
+        total_patients: patientsCount,
+        total_departments: departmentsCount,
+        total_doctors: doctorsCount,
+        total_nurses: nursesCount
       });
 
+      // Fetch settings
       const { data: settingsData, error: settingsError } = await supabase
         .from('system_settings')
         .select('*')
@@ -125,15 +109,12 @@ const SuperAdminDashboard: React.FC = () => {
 
       if (settingsError) throw settingsError;
       setSettings(settingsData || []);
-      
-      // Get main domain from settings
+
       const mainDomainSetting = settingsData?.find(s => s.key === 'system.main_domain');
-      if (mainDomainSetting && mainDomainSetting.value) {
-        // Remove quotes from the JSON string if needed
-        const domain = typeof mainDomainSetting.value === 'string' 
-          ? mainDomainSetting.value.replace(/"/g, '') 
+      if (mainDomainSetting?.value) {
+        const domain = typeof mainDomainSetting.value === 'string'
+          ? mainDomainSetting.value.replace(/"/g, '')
           : mainDomainSetting.value;
-        
         setMainDomain(domain);
       }
     } catch (error) {
@@ -144,26 +125,22 @@ const SuperAdminDashboard: React.FC = () => {
   };
 
   const validateHospitalData = (hospital: Partial<Hospital>): string | null => {
-    // Required fields validation
     const requiredFields = ['name', 'subdomain', 'address', 'phone'];
     const missingFields = requiredFields.filter(field => !hospital[field as keyof Partial<Hospital>]);
     if (missingFields.length > 0) {
       return `Please fill in all required fields: ${missingFields.join(', ')}`;
     }
 
-    // Subdomain validation - only lowercase letters, numbers, and hyphens
     const subdomainRegex = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
     if (hospital.subdomain && !subdomainRegex.test(hospital.subdomain)) {
       return 'Subdomain must contain only lowercase letters, numbers, and hyphens';
     }
 
-    // Phone validation
     const phoneRegex = /^\+?[\d\s-()]+$/;
     if (hospital.phone && !phoneRegex.test(hospital.phone)) {
       return 'Please enter a valid phone number';
     }
 
-    // Email validation (if provided)
     if (hospital.email) {
       const emailRegex = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i;
       if (!emailRegex.test(hospital.email)) {
@@ -178,7 +155,6 @@ const SuperAdminDashboard: React.FC = () => {
     try {
       setValidationError(null);
 
-      // Validate the hospital data
       const error = validateHospitalData(newHospital);
       if (error) {
         setValidationError(error);
@@ -189,13 +165,13 @@ const SuperAdminDashboard: React.FC = () => {
         .from('hospitals')
         .insert([{
           ...newHospital,
-          domain_enabled: true // Enable domain by default
+          domain_enabled: true
         }])
         .select()
         .single();
 
       if (insertError) {
-        if (insertError.code === '23505') { // Unique constraint violation
+        if (insertError.code === '23505') {
           setValidationError('A hospital with this subdomain already exists');
           return;
         }
@@ -216,7 +192,6 @@ const SuperAdminDashboard: React.FC = () => {
     try {
       setValidationError(null);
 
-      // Validate the hospital data
       const error = validateHospitalData(hospital);
       if (error) {
         setValidationError(error);
