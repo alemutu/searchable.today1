@@ -58,26 +58,85 @@ const SuperAdminDashboard: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      // Fetch hospitals first
-      const { data: hospitalsData, error: hospitalsError } = await supabase
-        .from('hospitals')
+      // Try to fetch from the super_admin_stats view first
+      const { data: statsData, error: statsError } = await supabase
+        .from('super_admin_stats')
         .select('*')
-        .order('name');
+        .limit(1);
 
-      if (hospitalsError) throw hospitalsError;
-      setHospitals(hospitalsData || []);
+      if (!statsError && statsData && statsData.length > 0) {
+        // If the view exists and works, use it
+        setStats({
+          total_hospitals: statsData[0].total_hospitals || 0,
+          total_users: statsData[0].total_users || 0,
+          total_patients: statsData[0].total_patients || 0,
+          total_departments: statsData[0].total_departments || 0,
+          total_doctors: statsData[0].total_doctors || 0,
+          total_nurses: statsData[0].total_nurses || 0
+        });
+      } else {
+        console.error('Error fetching from super_admin_stats view:', statsError);
+        
+        // Fallback to fetching counts individually
+        const fetchCount = async (table: string, column?: string, value?: string) => {
+          try {
+            let query = supabase.from(table).select('id', { count: 'exact', head: true });
+            if (column && value) {
+              query = query.eq(column, value);
+            }
+            const { count, error } = await query;
+            if (error) throw error;
+            return count || 0;
+          } catch (error) {
+            console.error(`Error fetching count for ${table}:`, error);
+            return 0;
+          }
+        };
 
-      // Set default stats
-      const defaultStats = {
-        total_hospitals: hospitalsData?.length || 0,
-        total_users: 0,
-        total_patients: 0,
-        total_departments: 0,
-        total_doctors: 0,
-        total_nurses: 0
-      };
-      
-      setStats(defaultStats);
+        // Fetch hospitals first
+        const { data: hospitalsData, error: hospitalsError } = await supabase
+          .from('hospitals')
+          .select('*')
+          .order('name');
+
+        if (hospitalsError) throw hospitalsError;
+        setHospitals(hospitalsData || []);
+
+        // Fetch all counts in parallel
+        const [
+          totalUsers,
+          totalPatients,
+          totalDepartments,
+          totalDoctors,
+          totalNurses
+        ] = await Promise.all([
+          fetchCount('profiles'),
+          fetchCount('patients'),
+          fetchCount('departments'),
+          fetchCount('profiles', 'role', 'doctor'),
+          fetchCount('profiles', 'role', 'nurse')
+        ]);
+
+        setStats({
+          total_hospitals: hospitalsData?.length || 0,
+          total_users: totalUsers,
+          total_patients: totalPatients,
+          total_departments: totalDepartments,
+          total_doctors: totalDoctors,
+          total_nurses: totalNurses
+        });
+      }
+
+      // Fetch hospitals if not already fetched
+      if (hospitals.length === 0) {
+        const { data: hospitalsData, error: hospitalsError } = await supabase
+          .from('hospitals')
+          .select('*')
+          .order('name');
+
+        if (hospitalsError) throw hospitalsError;
+        setHospitals(hospitalsData || []);
+      }
 
       // Fetch settings
       const { data: settingsData, error: settingsError } = await supabase
