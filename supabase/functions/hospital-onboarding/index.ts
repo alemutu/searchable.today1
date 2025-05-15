@@ -22,6 +22,9 @@ const supabaseAdmin = createClient(
       persistSession: false,
       detectSessionInUrl: false
     },
+    db: {
+      schema: 'public'
+    },
     global: {
       headers: {
         'X-Client-Info': 'hospital-onboarding-function'
