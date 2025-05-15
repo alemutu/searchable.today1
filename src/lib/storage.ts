@@ -65,7 +65,9 @@ export const processQueue = async (): Promise<void> => {
   for (const op of operations) {
     try {
       if (op.type === 'insert') {
-        await client.from(op.table).insert(op.data);
+        await client.from(op.table).upsert([op.data], {
+          onConflict: 'id'
+        });
       } else if (op.type === 'update' && op.id) {
         await client.from(op.table).update(op.data).eq('id', op.id);
       } else if (op.type === 'delete' && op.id) {
@@ -133,10 +135,12 @@ export const saveData = async <T extends object>(
           
         if (error) throw error;
       } else {
-        // Insert new record
+        // Insert new record with upsert to handle conflicts
         const { error } = await client
           .from(table)
-          .insert(sanitizedData);
+          .upsert([sanitizedData], {
+            onConflict: 'id'
+          });
           
         if (error) throw error;
       }
@@ -410,12 +414,14 @@ export const syncAllData = async (): Promise<void> => {
         }
       }
       
-      // Sync each item
+      // Sync each item using upsert
       for (const item of localItems) {
         if (item.id) {
           await client
             .from(table)
-            .upsert(item, { onConflict: 'id' });
+            .upsert([item], {
+              onConflict: 'id'
+            });
         }
       }
     } catch (error) {
