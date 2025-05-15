@@ -45,6 +45,33 @@ export const isStrongPassword = (password: string): boolean => {
 };
 
 /**
+ * Generate a secure random password
+ * Creates a password with at least 12 characters including uppercase, lowercase, numbers, and special characters
+ */
+export const generateSecurePassword = (): string => {
+  const uppercaseChars = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // Excluding I and O which can be confused
+  const lowercaseChars = 'abcdefghijkmnopqrstuvwxyz'; // Excluding l which can be confused
+  const numberChars = '23456789'; // Excluding 0 and 1 which can be confused
+  const specialChars = '@#$%^&*!-_=+';
+  
+  // Ensure at least one character from each category
+  let password = '';
+  password += uppercaseChars.charAt(Math.floor(Math.random() * uppercaseChars.length));
+  password += lowercaseChars.charAt(Math.floor(Math.random() * lowercaseChars.length));
+  password += numberChars.charAt(Math.floor(Math.random() * numberChars.length));
+  password += specialChars.charAt(Math.floor(Math.random() * specialChars.length));
+  
+  // Add 8 more random characters for a total of 12
+  const allChars = uppercaseChars + lowercaseChars + numberChars + specialChars;
+  for (let i = 0; i < 8; i++) {
+    password += allChars.charAt(Math.floor(Math.random() * allChars.length));
+  }
+  
+  // Shuffle the password characters
+  return password.split('').sort(() => 0.5 - Math.random()).join('');
+};
+
+/**
  * Validate phone number format
  */
 export const isValidPhone = (phone: string): boolean => {

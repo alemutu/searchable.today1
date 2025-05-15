@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Building2, Mail, Phone, Globe, MapPin, User, Lock, CheckCircle, AlertTriangle, ArrowRight, ArrowLeft, Box, CreditCard, Calendar, Save } from 'lucide-react';
 import { useAuthStore, useNotificationStore } from '../lib/store';
 import { hospitalOnboardingApi } from '../lib/api';
-import { isValidEmail, isStrongPassword } from '../lib/security';
+import { isValidEmail, isStrongPassword, generateSecurePassword } from '../lib/security';
 
 interface HospitalData {
   hospitalProfile: {
@@ -85,6 +85,19 @@ const HospitalOnboarding: React.FC = () => {
     [key: string]: string;
   }>({});
 
+  // Generate a secure password when the component loads
+  useEffect(() => {
+    const generatedPassword = generateSecurePassword();
+    setFormData(prevData => ({
+      ...prevData,
+      adminSetup: {
+        ...prevData.adminSetup,
+        password: generatedPassword,
+        confirmPassword: generatedPassword
+      }
+    }));
+  }, []);
+
   if (!isAdmin) {
     navigate('/dashboard');
     return null;
@@ -114,9 +127,10 @@ const HospitalOnboarding: React.FC = () => {
       if (subdomain && subdomainAvailable === false) {
         newErrors.subdomain = 'This subdomain is already taken';
       }
+      
     } else if (step === 2) {
       // Admin Setup validation
-      const { email, firstName, lastName, password, confirmPassword } = formData.adminSetup;
+      const { email, firstName, lastName } = formData.adminSetup;
       
       if (!email) newErrors.adminEmail = 'Email is required';
       else if (!isValidEmail(email)) newErrors.adminEmail = 'Invalid email format';
@@ -124,13 +138,6 @@ const HospitalOnboarding: React.FC = () => {
       if (!firstName) newErrors.firstName = 'First name is required';
       if (!lastName) newErrors.lastName = 'Last name is required';
       
-      if (!password) newErrors.password = 'Password is required';
-      else if (!isStrongPassword(password)) {
-        newErrors.password = 'Password must be at least 8 characters and include uppercase, lowercase, number and special character';
-      }
-      
-      if (!confirmPassword) newErrors.confirmPassword = 'Please confirm your password';
-      else if (password !== confirmPassword) newErrors.confirmPassword = 'Passwords do not match';
     } else if (step === 3) {
       // Module Selection validation
       const { outpatient, inpatient, shared } = formData.moduleSelection;
@@ -533,43 +540,21 @@ const HospitalOnboarding: React.FC = () => {
           </div>
 
           <div>
-            <label className="form-label required">Initial Password</label>
+            <label className="form-label">Initial Password (Auto-generated)</label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <Lock className="h-5 w-5 text-gray-400" />
               </div>
               <input
-                type="password"
+                type="text"
                 value={formData.adminSetup.password}
-                onChange={(e) => handleInputChange('adminSetup', 'password', e.target.value)}
-                className={`form-input pl-10 ${errors.password ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                placeholder="••••••••"
+                readOnly
+                className="form-input pl-10 bg-gray-50"
               />
             </div>
-            {errors.password ? (
-              <p className="form-error">{errors.password}</p>
-            ) : (
-              <p className="mt-1 text-sm text-gray-500">
-                Password must be at least 8 characters and include uppercase, lowercase, number and special character
-              </p>
-            )}
-          </div>
-
-          <div>
-            <label className="form-label required">Confirm Password</label>
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <Lock className="h-5 w-5 text-gray-400" />
-              </div>
-              <input
-                type="password"
-                value={formData.adminSetup.confirmPassword}
-                onChange={(e) => handleInputChange('adminSetup', 'confirmPassword', e.target.value)}
-                className={`form-input pl-10 ${errors.confirmPassword ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                placeholder="••••••••"
-              />
-            </div>
-            {errors.confirmPassword && <p className="form-error">{errors.confirmPassword}</p>}
+            <p className="mt-1 text-sm text-gray-500">
+              This secure password has been automatically generated. The admin will be required to change it upon first login.
+            </p>
           </div>
 
           <div className="flex items-center">
@@ -595,7 +580,7 @@ const HospitalOnboarding: React.FC = () => {
                 <div className="mt-2 text-sm text-blue-700">
                   <p>
                     The admin will be required to change their password upon first login.
-                    Please ensure the initial password is secure and communicated safely.
+                    Please ensure the initial password is communicated safely.
                   </p>
                 </div>
               </div>
@@ -987,8 +972,12 @@ const HospitalOnboarding: React.FC = () => {
                 <dd className="mt-1 text-sm text-gray-900">{formData.adminSetup.email}</dd>
               </div>
               <div className="sm:col-span-2">
-                <dt className="text-sm font-medium text-gray-500">Password</dt>
-                <dd className="mt-1 text-sm text-gray-900">••••••••</dd>
+                <dt className="text-sm font-medium text-gray-500">Initial Password</dt>
+                <dd className="mt-1 text-sm text-gray-900 font-mono">{formData.adminSetup.password}</dd>
+                <dd className="mt-1 text-xs text-warning-600">
+                  <AlertTriangle className="inline h-3 w-3 mr-1" />
+                  Make sure to securely share this password with the admin. They will be required to change it on first login.
+                </dd>
               </div>
               <div className="sm:col-span-2">
                 <dt className="text-sm font-medium text-gray-500">Send Credentials</dt>
