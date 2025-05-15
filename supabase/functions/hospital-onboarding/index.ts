@@ -13,13 +13,16 @@ const corsHeaders = {
 };
 
 // Initialize Supabase client with service role key to bypass RLS
-const supabaseClient = createClient(
+const supabaseAdmin = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
   {
     auth: {
       autoRefreshToken: false,
       persistSession: false
+    },
+    db: {
+      schema: 'public'
     }
   }
 );
@@ -54,7 +57,7 @@ app.post('/hospitals', async (req, res) => {
     }
 
     // 1. Create hospital record
-    const { data: hospital, error: hospitalError } = await supabaseClient
+    const { data: hospital, error: hospitalError } = await supabaseAdmin
       .from('hospitals')
       .insert([{
         name: hospitalProfile.name,
@@ -72,8 +75,8 @@ app.post('/hospitals', async (req, res) => {
     }
 
     // 2. Create admin user with service role permissions
-    const { data: user, error: userError } = await supabaseClient.auth.admin.createUser({
-      email: hospitalProfile.email,
+    const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({
+      email: adminSetup.email || hospitalProfile.email,
       password: adminSetup.password,
       email_confirm: true,
       user_metadata: {
@@ -86,12 +89,12 @@ app.post('/hospitals', async (req, res) => {
 
     if (userError) {
       // Rollback hospital creation
-      await supabaseClient.from('hospitals').delete().eq('id', hospital.id);
+      await supabaseAdmin.from('hospitals').delete().eq('id', hospital.id);
       return res.status(500).json({ error: userError.message });
     }
 
     // 3. Create profile for admin
-    const { error: profileError } = await supabaseClient
+    const { error: profileError } = await supabaseAdmin
       .from('profiles')
       .insert([{
         id: user.user.id,
@@ -99,13 +102,13 @@ app.post('/hospitals', async (req, res) => {
         last_name: hospitalProfile.contactPerson.split(' ').slice(1).join(' ') || 'User',
         role: 'admin',
         hospital_id: hospital.id,
-        email: hospitalProfile.email
+        email: adminSetup.email || hospitalProfile.email
       }]);
 
     if (profileError) {
       // Rollback user and hospital creation
-      await supabaseClient.auth.admin.deleteUser(user.user.id);
-      await supabaseClient.from('hospitals').delete().eq('id', hospital.id);
+      await supabaseAdmin.auth.admin.deleteUser(user.user.id);
+      await supabaseAdmin.from('hospitals').delete().eq('id', hospital.id);
       return res.status(500).json({ error: profileError.message });
     }
 
@@ -117,7 +120,7 @@ app.post('/hospitals', async (req, res) => {
       ...moduleSelection.addons.map(m => ({ module: m, category: 'addon' }))
     ];
 
-    const { error: modulesError } = await supabaseClient
+    const { error: modulesError } = await supabaseAdmin
       .from('hospital_modules')
       .insert(allModules.map(m => ({
         hospital_id: hospital.id,
@@ -128,13 +131,13 @@ app.post('/hospitals', async (req, res) => {
 
     if (modulesError) {
       // Rollback previous creations
-      await supabaseClient.auth.admin.deleteUser(user.user.id);
-      await supabaseClient.from('hospitals').delete().eq('id', hospital.id);
+      await supabaseAdmin.auth.admin.deleteUser(user.user.id);
+      await supabaseAdmin.from('hospitals').delete().eq('id', hospital.id);
       return res.status(500).json({ error: modulesError.message });
     }
 
     // 5. Get pricing plan
-    const { data: plan, error: planError } = await supabaseClient
+    const { data: plan, error: planError } = await supabaseAdmin
       .from('pricing_plans')
       .select('*')
       .eq('key', pricingPlan.plan)
@@ -157,7 +160,7 @@ app.post('/hospitals', async (req, res) => {
     }
 
     // 6. Create license
-    const { error: licenseError } = await supabaseClient
+    const { error: licenseError } = await supabaseAdmin
       .from('licenses')
       .insert([{
         hospital_id: hospital.id,
@@ -189,7 +192,7 @@ app.post('/hospitals', async (req, res) => {
       'Orthopedics'
     ];
 
-    const { error: departmentsError } = await supabaseClient
+    const { error: departmentsError } = await supabaseAdmin
       .from('departments')
       .insert(defaultDepartments.map(name => ({
         hospital_id: hospital.id,
@@ -222,7 +225,7 @@ app.post('/hospitals', async (req, res) => {
 // Get all hospitals
 app.get('/hospitals', async (req, res) => {
   try {
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabaseAdmin
       .from('hospitals')
       .select('*')
       .order('name');
@@ -239,7 +242,7 @@ app.get('/hospitals', async (req, res) => {
 app.get('/hospitals/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabaseAdmin
       .from('hospitals')
       .select(`
         *,
@@ -276,7 +279,7 @@ app.get('/hospitals/:id', async (req, res) => {
 app.get('/check-subdomain/:subdomain', async (req, res) => {
   try {
     const { subdomain } = req.params;
-    const { data, error } = await supabaseClient
+    const { data, error } = await supabaseAdmin
       .from('hospitals')
       .select('id')
       .eq('subdomain', subdomain)
