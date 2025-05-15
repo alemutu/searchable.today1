@@ -109,7 +109,6 @@ const Dashboard: React.FC = () => {
   });
   const [activePatients, setActivePatients] = useState<PatientTableRowProps[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   
   const [analyticsData, setAnalyticsData] = useState({
     patientsByDepartment: [] as {department: string, count: number}[],
@@ -122,69 +121,63 @@ const Dashboard: React.FC = () => {
   }, [hospital]);
   
   const fetchDashboardData = async () => {
-    if (!hospital?.id) {
-      setError("Hospital information is not available. Please ensure you're logged in with the correct hospital access.");
-      setIsLoading(false);
-      return;
-    }
+    if (!hospital) return;
     
     setIsLoading(true);
-    setError(null);
-    
     try {
       // Fetch total patients
-      const { data: patientsData, count: patientsCount, error: patientsError } = await supabase
+      const { count: patientsCount, error: patientsError } = await supabase
         .from('patients')
         .select('id', { count: 'exact', head: true })
         .eq('hospital_id', hospital.id);
       
-      if (patientsError) throw new Error(`Error fetching patients: ${patientsError.message}`);
+      if (patientsError) throw patientsError;
       
       // Fetch today's appointments
       const today = new Date().toISOString().split('T')[0];
-      const { data: appointmentsData, count: appointmentsCount, error: appointmentsError } = await supabase
+      const { count: appointmentsCount, error: appointmentsError } = await supabase
         .from('appointments')
         .select('id', { count: 'exact', head: true })
         .eq('hospital_id', hospital.id)
         .eq('date', today);
       
-      if (appointmentsError) throw new Error(`Error fetching appointments: ${appointmentsError.message}`);
+      if (appointmentsError) throw appointmentsError;
       
       // Fetch active consultations
-      const { data: consultationsData, count: consultationsCount, error: consultationsError } = await supabase
+      const { count: consultationsCount, error: consultationsError } = await supabase
         .from('consultations')
         .select('id', { count: 'exact', head: true })
         .eq('hospital_id', hospital.id)
         .gte('consultation_date', new Date().toISOString().split('T')[0]);
       
-      if (consultationsError) throw new Error(`Error fetching consultations: ${consultationsError.message}`);
+      if (consultationsError) throw consultationsError;
       
       // Fetch pending lab results
-      const { data: labResultsData, count: labResultsCount, error: labResultsError } = await supabase
+      const { count: labResultsCount, error: labResultsError } = await supabase
         .from('lab_results')
         .select('id', { count: 'exact', head: true })
         .eq('hospital_id', hospital.id)
         .eq('status', 'pending');
       
-      if (labResultsError) throw new Error(`Error fetching lab results: ${labResultsError.message}`);
+      if (labResultsError) throw labResultsError;
       
       // Fetch pharmacy orders
-      const { data: pharmacyData, count: pharmacyCount, error: pharmacyError } = await supabase
+      const { count: pharmacyCount, error: pharmacyError } = await supabase
         .from('pharmacy')
         .select('id', { count: 'exact', head: true })
         .eq('hospital_id', hospital.id)
         .in('status', ['pending', 'processing']);
       
-      if (pharmacyError) throw new Error(`Error fetching pharmacy orders: ${pharmacyError.message}`);
+      if (pharmacyError) throw pharmacyError;
       
       // Fetch emergency cases
-      const { data: emergencyData, count: emergencyCount, error: emergencyError } = await supabase
+      const { count: emergencyCount, error: emergencyError } = await supabase
         .from('triage')
         .select('id', { count: 'exact', head: true })
         .eq('hospital_id', hospital.id)
         .eq('is_emergency', true);
       
-      if (emergencyError) throw new Error(`Error fetching emergency cases: ${emergencyError.message}`);
+      if (emergencyError) throw emergencyError;
       
       // Fetch active patients
       const { data: activePatientsData, error: activePatientsError } = await supabase
@@ -202,7 +195,7 @@ const Dashboard: React.FC = () => {
         .order('created_at', { ascending: false })
         .limit(5);
       
-      if (activePatientsError) throw new Error(`Error fetching active patients: ${activePatientsError.message}`);
+      if (activePatientsError) throw activePatientsError;
       
       // Transform active patients data
       const activePatientsList = activePatientsData?.map(patient => {
@@ -237,14 +230,13 @@ const Dashboard: React.FC = () => {
       
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred while fetching dashboard data');
     } finally {
       setIsLoading(false);
     }
   };
   
   const fetchAnalyticsData = async () => {
-    if (!hospital?.id) return;
+    if (!hospital) return;
     
     try {
       // Fetch patients by department
@@ -326,7 +318,6 @@ const Dashboard: React.FC = () => {
       
     } catch (error) {
       console.error('Error fetching analytics data:', error);
-      setError(error instanceof Error ? error.message : 'An error occurred while fetching analytics data');
     }
   };
   
@@ -471,22 +462,6 @@ const Dashboard: React.FC = () => {
     return (
       <div className="flex justify-center p-8">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="flex flex-col items-center justify-center p-8">
-        <AlertTriangle className="h-12 w-12 text-error-500 mb-4" />
-        <h2 className="text-xl font-semibold text-gray-900 mb-2">Error Loading Dashboard</h2>
-        <p className="text-gray-600 text-center mb-4">{error}</p>
-        <button 
-          onClick={() => fetchDashboardData()} 
-          className="btn btn-primary"
-        >
-          Retry
-        </button>
       </div>
     );
   }
