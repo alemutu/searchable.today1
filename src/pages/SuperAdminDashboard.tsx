@@ -66,7 +66,7 @@ const SuperAdminDashboard: React.FC = () => {
 
       if (hospitalsError) {
         console.error('Error fetching hospitals:', hospitalsError);
-        return false; // Early return on error
+        return false;
       }
 
       setHospitals(hospitalsData || []);
@@ -89,7 +89,7 @@ const SuperAdminDashboard: React.FC = () => {
 
       if (settingsError) {
         console.error('Error fetching system settings:', settingsError);
-        return false; // Early return on error
+        return false;
       }
 
       setSettings(settingsData || []);
@@ -102,10 +102,10 @@ const SuperAdminDashboard: React.FC = () => {
         setMainDomain(domain);
       }
 
-      return true; // Successful completion
+      return true;
     } catch (error) {
       console.error('Error fetching super admin data:', error);
-      return false; // Error case
+      return false;
     } finally {
       setIsLoading(false);
     }
