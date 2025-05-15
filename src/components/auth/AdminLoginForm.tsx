@@ -18,6 +18,8 @@ const AdminLoginForm: React.FC = () => {
   const location = useLocation();
   const [offlineError, setOfflineError] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [loginAttempts, setLoginAttempts] = useState<number>(0);
+  const [lockoutUntil, setLockoutUntil] = useState<Date | null>(null);
   
   // Check if user is already logged in and redirect accordingly
   useEffect(() => {
@@ -25,11 +27,29 @@ const AdminLoginForm: React.FC = () => {
     if (user && isAdmin) {
       navigate('/super-admin');
     }
+    
+    // Check for lockout in localStorage
+    const storedLockout = localStorage.getItem('adminLoginLockout');
+    if (storedLockout) {
+      const lockoutTime = new Date(storedLockout);
+      if (lockoutTime > new Date()) {
+        setLockoutUntil(lockoutTime);
+      } else {
+        localStorage.removeItem('adminLoginLockout');
+      }
+    }
   }, [navigate]);
   
   const onSubmit = async (data: AdminLoginFormData) => {
     if (isOffline) {
       setOfflineError("Can't log in while offline. Please check your internet connection.");
+      return;
+    }
+    
+    // Check if account is locked out
+    if (lockoutUntil && lockoutUntil > new Date()) {
+      const timeLeft = Math.ceil((lockoutUntil.getTime() - new Date().getTime()) / 60000);
+      setRoleError(`Too many failed attempts. Please try again in ${timeLeft} minutes.`);
       return;
     }
     
@@ -48,10 +68,29 @@ const AdminLoginForm: React.FC = () => {
         return;
       }
       
+      // Reset login attempts on successful login
+      setLoginAttempts(0);
+      localStorage.removeItem('adminLoginAttempts');
+      localStorage.removeItem('adminLoginLockout');
+      
       // Redirect to the super admin dashboard
       navigate('/super-admin');
     } catch (error) {
       console.error('Login error:', error);
+      
+      // Increment login attempts
+      const newAttempts = loginAttempts + 1;
+      setLoginAttempts(newAttempts);
+      localStorage.setItem('adminLoginAttempts', newAttempts.toString());
+      
+      // Implement lockout after 3 failed attempts (stricter for admin)
+      if (newAttempts >= 3) {
+        const lockoutTime = new Date();
+        lockoutTime.setMinutes(lockoutTime.getMinutes() + 30); // 30 minute lockout
+        setLockoutUntil(lockoutTime);
+        localStorage.setItem('adminLoginLockout', lockoutTime.toISOString());
+        setRoleError(`Too many failed attempts. Account locked for 30 minutes.`);
+      }
     }
   };
   
@@ -127,11 +166,7 @@ const AdminLoginForm: React.FC = () => {
                 type="password"
                 autoComplete="current-password"
                 {...register('password', { 
-                  required: 'Password is required',
-                  minLength: {
-                    value: 6,
-                    message: 'Password must be at least 6 characters'
-                  }
+                  required: 'Password is required'
                 })}
                 className={`form-input ${errors.password ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
               />
@@ -164,7 +199,7 @@ const AdminLoginForm: React.FC = () => {
           <div>
             <button
               type="submit"
-              disabled={isLoading || isOffline}
+              disabled={isLoading || isOffline || (lockoutUntil && lockoutUntil > new Date())}
               className="btn btn-primary w-full flex justify-center items-center"
             >
               {isLoading ? (

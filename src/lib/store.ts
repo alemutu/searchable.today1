@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { initializeStorage, syncAllData } from './storage';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AuthState {
   user: User | null;
@@ -157,6 +158,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isNurse: false,
         isReceptionist: false
       });
+      
+      // Clear sensitive data from localStorage
+      localStorage.removeItem('supabase.auth.token');
+      
+      // Clear session cookies
+      document.cookie.split(';').forEach(cookie => {
+        const [name] = cookie.trim().split('=');
+        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
+      });
+      
     } catch (error: any) {
       console.error('Error logging out:', error.message);
       set({ error: error.message });
@@ -241,7 +252,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifiedEmergencies: new Set<string>(),
   
   addNotification: (notification) => {
-    const id = Math.random().toString(36).substring(2, 9);
+    const id = uuidv4(); // Use UUID for secure random IDs
     set((state) => ({
       notifications: [
         ...state.notifications,

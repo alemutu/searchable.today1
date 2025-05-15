@@ -1,7 +1,9 @@
 import { supabase, getClient } from './supabase';
+import { v4 as uuidv4 } from 'uuid';
 
 // Type for storage operations
 type StorageOperation = {
+  id: string; // Add unique ID for each operation
   table: string;
   type: 'insert' | 'update' | 'delete';
   data: any;
@@ -16,7 +18,12 @@ let operationsQueue: StorageOperation[] = [];
 const loadQueue = (): void => {
   const savedQueue = localStorage.getItem('pendingOperations');
   if (savedQueue) {
-    operationsQueue = JSON.parse(savedQueue);
+    try {
+      operationsQueue = JSON.parse(savedQueue);
+    } catch (e) {
+      console.error('Error parsing pending operations:', e);
+      operationsQueue = [];
+    }
   }
 };
 
@@ -34,8 +41,12 @@ const isOnline = (): boolean => {
 };
 
 // Add operation to queue
-const addToQueue = (operation: StorageOperation): void => {
-  operationsQueue.push(operation);
+const addToQueue = (operation: Omit<StorageOperation, 'id'>): void => {
+  const operationWithId = {
+    ...operation,
+    id: uuidv4() // Add unique ID to each operation
+  };
+  operationsQueue.push(operationWithId);
   saveQueue();
 };
 
@@ -61,9 +72,14 @@ export const processQueue = async (): Promise<void> => {
       }
     } catch (error) {
       console.error(`Error processing operation:`, op, error);
-      // Add failed operation back to queue
-      addToQueue(op);
+      // Add failed operation back to queue with its original ID
+      operationsQueue.push(op);
     }
+  }
+  
+  // Save any operations that failed back to the queue
+  if (operationsQueue.length > 0) {
+    saveQueue();
   }
 };
 
@@ -73,9 +89,12 @@ export const saveData = async <T extends object>(
   data: T,
   id?: string
 ): Promise<T> => {
+  // Sanitize data to prevent XSS
+  const sanitizedData = sanitizeData(data);
+  
   // Save to local storage first
-  const localStorageKey = `${table}_${id || (data as any).id || 'new'}`;
-  localStorage.setItem(localStorageKey, JSON.stringify(data));
+  const localStorageKey = `${table}_${id || (sanitizedData as any).id || 'new'}`;
+  localStorage.setItem(localStorageKey, JSON.stringify(sanitizedData));
   
   // If online, save to Supabase
   if (isOnline()) {
@@ -86,7 +105,7 @@ export const saveData = async <T extends object>(
         // Update existing record
         const { error } = await client
           .from(table)
-          .update(data)
+          .update(sanitizedData)
           .eq('id', id);
           
         if (error) throw error;
@@ -94,7 +113,7 @@ export const saveData = async <T extends object>(
         // Insert new record
         const { error } = await client
           .from(table)
-          .insert(data);
+          .insert(sanitizedData);
           
         if (error) throw error;
       }
@@ -105,7 +124,7 @@ export const saveData = async <T extends object>(
       addToQueue({
         table,
         type: id ? 'update' : 'insert',
-        data,
+        data: sanitizedData,
         id,
         timestamp: Date.now()
       });
@@ -117,13 +136,13 @@ export const saveData = async <T extends object>(
     addToQueue({
       table,
       type: id ? 'update' : 'insert',
-      data,
+      data: sanitizedData,
       id,
       timestamp: Date.now()
     });
   }
   
-  return data;
+  return sanitizedData;
 };
 
 // Generic fetch function that works with both local and remote storage
@@ -136,7 +155,11 @@ export const fetchData = async <T>(
   if (id) {
     const localData = localStorage.getItem(`${table}_${id}`);
     if (localData) {
-      return JSON.parse(localData) as T;
+      try {
+        return JSON.parse(localData) as T;
+      } catch (e) {
+        console.error('Error parsing local data:', e);
+      }
     }
   }
   
@@ -215,22 +238,26 @@ export const fetchData = async <T>(
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
           if (key && key.startsWith(`${table}_`)) {
-            const item = JSON.parse(localStorage.getItem(key) || '{}');
-            
-            // Apply query filter if provided
-            if (query) {
-              let matches = true;
-              Object.entries(query).forEach(([queryKey, queryValue]) => {
-                if (item[queryKey] !== queryValue) {
-                  matches = false;
-                }
-              });
+            try {
+              const item = JSON.parse(localStorage.getItem(key) || '{}');
               
-              if (matches) {
+              // Apply query filter if provided
+              if (query) {
+                let matches = true;
+                Object.entries(query).forEach(([queryKey, queryValue]) => {
+                  if (item[queryKey] !== queryValue) {
+                    matches = false;
+                  }
+                });
+                
+                if (matches) {
+                  results.push(item as T);
+                }
+              } else {
                 results.push(item as T);
               }
-            } else {
-              results.push(item as T);
+            } catch (e) {
+              console.error('Error parsing local storage item:', e);
             }
           }
         }
@@ -248,22 +275,26 @@ export const fetchData = async <T>(
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
         if (key && key.startsWith(`${table}_`)) {
-          const item = JSON.parse(localStorage.getItem(key) || '{}');
-          
-          // Apply query filter if provided
-          if (query) {
-            let matches = true;
-            Object.entries(query).forEach(([queryKey, queryValue]) => {
-              if (item[queryKey] !== queryValue) {
-                matches = false;
-              }
-            });
+          try {
+            const item = JSON.parse(localStorage.getItem(key) || '{}');
             
-            if (matches) {
+            // Apply query filter if provided
+            if (query) {
+              let matches = true;
+              Object.entries(query).forEach(([queryKey, queryValue]) => {
+                if (item[queryKey] !== queryValue) {
+                  matches = false;
+                }
+              });
+              
+              if (matches) {
+                results.push(item as T);
+              }
+            } else {
               results.push(item as T);
             }
-          } else {
-            results.push(item as T);
+          } catch (e) {
+            console.error('Error parsing local storage item:', e);
           }
         }
       }
@@ -346,8 +377,12 @@ export const syncAllData = async (): Promise<void> => {
         if (key && key.startsWith(`${table}_`) && key !== 'pendingOperations') {
           const id = key.split('_')[1];
           if (id && id !== 'new') {
-            const item = JSON.parse(localStorage.getItem(key) || '{}');
-            localItems.push(item);
+            try {
+              const item = JSON.parse(localStorage.getItem(key) || '{}');
+              localItems.push(item);
+            } catch (e) {
+              console.error('Error parsing local storage item:', e);
+            }
           }
         }
       }
@@ -381,4 +416,25 @@ export const initializeStorage = (): void => {
   if (typeof localStorage === 'undefined') {
     console.error('Local storage is not available');
   }
+};
+
+// Sanitize data to prevent XSS
+const sanitizeData = <T extends object>(data: T): T => {
+  const sanitized: any = {};
+  
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value === 'string') {
+      sanitized[key] = value
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeData(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  
+  return sanitized as T;
 };

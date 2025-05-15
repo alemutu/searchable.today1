@@ -38,6 +38,9 @@ const RegisterForm: React.FC = () => {
     
     navigate('/login');
   };
+
+  // Password validation regex
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-fade py-12 px-4 sm:px-6 lg:px-8">
@@ -144,9 +147,9 @@ const RegisterForm: React.FC = () => {
                 type="password"
                 {...register('password', { 
                   required: 'Password is required',
-                  minLength: {
-                    value: 6,
-                    message: 'Password must be at least 6 characters'
+                  pattern: {
+                    value: passwordRegex,
+                    message: 'Password must be at least 8 characters and include uppercase, lowercase, number and special character'
                   }
                 })}
                 className={`form-input ${errors.password ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}

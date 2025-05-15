@@ -18,6 +18,8 @@ const LoginForm: React.FC = () => {
   const location = useLocation();
   const [offlineError, setOfflineError] = useState<string | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
+  const [loginAttempts, setLoginAttempts] = useState<number>(0);
+  const [lockoutUntil, setLockoutUntil] = useState<Date | null>(null);
   
   // Check if user is already logged in and redirect accordingly
   useEffect(() => {
@@ -29,11 +31,29 @@ const LoginForm: React.FC = () => {
         navigate('/dashboard');
       }
     }
+    
+    // Check for lockout in localStorage
+    const storedLockout = localStorage.getItem('loginLockout');
+    if (storedLockout) {
+      const lockoutTime = new Date(storedLockout);
+      if (lockoutTime > new Date()) {
+        setLockoutUntil(lockoutTime);
+      } else {
+        localStorage.removeItem('loginLockout');
+      }
+    }
   }, [navigate]);
   
   const onSubmit = async (data: LoginFormData) => {
     if (isOffline) {
       setOfflineError("Can't log in while offline. Please check your internet connection.");
+      return;
+    }
+    
+    // Check if account is locked out
+    if (lockoutUntil && lockoutUntil > new Date()) {
+      const timeLeft = Math.ceil((lockoutUntil.getTime() - new Date().getTime()) / 60000);
+      setRoleError(`Too many failed attempts. Please try again in ${timeLeft} minutes.`);
       return;
     }
     
@@ -52,11 +72,30 @@ const LoginForm: React.FC = () => {
         return;
       }
       
+      // Reset login attempts on successful login
+      setLoginAttempts(0);
+      localStorage.removeItem('loginAttempts');
+      localStorage.removeItem('loginLockout');
+      
       // Redirect to the dashboard
       const from = location.state?.from?.pathname || '/dashboard';
       navigate(from);
     } catch (error) {
       console.error('Login error:', error);
+      
+      // Increment login attempts
+      const newAttempts = loginAttempts + 1;
+      setLoginAttempts(newAttempts);
+      localStorage.setItem('loginAttempts', newAttempts.toString());
+      
+      // Implement lockout after 5 failed attempts
+      if (newAttempts >= 5) {
+        const lockoutTime = new Date();
+        lockoutTime.setMinutes(lockoutTime.getMinutes() + 15); // 15 minute lockout
+        setLockoutUntil(lockoutTime);
+        localStorage.setItem('loginLockout', lockoutTime.toISOString());
+        setRoleError(`Too many failed attempts. Account locked for 15 minutes.`);
+      }
     }
   };
   
@@ -129,11 +168,7 @@ const LoginForm: React.FC = () => {
                 type="password"
                 autoComplete="current-password"
                 {...register('password', { 
-                  required: 'Password is required',
-                  minLength: {
-                    value: 6,
-                    message: 'Password must be at least 6 characters'
-                  }
+                  required: 'Password is required'
                 })}
                 className={`form-input ${errors.password ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
               />
@@ -166,7 +201,7 @@ const LoginForm: React.FC = () => {
           <div>
             <button
               type="submit"
-              disabled={isLoading || isOffline}
+              disabled={isLoading || isOffline || (lockoutUntil && lockoutUntil > new Date())}
               className="btn btn-primary w-full flex justify-center items-center"
             >
               {isLoading ? (
