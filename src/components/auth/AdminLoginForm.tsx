@@ -75,8 +75,15 @@ const AdminLoginForm: React.FC = () => {
     try {
       await login(data.email, data.password);
       
-      // For development, we're bypassing the role check
-      // In production, you would check if the user is a super_admin
+      // Check if the user is a super_admin
+      const { isAdmin } = useAuthStore.getState();
+      
+      if (!isAdmin) {
+        setRoleError("This login is for Super Admin only.");
+        // Logout the user since they're not a super_admin
+        await useAuthStore.getState().logout();
+        return;
+      }
       
       // Reset login attempts on successful login
       setLoginAttempts(0);

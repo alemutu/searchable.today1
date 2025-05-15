@@ -80,6 +80,16 @@ const LoginForm: React.FC = () => {
     try {
       await login(data.email, data.password);
       
+      // Check if the user is a super_admin
+      const { isAdmin } = useAuthStore.getState();
+      
+      if (isAdmin) {
+        setRoleError("This login is for regular users only. Super admins should use the admin login portal.");
+        // Logout the user since they should use the admin login
+        await useAuthStore.getState().logout();
+        return;
+      }
+      
       // Reset login attempts on successful login
       setLoginAttempts(0);
       localStorage.removeItem('loginAttempts');
