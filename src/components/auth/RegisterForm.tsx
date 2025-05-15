@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
 import { Activity, WifiOff } from 'lucide-react';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
+import { isValidEmail, isStrongPassword, generateCsrfToken, storeCsrfToken } from '../../lib/security';
 
 interface RegisterFormData {
   email: string;
@@ -22,9 +23,28 @@ const RegisterForm: React.FC = () => {
   
   const password = watch('password');
   
+  // Password validation regex
+  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
+  
+  useEffect(() => {
+    // Generate and store CSRF token
+    const csrfToken = generateCsrfToken();
+    storeCsrfToken(csrfToken);
+  }, []);
+  
   const onSubmit = async (data: RegisterFormData) => {
     if (isOffline) {
       setOfflineError("Can't register while offline. Please check your internet connection.");
+      return;
+    }
+    
+    // Validate email format
+    if (!isValidEmail(data.email)) {
+      return;
+    }
+    
+    // Validate password strength
+    if (!isStrongPassword(data.password)) {
       return;
     }
     
@@ -38,9 +58,6 @@ const RegisterForm: React.FC = () => {
     
     navigate('/login');
   };
-
-  // Password validation regex
-  const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
   
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-fade py-12 px-4 sm:px-6 lg:px-8">
@@ -157,6 +174,9 @@ const RegisterForm: React.FC = () => {
               {errors.password && (
                 <p className="form-error">{errors.password.message}</p>
               )}
+              <p className="mt-1 text-xs text-gray-500">
+                Password must be at least 8 characters and include uppercase, lowercase, number and special character
+              </p>
             </div>
             
             <div>

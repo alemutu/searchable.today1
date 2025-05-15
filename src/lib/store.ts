@@ -3,6 +3,7 @@ import type { User } from '@supabase/supabase-js';
 import { supabase } from './supabase';
 import { initializeStorage, syncAllData } from './storage';
 import { v4 as uuidv4 } from 'uuid';
+import { clearSensitiveData } from './security';
 
 interface AuthState {
   user: User | null;
@@ -160,13 +161,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       });
       
       // Clear sensitive data from localStorage
-      localStorage.removeItem('supabase.auth.token');
-      
-      // Clear session cookies
-      document.cookie.split(';').forEach(cookie => {
-        const [name] = cookie.trim().split('=');
-        document.cookie = `${name}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-      });
+      clearSensitiveData();
       
     } catch (error: any) {
       console.error('Error logging out:', error.message);

@@ -4,6 +4,8 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
 import { Activity, WifiOff } from 'lucide-react';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
+import { isValidEmail, isStrongPassword } from '../../lib/security';
+import { generateCsrfToken, storeCsrfToken } from '../../lib/security';
 
 interface LoginFormData {
   email: string;
@@ -42,6 +44,16 @@ const LoginForm: React.FC = () => {
         localStorage.removeItem('loginLockout');
       }
     }
+    
+    // Get stored login attempts
+    const storedAttempts = localStorage.getItem('loginAttempts');
+    if (storedAttempts) {
+      setLoginAttempts(parseInt(storedAttempts, 10));
+    }
+    
+    // Generate and store CSRF token
+    const csrfToken = generateCsrfToken();
+    storeCsrfToken(csrfToken);
   }, [navigate]);
   
   const onSubmit = async (data: LoginFormData) => {
@@ -54,6 +66,12 @@ const LoginForm: React.FC = () => {
     if (lockoutUntil && lockoutUntil > new Date()) {
       const timeLeft = Math.ceil((lockoutUntil.getTime() - new Date().getTime()) / 60000);
       setRoleError(`Too many failed attempts. Please try again in ${timeLeft} minutes.`);
+      return;
+    }
+    
+    // Validate email format
+    if (!isValidEmail(data.email)) {
+      setRoleError("Please enter a valid email address.");
       return;
     }
     

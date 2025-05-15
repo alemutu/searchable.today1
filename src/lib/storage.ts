@@ -1,5 +1,6 @@
 import { supabase, getClient } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
+import { sanitizeInput } from './security';
 
 // Type for storage operations
 type StorageOperation = {
@@ -81,6 +82,28 @@ export const processQueue = async (): Promise<void> => {
   if (operationsQueue.length > 0) {
     saveQueue();
   }
+};
+
+// Sanitize data to prevent XSS
+const sanitizeData = <T extends object>(data: T): T => {
+  const sanitized: any = {};
+  
+  for (const [key, value] of Object.entries(data)) {
+    if (typeof value === 'string') {
+      sanitized[key] = sanitizeInput(value);
+    } else if (Array.isArray(value)) {
+      sanitized[key] = value.map(item => 
+        typeof item === 'object' && item !== null ? sanitizeData(item) : 
+        typeof item === 'string' ? sanitizeInput(item) : item
+      );
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeData(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  
+  return sanitized as T;
 };
 
 // Generic save function that works with both local and remote storage
@@ -416,25 +439,29 @@ export const initializeStorage = (): void => {
   if (typeof localStorage === 'undefined') {
     console.error('Local storage is not available');
   }
+  
+  // Periodically clean up old data
+  setInterval(() => {
+    cleanupOldData();
+  }, 24 * 60 * 60 * 1000); // Once a day
 };
 
-// Sanitize data to prevent XSS
-const sanitizeData = <T extends object>(data: T): T => {
-  const sanitized: any = {};
+// Clean up old data from localStorage
+const cleanupOldData = (): void => {
+  const now = Date.now();
+  const MAX_AGE = 30 * 24 * 60 * 60 * 1000; // 30 days
   
-  for (const [key, value] of Object.entries(data)) {
-    if (typeof value === 'string') {
-      sanitized[key] = value
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;')
-        .replace(/'/g, '&#039;');
-    } else if (typeof value === 'object' && value !== null) {
-      sanitized[key] = sanitizeData(value);
-    } else {
-      sanitized[key] = value;
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key && key.includes('_')) {
+      try {
+        const item = JSON.parse(localStorage.getItem(key) || '{}');
+        if (item.timestamp && (now - item.timestamp > MAX_AGE)) {
+          localStorage.removeItem(key);
+        }
+      } catch (e) {
+        // Skip items that can't be parsed
+      }
     }
   }
-  
-  return sanitized as T;
 };
