@@ -12,17 +12,14 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 };
 
-// Initialize Supabase client with service role key to bypass RLS
-const supabaseAdmin = createClient(
+// Initialize Supabase client with service role key for admin operations
+const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
   {
     auth: {
       autoRefreshToken: false,
       persistSession: false
-    },
-    db: {
-      schema: 'public'
     }
   }
 );
@@ -57,7 +54,7 @@ app.post('/hospitals', async (req, res) => {
     }
 
     // 1. Create hospital record
-    const { data: hospital, error: hospitalError } = await supabaseAdmin
+    const { data: hospital, error: hospitalError } = await supabaseClient
       .from('hospitals')
       .insert([{
         name: hospitalProfile.name,
@@ -74,14 +71,14 @@ app.post('/hospitals', async (req, res) => {
       return res.status(500).json({ error: hospitalError.message });
     }
 
-    // 2. Create admin user with service role permissions
-    const { data: user, error: userError } = await supabaseAdmin.auth.admin.createUser({
+    // 2. Create admin user using the auth.admin API
+    const { data: user, error: userError } = await supabaseClient.auth.admin.createUser({
       email: adminSetup.email || hospitalProfile.email,
       password: adminSetup.password,
       email_confirm: true,
       user_metadata: {
-        first_name: hospitalProfile.contactPerson.split(' ')[0] || 'Admin',
-        last_name: hospitalProfile.contactPerson.split(' ').slice(1).join(' ') || 'User',
+        first_name: adminSetup.firstName || hospitalProfile.contactPerson.split(' ')[0] || 'Admin',
+        last_name: adminSetup.lastName || hospitalProfile.contactPerson.split(' ').slice(1).join(' ') || 'User',
         role: 'admin',
         hospital_id: hospital.id
       }
@@ -89,17 +86,17 @@ app.post('/hospitals', async (req, res) => {
 
     if (userError) {
       // Rollback hospital creation
-      await supabaseAdmin.from('hospitals').delete().eq('id', hospital.id);
+      await supabaseClient.from('hospitals').delete().eq('id', hospital.id);
       return res.status(500).json({ error: userError.message });
     }
 
     // 3. Create profile for admin
-    const { error: profileError } = await supabaseAdmin
+    const { error: profileError } = await supabaseClient
       .from('profiles')
       .insert([{
         id: user.user.id,
-        first_name: hospitalProfile.contactPerson.split(' ')[0] || 'Admin',
-        last_name: hospitalProfile.contactPerson.split(' ').slice(1).join(' ') || 'User',
+        first_name: adminSetup.firstName || hospitalProfile.contactPerson.split(' ')[0] || 'Admin',
+        last_name: adminSetup.lastName || hospitalProfile.contactPerson.split(' ').slice(1).join(' ') || 'User',
         role: 'admin',
         hospital_id: hospital.id,
         email: adminSetup.email || hospitalProfile.email
@@ -107,8 +104,8 @@ app.post('/hospitals', async (req, res) => {
 
     if (profileError) {
       // Rollback user and hospital creation
-      await supabaseAdmin.auth.admin.deleteUser(user.user.id);
-      await supabaseAdmin.from('hospitals').delete().eq('id', hospital.id);
+      await supabaseClient.auth.admin.deleteUser(user.user.id);
+      await supabaseClient.from('hospitals').delete().eq('id', hospital.id);
       return res.status(500).json({ error: profileError.message });
     }
 
@@ -120,7 +117,7 @@ app.post('/hospitals', async (req, res) => {
       ...moduleSelection.addons.map(m => ({ module: m, category: 'addon' }))
     ];
 
-    const { error: modulesError } = await supabaseAdmin
+    const { error: modulesError } = await supabaseClient
       .from('hospital_modules')
       .insert(allModules.map(m => ({
         hospital_id: hospital.id,
@@ -131,13 +128,13 @@ app.post('/hospitals', async (req, res) => {
 
     if (modulesError) {
       // Rollback previous creations
-      await supabaseAdmin.auth.admin.deleteUser(user.user.id);
-      await supabaseAdmin.from('hospitals').delete().eq('id', hospital.id);
+      await supabaseClient.auth.admin.deleteUser(user.user.id);
+      await supabaseClient.from('hospitals').delete().eq('id', hospital.id);
       return res.status(500).json({ error: modulesError.message });
     }
 
     // 5. Get pricing plan
-    const { data: plan, error: planError } = await supabaseAdmin
+    const { data: plan, error: planError } = await supabaseClient
       .from('pricing_plans')
       .select('*')
       .eq('key', pricingPlan.plan)
@@ -160,7 +157,7 @@ app.post('/hospitals', async (req, res) => {
     }
 
     // 6. Create license
-    const { error: licenseError } = await supabaseAdmin
+    const { error: licenseError } = await supabaseClient
       .from('licenses')
       .insert([{
         hospital_id: hospital.id,
@@ -192,7 +189,7 @@ app.post('/hospitals', async (req, res) => {
       'Orthopedics'
     ];
 
-    const { error: departmentsError } = await supabaseAdmin
+    const { error: departmentsError } = await supabaseClient
       .from('departments')
       .insert(defaultDepartments.map(name => ({
         hospital_id: hospital.id,
@@ -208,7 +205,7 @@ app.post('/hospitals', async (req, res) => {
     // 8. Send email if enabled
     if (adminSetup.sendCredentials) {
       // In a real implementation, this would send an email
-      console.log('Would send email to:', hospitalProfile.email);
+      console.log('Would send email to:', adminSetup.email || hospitalProfile.email);
     }
 
     res.status(201).json({
@@ -222,10 +219,29 @@ app.post('/hospitals', async (req, res) => {
   }
 });
 
+// Check if subdomain is available
+app.get('/check-subdomain/:subdomain', async (req, res) => {
+  try {
+    const { subdomain } = req.params;
+    const { data, error } = await supabaseClient
+      .from('hospitals')
+      .select('id')
+      .eq('subdomain', subdomain)
+      .maybeSingle();
+
+    if (error) throw error;
+    
+    res.json({ available: !data });
+  } catch (error) {
+    console.error('Error checking subdomain:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get all hospitals
 app.get('/hospitals', async (req, res) => {
   try {
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseClient
       .from('hospitals')
       .select('*')
       .order('name');
@@ -242,7 +258,7 @@ app.get('/hospitals', async (req, res) => {
 app.get('/hospitals/:id', async (req, res) => {
   try {
     const { id } = req.params;
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabaseClient
       .from('hospitals')
       .select(`
         *,
@@ -271,25 +287,6 @@ app.get('/hospitals/:id', async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error('Error fetching hospital:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Check if subdomain is available
-app.get('/check-subdomain/:subdomain', async (req, res) => {
-  try {
-    const { subdomain } = req.params;
-    const { data, error } = await supabaseAdmin
-      .from('hospitals')
-      .select('id')
-      .eq('subdomain', subdomain)
-      .maybeSingle();
-
-    if (error) throw error;
-    
-    res.json({ available: !data });
-  } catch (error) {
-    console.error('Error checking subdomain:', error);
     res.status(500).json({ error: error.message });
   }
 });

@@ -11,10 +11,16 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 };
 
-// Initialize Supabase client
+// Initialize Supabase client with service role key for admin operations
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
 );
 
 // Middleware to parse JSON bodies
