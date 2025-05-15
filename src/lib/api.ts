@@ -1,173 +1,231 @@
 import { supabase } from './supabase';
 
 /**
- * Call the hospital-onboarding edge function
- * @param endpoint The endpoint to call
- * @param method The HTTP method to use
- * @param data The data to send in the request body
- * @returns The response from the edge function
+ * Base URL for Supabase Edge Functions
+ * This will be used to construct the full URL for each function
  */
-export async function callHospitalOnboarding(
-  endpoint: string = 'hospitals',
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-  data?: any
-) {
-  try {
-    const { data: authData } = await supabase.auth.getSession();
-    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/hospital-onboarding/${endpoint}`;
+const getEdgeFunctionBaseUrl = () => {
+  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+};
 
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
+/**
+ * Get headers for Supabase Edge Function requests
+ * This includes the Authorization header with the anonymous key
+ */
+const getHeaders = async () => {
+  const { data } = await supabase.auth.getSession();
+  
+  return {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+    ...(data.session?.access_token 
+      ? { 'Authorization': `Bearer ${data.session.access_token}` }
+      : {})
+  };
+};
+
+/**
+ * Hospital Onboarding API
+ * Functions for managing hospital onboarding process
+ */
+export const hospitalOnboardingApi = {
+  /**
+   * Create a new hospital with all related resources
+   */
+  createHospital: async (data: {
+    hospitalProfile: {
+      name: string;
+      subdomain: string;
+      address: string;
+      phone: string;
+      email: string;
+      contactPerson: string;
     };
+    adminSetup: {
+      password: string;
+      sendCredentials: boolean;
+    };
+    moduleSelection: {
+      outpatient: string[];
+      inpatient: string[];
+      shared: string[];
+      addons: string[];
+    };
+    pricingPlan: {
+      plan: string;
+    };
+    licenseDetails: {
+      startDate: string;
+      type: 'monthly' | 'yearly' | 'lifetime';
+      autoRenew: boolean;
+      notes?: string;
+    };
+  }) => {
+    const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals`;
+    const headers = await getHeaders();
 
-    // Add authorization header if we have a session
-    if (authData.session?.access_token) {
-      headers['Authorization'] = `Bearer ${authData.session.access_token}`;
-    } else {
-      // For public endpoints, use the anon key
-      headers['Authorization'] = `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
-    }
-
-    const requestOptions: RequestInit = {
-      method,
+    const response = await fetch(url, {
+      method: 'POST',
       headers,
-      body: data ? JSON.stringify(data) : undefined,
-    };
+      body: JSON.stringify(data)
+    });
 
-    const response = await fetch(apiUrl, requestOptions);
-    
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error calling hospital-onboarding function:', error);
-    throw error;
-  }
-}
-
-/**
- * Call the license-management edge function
- * @param endpoint The endpoint to call
- * @param method The HTTP method to use
- * @param data The data to send in the request body
- * @returns The response from the edge function
- */
-export async function callLicenseManagement(
-  endpoint: string = 'licenses',
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE' = 'GET',
-  data?: any
-) {
-  try {
-    const { data: authData } = await supabase.auth.getSession();
-    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/license-management/${endpoint}`;
-
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-    };
-
-    // Add authorization header if we have a session
-    if (authData.session?.access_token) {
-      headers['Authorization'] = `Bearer ${authData.session.access_token}`;
-    } else {
-      // For public endpoints, use the anon key
-      headers['Authorization'] = `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
+      throw new Error(errorData.error || 'Failed to create hospital');
     }
 
-    const requestOptions: RequestInit = {
-      method,
-      headers,
-      body: data ? JSON.stringify(data) : undefined,
-    };
+    return response.json();
+  },
 
-    const response = await fetch(apiUrl, requestOptions);
-    
+  /**
+   * Get all hospitals
+   */
+  getHospitals: async () => {
+    const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals`;
+    const headers = await getHeaders();
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
+
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      throw new Error(errorData.error || 'Failed to fetch hospitals');
     }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error calling license-management function:', error);
-    throw error;
+
+    return response.json();
+  },
+
+  /**
+   * Get hospital by ID
+   */
+  getHospital: async (id: string) => {
+    const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals/${id}`;
+    const headers = await getHeaders();
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch hospital');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Check if a subdomain is available
+   */
+  checkSubdomain: async (subdomain: string) => {
+    const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/check-subdomain/${subdomain}`;
+    const headers = await getHeaders();
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to check subdomain');
+    }
+
+    return response.json();
   }
-}
+};
 
 /**
- * Check if a subdomain is available
- * @param subdomain The subdomain to check
- * @returns Whether the subdomain is available
+ * License Management API
+ * Functions for managing hospital licenses
  */
-export async function checkSubdomainAvailability(subdomain: string): Promise<boolean> {
-  try {
-    const result = await callHospitalOnboarding(`check-subdomain/${subdomain}`);
-    return result.available;
-  } catch (error) {
-    console.error('Error checking subdomain availability:', error);
-    throw error;
+export const licenseApi = {
+  /**
+   * Get all licenses
+   */
+  getLicenses: async () => {
+    const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses`;
+    const headers = await getHeaders();
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch licenses');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Create a new license
+   */
+  createLicense: async (data: {
+    hospital_id: string;
+    plan_id: string;
+  }) => {
+    const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses`;
+    const headers = await getHeaders();
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create license');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Update license status
+   */
+  updateLicenseStatus: async (id: string, status: 'active' | 'suspended' | 'cancelled') => {
+    const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses/${id}/status`;
+    const headers = await getHeaders();
+
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ status })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update license status');
+    }
+
+    return response.json();
+  },
+
+  /**
+   * Get license usage metrics
+   */
+  getLicenseMetrics: async () => {
+    const url = `${getEdgeFunctionBaseUrl()}/license-management/metrics`;
+    const headers = await getHeaders();
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch license metrics');
+    }
+
+    return response.json();
   }
-}
-
-/**
- * Create a new hospital
- * @param hospitalData The hospital data to create
- * @returns The created hospital
- */
-export async function createHospital(hospitalData: any) {
-  return callHospitalOnboarding('hospitals', 'POST', hospitalData);
-}
-
-/**
- * Get all hospitals
- * @returns All hospitals
- */
-export async function getAllHospitals() {
-  return callHospitalOnboarding('hospitals');
-}
-
-/**
- * Get a hospital by ID
- * @param id The hospital ID
- * @returns The hospital
- */
-export async function getHospitalById(id: string) {
-  return callHospitalOnboarding(`hospitals/${id}`);
-}
-
-/**
- * Get all licenses
- * @returns All licenses
- */
-export async function getAllLicenses() {
-  return callLicenseManagement('licenses');
-}
-
-/**
- * Create a new license
- * @param licenseData The license data to create
- * @returns The created license
- */
-export async function createLicense(licenseData: any) {
-  return callLicenseManagement('licenses', 'POST', licenseData);
-}
-
-/**
- * Update a license status
- * @param id The license ID
- * @param status The new status
- * @returns The updated license
- */
-export async function updateLicenseStatus(id: string, status: 'active' | 'suspended' | 'cancelled') {
-  return callLicenseManagement(`licenses/${id}/status`, 'PUT', { status });
-}
-
-/**
- * Get license metrics
- * @returns License metrics
- */
-export async function getLicenseMetrics() {
-  return callLicenseManagement('metrics');
-}
+};
