@@ -21,9 +21,6 @@ export const supabase = createClient<Database>(
       storageKey: 'hms-auth-token', // Custom storage key
       flowType: 'pkce' // Use PKCE flow for added security
     },
-    db: {
-      schema: 'public'
-    },
     global: {
       headers: {
         'X-Client-Info': 'hms-web-client'
