@@ -47,27 +47,153 @@ const Laboratory: React.FC = () => {
   }, [hospital]);
 
   const fetchLabResults = async () => {
-    if (!hospital?.id) return;
-    
     try {
-      setIsLoading(true);
+      // In a real app, we would fetch from Supabase
+      // For now, we'll use mock data
+      const mockResults = [
+        {
+          id: '00000000-0000-0000-0000-000000000001',
+          patient: {
+            id: '00000000-0000-0000-0000-000000000001',
+            first_name: 'John',
+            last_name: 'Doe'
+          },
+          test_type: 'complete_blood_count',
+          test_date: '2025-05-15',
+          status: 'pending',
+          results: null,
+          reviewed_by: null,
+          is_emergency: false,
+          workflow_stage: 'pending',
+          last_updated: '2025-05-15T09:15:00Z'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000002',
+          patient: {
+            id: '00000000-0000-0000-0000-000000000002',
+            first_name: 'Jane',
+            last_name: 'Smith'
+          },
+          test_type: 'liver_function',
+          test_date: '2025-05-15',
+          status: 'in_progress',
+          results: null,
+          reviewed_by: null,
+          is_emergency: true,
+          workflow_stage: 'sample_collected',
+          sample_info: {
+            sample_id: 'LAB-20250515-1234',
+            sample_type: 'blood',
+            collection_time: '2025-05-15T10:30:00Z',
+            container_type: 'red_top_tube'
+          },
+          assigned_to: user?.id,
+          last_updated: '2025-05-15T10:35:00Z'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000003',
+          patient: {
+            id: '00000000-0000-0000-0000-000000000003',
+            first_name: 'Robert',
+            last_name: 'Johnson'
+          },
+          test_type: 'kidney_function',
+          test_date: '2025-05-14',
+          status: 'in_progress',
+          results: null,
+          reviewed_by: null,
+          is_emergency: false,
+          workflow_stage: 'testing',
+          sample_info: {
+            sample_id: 'LAB-20250514-5678',
+            sample_type: 'blood',
+            collection_time: '2025-05-14T14:45:00Z',
+            container_type: 'green_top_tube'
+          },
+          assigned_to: '00000000-0000-0000-0000-000000000010', // Another technician
+          last_updated: '2025-05-14T15:00:00Z'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000004',
+          patient: {
+            id: '00000000-0000-0000-0000-000000000004',
+            first_name: 'Emily',
+            last_name: 'Williams'
+          },
+          test_type: 'lipid_profile',
+          test_date: '2025-05-14',
+          status: 'in_progress',
+          results: {
+            cholesterol: 180,
+            triglycerides: 150,
+            hdl: 45,
+            ldl: 110
+          },
+          reviewed_by: null,
+          is_emergency: false,
+          workflow_stage: 'review',
+          sample_info: {
+            sample_id: 'LAB-20250514-9012',
+            sample_type: 'blood',
+            collection_time: '2025-05-14T16:15:00Z',
+            container_type: 'purple_top_tube'
+          },
+          assigned_to: user?.id,
+          last_updated: '2025-05-14T17:30:00Z'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000005',
+          patient: {
+            id: '00000000-0000-0000-0000-000000000005',
+            first_name: 'Michael',
+            last_name: 'Brown'
+          },
+          test_type: 'blood_glucose',
+          test_date: '2025-05-15',
+          status: 'completed',
+          results: { 
+            glucose: 95,
+            units: 'mg/dL',
+            reference_range: '70-99',
+            interpretation: 'Normal'
+          },
+          reviewed_by: {
+            first_name: 'Doctor',
+            last_name: 'Smith'
+          },
+          is_emergency: false,
+          workflow_stage: 'completed',
+          sample_info: {
+            sample_id: 'LAB-20250515-3456',
+            sample_type: 'blood',
+            collection_time: '2025-05-15T09:00:00Z',
+            container_type: 'gray_top_tube'
+          },
+          assigned_to: user?.id,
+          last_updated: '2025-05-15T10:15:00Z'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000006',
+          patient: {
+            id: '00000000-0000-0000-0000-000000000006',
+            first_name: 'Sarah',
+            last_name: 'Davis'
+          },
+          test_type: 'urinalysis',
+          test_date: '2025-05-15',
+          status: 'pending',
+          results: null,
+          reviewed_by: null,
+          is_emergency: true,
+          workflow_stage: 'pending',
+          last_updated: '2025-05-15T11:00:00Z'
+        }
+      ];
       
-      const { data, error } = await supabase
-        .from('lab_results')
-        .select(`
-          *,
-          patient:patient_id(id, first_name, last_name),
-          reviewed_by:reviewed_by(first_name, last_name)
-        `)
-        .eq('hospital_id', hospital.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      
-      setLabResults(data || []);
+      setLabResults(mockResults);
       
       // Show notification for emergency cases
-      const emergencyCases = data?.filter(result => result.is_emergency && (result.status === 'pending' || result.status === 'in_progress')) || [];
+      const emergencyCases = mockResults.filter(result => result.is_emergency && (result.status === 'pending' || result.status === 'in_progress'));
       
       emergencyCases.forEach(emergency => {
         // Create a unique key for this emergency
@@ -237,160 +363,109 @@ const Laboratory: React.FC = () => {
   const assignedToMeCount = labResults.filter(r => r.assigned_to === user?.id).length;
 
   const handleStartTest = async (testId: string) => {
-    if (!user?.id || !hospital?.id) return;
-    
-    try {
-      // Get the test to determine appropriate sample type
-      const testResult = labResults.find(r => r.id === testId);
-      const sampleType = testResult?.test_type === 'urinalysis' ? 'urine' : 'blood';
-      const containerType = testResult?.test_type === 'urinalysis' ? 'urine_container' : 
-                           testResult?.test_type === 'complete_blood_count' ? 'purple_top_tube' :
-                           testResult?.test_type === 'blood_glucose' ? 'gray_top_tube' : 'red_top_tube';
-      
-      // Generate a sample ID
-      const date = new Date();
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      const random = Math.floor(1000 + Math.random() * 9000);
-      const sampleId = `LAB-${year}${month}${day}-${random}`;
-      
-      // Update the test in the database
-      const { error } = await supabase
-        .from('lab_results')
-        .update({
+    // Update the test status to in_progress
+    const updatedResults = labResults.map(result => {
+      if (result.id === testId) {
+        return {
+          ...result,
           status: 'in_progress',
           workflow_stage: 'sample_collected',
-          assigned_to: user.id,
+          assigned_to: user?.id,
           sample_info: {
-            sample_id: sampleId,
-            sample_type: sampleType,
+            sample_id: `LAB-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
+            sample_type: result.test_type === 'urinalysis' ? 'urine' : 'blood',
             collection_time: new Date().toISOString(),
-            container_type: containerType
+            container_type: result.test_type === 'urinalysis' ? 'urine_container' : 
+                           result.test_type === 'complete_blood_count' ? 'purple_top_tube' :
+                           result.test_type === 'blood_glucose' ? 'gray_top_tube' : 'red_top_tube'
           },
           last_updated: new Date().toISOString()
-        })
-        .eq('id', testId);
-
-      if (error) throw error;
-      
-      // Refresh the data
-      await fetchLabResults();
-      
-      // Show notification
-      if (testResult) {
-        addNotification({
-          message: `Sample collection started for ${testResult.patient.first_name} ${testResult.patient.last_name}`,
-          type: 'success',
-          duration: 3000
-        });
+        };
       }
-    } catch (error) {
-      console.error('Error starting test:', error);
-      addNotification({
-        message: 'Failed to start test',
-        type: 'error'
-      });
-    }
+      return result;
+    });
+    
+    setLabResults(updatedResults);
+    
+    // Show notification
+    addNotification({
+      message: `Sample collection started for ${updatedResults.find(r => r.id === testId)?.patient.first_name} ${updatedResults.find(r => r.id === testId)?.patient.last_name}`,
+      type: 'success',
+      duration: 3000
+    });
   };
 
   const handleProcessTest = (testId: string) => {
     navigate(`/laboratory/process/${testId}`);
   };
 
-  const handleAssignToMe = async (testId: string) => {
-    if (!user?.id) return;
-    
-    try {
-      // Update the test in the database
-      const { error } = await supabase
-        .from('lab_results')
-        .update({
-          assigned_to: user.id,
+  const handleAssignToMe = (testId: string) => {
+    // Update the test to assign it to the current user
+    const updatedResults = labResults.map(result => {
+      if (result.id === testId) {
+        return {
+          ...result,
+          assigned_to: user?.id,
           last_updated: new Date().toISOString()
-        })
-        .eq('id', testId);
-
-      if (error) throw error;
-      
-      // Refresh the data
-      await fetchLabResults();
-      
-      // Show notification
-      addNotification({
-        message: 'Test assigned to you',
-        type: 'success',
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Error assigning test:', error);
-      addNotification({
-        message: 'Failed to assign test',
-        type: 'error'
-      });
-    }
+        };
+      }
+      return result;
+    });
+    
+    setLabResults(updatedResults);
+    
+    // Show notification
+    addNotification({
+      message: `Test assigned to you`,
+      type: 'success',
+      duration: 3000
+    });
   };
 
-  const handleReleaseAssignment = async (testId: string) => {
-    try {
-      // Update the test in the database
-      const { error } = await supabase
-        .from('lab_results')
-        .update({
+  const handleReleaseAssignment = (testId: string) => {
+    // Update the test to unassign it
+    const updatedResults = labResults.map(result => {
+      if (result.id === testId) {
+        return {
+          ...result,
           assigned_to: null,
           last_updated: new Date().toISOString()
-        })
-        .eq('id', testId);
-
-      if (error) throw error;
-      
-      // Refresh the data
-      await fetchLabResults();
-      
-      // Show notification
-      addNotification({
-        message: 'Test released from your queue',
-        type: 'info',
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Error releasing test assignment:', error);
-      addNotification({
-        message: 'Failed to release test',
-        type: 'error'
-      });
-    }
+        };
+      }
+      return result;
+    });
+    
+    setLabResults(updatedResults);
+    
+    // Show notification
+    addNotification({
+      message: `Test released from your queue`,
+      type: 'info',
+      duration: 3000
+    });
   };
 
-  const handleUpdateWorkflowStage = async (testId: string, newStage: 'sample_collected' | 'testing' | 'review' | 'completed') => {
-    try {
-      // Update the test in the database
-      const { error } = await supabase
-        .from('lab_results')
-        .update({
+  const handleUpdateWorkflowStage = (testId: string, newStage: 'sample_collected' | 'testing' | 'review' | 'completed') => {
+    // Update the test workflow stage
+    const updatedResults = labResults.map(result => {
+      if (result.id === testId) {
+        return {
+          ...result,
           workflow_stage: newStage,
           last_updated: new Date().toISOString()
-        })
-        .eq('id', testId);
-
-      if (error) throw error;
-      
-      // Refresh the data
-      await fetchLabResults();
-      
-      // Show notification
-      addNotification({
-        message: `Test moved to ${getWorkflowStageLabel(newStage)}`,
-        type: 'success',
-        duration: 3000
-      });
-    } catch (error) {
-      console.error('Error updating test workflow stage:', error);
-      addNotification({
-        message: 'Failed to update test stage',
-        type: 'error'
-      });
-    }
+        };
+      }
+      return result;
+    });
+    
+    setLabResults(updatedResults);
+    
+    // Show notification
+    addNotification({
+      message: `Test moved to ${getWorkflowStageLabel(newStage)}`,
+      type: 'success',
+      duration: 3000
+    });
   };
 
   if (isLoading) {
@@ -695,7 +770,7 @@ const Laboratory: React.FC = () => {
                                   </>
                                 ) : (
                                   <button 
-                                    onClick={() => handleAssignToMe(result.i)}
+                                    onClick={() => handleAssignToMe(result.id)}
                                     className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
                                     title="Take over this test"
                                   >

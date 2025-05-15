@@ -19,7 +19,6 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
-import { supabase } from '../lib/supabase';
 
 interface PatientData {
   id: string;
@@ -41,135 +40,101 @@ const ReceptionDashboard: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const { hospital } = useAuthStore();
-  const [stats, setStats] = useState({
-    registeredToday: 0,
-    avgWaitTime: 0,
-    activePatients: 0,
-    completedToday: 0
-  });
   
   useEffect(() => {
-    fetchData();
+    fetchPatients();
   }, [hospital]);
   
-  const fetchData = async () => {
-    if (!hospital?.id) return;
-    
+  const fetchPatients = async () => {
     try {
       setIsLoading(true);
       
-      // Fetch active patients
-      const { data, error } = await supabase
-        .from('patients')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          date_of_birth,
-          gender,
-          current_flow_step,
-          priority_level,
-          created_at
-        `)
-        .eq('hospital_id', hospital.id)
-        .not('current_flow_step', 'is', null)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
+      // In a real app, we would fetch from Supabase
+      // For now, we'll use mock data
+      const mockPatients = [
+        {
+          id: '00000000-0000-0000-0000-000000000001',
+          first_name: 'John',
+          last_name: 'Doe',
+          date_of_birth: '1980-05-15',
+          gender: 'Male',
+          current_flow_step: 'registration',
+          priority_level: 'normal',
+          department: 'General Medicine',
+          wait_time: '10 min',
+          arrival_time: '09:15 AM'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000002',
+          first_name: 'Jane',
+          last_name: 'Smith',
+          date_of_birth: '1992-08-22',
+          gender: 'Female',
+          current_flow_step: 'triage',
+          priority_level: 'urgent',
+          department: 'Cardiology',
+          wait_time: '5 min',
+          arrival_time: '09:30 AM'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000003',
+          first_name: 'Robert',
+          last_name: 'Johnson',
+          date_of_birth: '1975-12-10',
+          gender: 'Male',
+          current_flow_step: 'waiting_consultation',
+          priority_level: 'normal',
+          department: 'Orthopedics',
+          wait_time: '25 min',
+          arrival_time: '08:45 AM'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000004',
+          first_name: 'Emily',
+          last_name: 'Williams',
+          date_of_birth: '1988-03-30',
+          gender: 'Female',
+          current_flow_step: 'consultation',
+          priority_level: 'normal',
+          department: 'Gynecology',
+          wait_time: '0 min',
+          arrival_time: '10:00 AM'
+        },
+        {
+          id: '00000000-0000-0000-0000-000000000005',
+          first_name: 'Michael',
+          last_name: 'Brown',
+          date_of_birth: '1965-07-18',
+          gender: 'Male',
+          current_flow_step: 'emergency',
+          priority_level: 'critical',
+          department: 'Emergency',
+          wait_time: '0 min',
+          arrival_time: '10:15 AM'
+        }
+      ];
       
-      // Process patient data
-      const processedPatients = data?.map(patient => {
-        return {
-          ...patient,
-          department: getDepartmentFromFlowStep(patient.current_flow_step),
-          wait_time: calculateWaitTime(patient.created_at),
-          arrival_time: formatArrivalTime(patient.created_at)
-        };
-      }) || [];
-      
-      setPatients(processedPatients);
+      setPatients(mockPatients);
       
       // Calculate stats
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date().toDateString();
+      const registeredToday = mockPatients.filter(p => 
+        new Date(p.arrival_time || '').toDateString() === today
+      ).length;
       
-      // Count patients registered today
-      const registeredToday = data?.filter(p => 
-        new Date(p.created_at).toISOString().split('T')[0] === today
-      ).length || 0;
-      
-      // Calculate average wait time (in minutes)
-      const waitTimes = data?.map(p => {
-        const createdAt = new Date(p.created_at).getTime();
-        const now = new Date().getTime();
-        return Math.round((now - createdAt) / 60000); // Convert to minutes
-      }) || [];
-      
-      const avgWaitTime = waitTimes.length > 0 
-        ? Math.round(waitTimes.reduce((sum, time) => sum + time, 0) / waitTimes.length)
-        : 0;
-      
-      // Count active patients
-      const activePatients = data?.filter(p => 
+      const activePatients = mockPatients.filter(p => 
         p.current_flow_step !== 'completed'
-      ).length || 0;
+      ).length;
       
-      // Count completed today
-      const completedToday = data?.filter(p => 
+      const completedToday = mockPatients.filter(p => 
         p.current_flow_step === 'completed' && 
-        new Date(p.created_at).toISOString().split('T')[0] === today
-      ).length || 0;
-      
-      setStats({
-        registeredToday,
-        avgWaitTime,
-        activePatients,
-        completedToday
-      });
-      
+        new Date(p.arrival_time || '').toDateString() === today
+      ).length;
     } catch (error) {
-      console.error('Error fetching reception data:', error);
+      console.error('Error fetching patients:', error);
     } finally {
       setIsLoading(false);
     }
-  };
-  
-  const getDepartmentFromFlowStep = (step: string | null): string => {
-    if (!step) return 'Unassigned';
-    
-    if (step.includes('waiting_')) {
-      const dept = step.replace('waiting_', '');
-      return dept.charAt(0).toUpperCase() + dept.slice(1);
-    }
-    
-    const departments: Record<string, string> = {
-      'registration': 'Reception',
-      'triage': 'Triage',
-      'waiting_consultation': 'Waiting Room',
-      'consultation': 'Doctor',
-      'emergency': 'Emergency',
-      'lab_tests': 'Laboratory',
-      'radiology': 'Radiology',
-      'pharmacy': 'Pharmacy',
-      'billing': 'Billing',
-      'completed': 'Discharged'
-    };
-    
-    return departments[step] || 'General';
-  };
-  
-  const calculateWaitTime = (createdAt: string): string => {
-    const created = new Date(createdAt).getTime();
-    const now = new Date().getTime();
-    const diffMinutes = Math.round((now - created) / 60000);
-    
-    return `${diffMinutes} min`;
-  };
-  
-  const formatArrivalTime = (createdAt: string): string => {
-    return new Date(createdAt).toLocaleTimeString([], { 
-      hour: '2-digit', 
-      minute: '2-digit'
-    });
   };
   
   const getFlowStepLabel = (step: string | null) => {
@@ -239,14 +204,12 @@ const ReceptionDashboard: React.FC = () => {
     const matchesFilter = filterStatus === 'all' || patient.current_flow_step === filterStatus;
     return matchesSearch && matchesFilter;
   });
-
-  if (isLoading) {
-    return (
-      <div className="flex justify-center p-6">
-        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-500"></div>
-      </div>
-    );
-  }
+  
+  // Stats
+  const registeredToday = 0;
+  const avgWaitTime = 15; // minutes
+  const activePatients = patients.length;
+  const completedToday = 0;
 
   return (
     <div className="space-y-6">
@@ -309,7 +272,7 @@ const ReceptionDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500">Registered Today</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">{stats.registeredToday}</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900">{registeredToday}</p>
               <div className="mt-1 flex items-center text-xs">
                 <span className="text-green-500 flex items-center">
                   <ArrowUp className="h-3 w-3 mr-1" />
@@ -328,7 +291,7 @@ const ReceptionDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500">Avg. Wait Time</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">{stats.avgWaitTime} min</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900">{avgWaitTime} min</p>
               <div className="mt-1 flex items-center text-xs">
                 <span className="text-green-500 flex items-center">
                   <ArrowDown className="h-3 w-3 mr-1" />
@@ -347,7 +310,7 @@ const ReceptionDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500">Active Patients</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">{stats.activePatients}</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900">{activePatients}</p>
               <div className="mt-1 flex items-center text-xs">
                 <span className="text-green-500 flex items-center">
                   <ArrowUp className="h-3 w-3 mr-1" />
@@ -366,7 +329,7 @@ const ReceptionDashboard: React.FC = () => {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-gray-500">Completed Today</p>
-              <p className="mt-1 text-2xl font-semibold text-gray-900">{stats.completedToday}</p>
+              <p className="mt-1 text-2xl font-semibold text-gray-900">{completedToday}</p>
               <div className="mt-1 flex items-center text-xs">
                 <span className="text-red-500 flex items-center">
                   <ArrowDown className="h-3 w-3 mr-1" />
@@ -473,13 +436,21 @@ const ReceptionDashboard: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredPatients.length === 0 ? (
+                {isLoading ? (
                   <tr>
                     <td colSpan={7} className="px-4 py-4 text-center">
+                      <div className="flex justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary-500"></div>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredPatients.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-4 py-16 text-center">
                       <div className="flex flex-col items-center justify-center text-gray-500">
                         <UserPlus className="h-12 w-12 text-gray-300 mb-4" />
                         <p className="text-base font-medium">No patients found</p>
-                        <p className="text-sm">Try adjusting your search or filter criteria</p>
+                        <p className="text-sm">There are no patients in the system at the moment</p>
                       </div>
                     </td>
                   </tr>
@@ -538,11 +509,15 @@ const ReceptionDashboard: React.FC = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 p-4">
-            {filteredPatients.length === 0 ? (
+            {isLoading ? (
+              <div className="col-span-full flex justify-center py-12">
+                <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-500"></div>
+              </div>
+            ) : filteredPatients.length === 0 ? (
               <div className="col-span-full flex flex-col items-center justify-center py-12 text-gray-500">
                 <UserPlus className="h-16 w-16 text-gray-300 mb-4" />
                 <p className="text-base font-medium">No patients found</p>
-                <p className="text-sm">Try adjusting your search or filter criteria</p>
+                <p className="text-sm">There are no patients in the system at the moment</p>
               </div>
             ) : (
               filteredPatients.map((patient) => (
