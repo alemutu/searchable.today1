@@ -6,6 +6,7 @@ import { Activity, WifiOff } from 'lucide-react';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
 import { isValidEmail, isStrongPassword } from '../../lib/security';
 import { generateCsrfToken, storeCsrfToken } from '../../lib/security';
+import { supabase } from '../../lib/supabase';
 
 interface LoginFormData {
   email: string;
@@ -22,6 +23,7 @@ const LoginForm: React.FC = () => {
   const [roleError, setRoleError] = useState<string | null>(null);
   const [loginAttempts, setLoginAttempts] = useState<number>(0);
   const [lockoutUntil, setLockoutUntil] = useState<Date | null>(null);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   
   // Check if user is already logged in and redirect accordingly
   useEffect(() => {
@@ -55,6 +57,22 @@ const LoginForm: React.FC = () => {
     const csrfToken = generateCsrfToken();
     storeCsrfToken(csrfToken);
   }, [navigate]);
+  
+  const handlePasswordReset = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      setResetEmailSent(true);
+    } catch (error: any) {
+      console.error('Password reset error:', error.message);
+    }
+  };
   
   const onSubmit = async (data: LoginFormData) => {
     if (isOffline) {
@@ -130,7 +148,7 @@ const LoginForm: React.FC = () => {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {error && (
             <div className="bg-error-50 border border-error-200 text-error-700 px-4 py-3 rounded-md">
-              {error}
+              The email or password you entered is incorrect. Please try again or reset your password.
             </div>
           )}
           
@@ -151,6 +169,12 @@ const LoginForm: React.FC = () => {
             <div className="bg-warning-50 border border-warning-200 text-warning-700 px-4 py-3 rounded-md flex items-center">
               <WifiOff className="h-5 w-5 mr-2 text-warning-500" />
               You are currently offline. Login requires an internet connection.
+            </div>
+          )}
+          
+          {resetEmailSent && (
+            <div className="bg-success-50 border border-success-200 text-success-700 px-4 py-3 rounded-md">
+              Password reset instructions have been sent to your email address.
             </div>
           )}
           
@@ -210,9 +234,20 @@ const LoginForm: React.FC = () => {
             </div>
 
             <div className="text-sm">
-              <a href="#" className="font-medium text-primary-600 hover:text-primary-500">
+              <button
+                type="button"
+                onClick={() => {
+                  const email = (document.getElementById('email') as HTMLInputElement)?.value;
+                  if (email && isValidEmail(email)) {
+                    handlePasswordReset(email);
+                  } else {
+                    setRoleError("Please enter a valid email address to reset your password.");
+                  }
+                }}
+                className="font-medium text-primary-600 hover:text-primary-500"
+              >
                 Forgot your password?
-              </a>
+              </button>
             </div>
           </div>
 
