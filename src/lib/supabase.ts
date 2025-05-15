@@ -17,19 +17,19 @@ export const supabase = createClient<Database>(
     auth: {
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: false, // Changed to false to prevent URL parsing issues
-      storage: localStorage, // Explicitly set storage
-      storageKey: 'hms-auth-token', // Custom storage key
-      flowType: 'pkce' // Use PKCE flow for added security
+      detectSessionInUrl: false,
+      storage: localStorage,
+      storageKey: 'hms-auth-token',
+      flowType: 'pkce'
     },
     global: {
       headers: {
         'X-Client-Info': 'hms-web-client'
       }
     },
-    // Add retry configuration
+    // Add retry configuration with exponential backoff
     retryAttempts: 3,
-    retryInterval: 1000
+    retryInterval: (attempt) => Math.min(1000 * Math.pow(2, attempt), 10000)
   }
 );
 
@@ -82,4 +82,30 @@ export const clearSessionTimeout = () => {
   ['mousedown', 'keypress', 'scroll', 'touchstart'].forEach(event => {
     document.removeEventListener(event, resetSessionTimeout);
   });
+};
+
+// Add retry mechanism for auth operations
+export const retryOperation = async <T>(
+  operation: () => Promise<T>,
+  maxAttempts = 3,
+  delay = 1000
+): Promise<T> => {
+  let lastError: Error;
+  
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      
+      if (attempt === maxAttempts) {
+        break;
+      }
+      
+      // Wait with exponential backoff
+      await new Promise(resolve => setTimeout(resolve, delay * Math.pow(2, attempt - 1)));
+    }
+  }
+  
+  throw lastError!;
 };

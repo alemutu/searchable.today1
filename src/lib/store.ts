@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { User } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { supabase, retryOperation } from './supabase';
 import { initializeStorage, syncAllData } from './storage';
 import { v4 as uuidv4 } from 'uuid';
 import { clearSensitiveData } from './security';
@@ -86,12 +86,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
       
-      // Get current session
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      // Get current session with retry mechanism
+      const { data: { session }, error: sessionError } = await retryOperation(
+        () => supabase.auth.getSession()
+      );
       
       if (sessionError) {
         if (sessionError.message.includes('JWT')) {
-          // Invalid JWT token, clear the session
           await supabase.auth.signOut();
           set({ user: null });
           return;
@@ -100,11 +101,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
       
       if (session) {
-        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await retryOperation(
+          () => supabase.auth.getUser()
+        );
         
         if (userError) {
           if (userError.message.includes('user_not_found') || userError.status === 403) {
-            // User doesn't exist, sign out
             await supabase.auth.signOut();
             set({ user: null });
             return;
@@ -121,7 +123,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch (error: any) {
       console.error('Error initializing auth:', error.message);
-      set({ error: error.message });
+      set({ error: `Connection error: Please check your internet connection and try again. (${error.message})` });
     } finally {
       set({ isLoading: false });
     }
@@ -135,10 +137,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw new Error('Cannot login while offline');
       }
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
-      });
+      const { data, error } = await retryOperation(
+        () => supabase.auth.signInWithPassword({
+          email,
+          password
+        })
+      );
       
       if (error) throw error;
       
@@ -150,7 +154,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch (error: any) {
       console.error('Error logging in:', error.message);
-      set({ error: `Error logging in: ${error.message}` });
+      set({ error: `Login failed: ${error.message}. Please check your credentials and try again.` });
       throw error;
     } finally {
       set({ isLoading: false });
@@ -165,13 +169,15 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw new Error('Cannot sign up while offline');
       }
       
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: metadata
-        }
-      });
+      const { data, error } = await retryOperation(
+        () => supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: metadata
+          }
+        })
+      );
       
       if (error) throw error;
       
@@ -192,7 +198,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ isLoading: true, error: null });
       
       if (!isOnline()) {
-        // If offline, just clear local state
         set({ 
           user: null,
           hospital: null,
@@ -205,10 +210,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
       
-      const { error } = await supabase.auth.signOut();
+      const { error } = await retryOperation(
+        () => supabase.auth.signOut()
+      );
+      
       if (error) {
         if (error.message.includes('Failed to fetch')) {
-          // Network error during logout, just clear local state
           console.log('Network error during logout, clearing local state');
         } else {
           throw error;
@@ -224,7 +231,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isReceptionist: false
       });
       
-      // Clear sensitive data from localStorage
       clearSensitiveData();
       
     } catch (error: any) {
@@ -245,12 +251,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
 
-      // Get user metadata directly from auth.users
-      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+      const { data: { user: currentUser }, error: userError } = await retryOperation(
+        () => supabase.auth.getUser()
+      );
       
       if (userError) {
         console.error('Error fetching user data:', userError);
-        // If user not found, log out and clear state
         if (userError.message.includes('user_not_found') || userError.status === 403) {
           console.log('User not found in auth.users table, logging out');
           await get().logout();
@@ -259,14 +265,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw userError;
       }
 
-      // If user is null, they don't exist in auth.users anymore
       if (!currentUser) {
         console.log('User not found in auth.users table, logging out');
         await get().logout();
         return;
       }
 
-      // Set role from user metadata
       if (currentUser?.user_metadata) {
         const { role } = currentUser.user_metadata;
         
@@ -278,13 +282,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
       }
       
-      // Fetch hospital information if available
       if (currentUser?.user_metadata?.hospital_id) {
         await get().fetchCurrentHospital();
       }
     } catch (error: any) {
       console.error('Error fetching user profile:', error.message);
-      // If there's any error fetching the profile, log out as a safety measure
       await get().logout();
     }
   },
@@ -299,19 +301,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         return;
       }
       
-      // Get hospital_id from user metadata
-      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+      const { data: { user: currentUser }, error: userError } = await retryOperation(
+        () => supabase.auth.getUser()
+      );
       
       if (userError) throw userError;
       
       const hospitalId = currentUser?.user_metadata?.hospital_id;
       
       if (hospitalId) {
-        const { data: hospital, error: hospitalError } = await supabase
-          .from('hospitals')
-          .select('*')
-          .eq('id', hospitalId)
-          .single();
+        const { data: hospital, error: hospitalError } = await retryOperation(
+          () => supabase
+            .from('hospitals')
+            .select('*')
+            .eq('id', hospitalId)
+            .single()
+        );
         
         if (hospitalError) {
           console.error('Error fetching hospital:', hospitalError);
@@ -320,7 +325,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         
         if (hospital) {
           set({ hospital });
-          // Save hospital to local storage for offline use
           localStorage.setItem(`hospitals_${hospital.id}`, JSON.stringify(hospital));
         }
       }
@@ -348,7 +352,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       ]
     }));
     
-    // Auto-remove notification after duration
     const duration = notification.duration || 3000;
     setTimeout(() => {
       set((state) => ({
