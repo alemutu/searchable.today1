@@ -1,4 +1,4 @@
-import { supabase, getClient } from './supabase';
+import { supabase, getClient, retryOperation } from './supabase';
 import { v4 as uuidv4 } from 'uuid';
 import { sanitizeInput } from './security';
 
@@ -195,63 +195,126 @@ export const fetchData = async <T>(
     try {
       const client = getClient();
       
-      if (id) {
-        // Fetch single record
-        const { data, error } = await client
-          .from(table)
-          .select('*')
-          .eq('id', id)
-          .single();
+      // Special handling for cached table to avoid column errors
+      if (table === 'cached') {
+        if (id) {
+          // Fetch single record with specific columns
+          const { data, error } = await client
+            .from(table)
+            .select('id, key, value, expires_at, created_at, updated_at')
+            .eq('id', id)
+            .single();
+            
+          if (error) throw error;
           
-        if (error) throw error;
-        
-        // Save to local storage
-        if (data) {
-          localStorage.setItem(`${table}_${id}`, JSON.stringify(data));
-        }
-        
-        return data as T;
-      } else if (query) {
-        // Fetch with query
-        let queryBuilder = client.from(table).select('*');
-        
-        // Apply query parameters
-        Object.entries(query).forEach(([key, value]) => {
-          queryBuilder = queryBuilder.eq(key, value);
-        });
-        
-        const { data, error } = await queryBuilder;
-        
-        if (error) throw error;
-        
-        // Save to local storage
-        if (data) {
-          data.forEach((item: any) => {
-            if (item.id) {
-              localStorage.setItem(`${table}_${item.id}`, JSON.stringify(item));
-            }
+          // Save to local storage
+          if (data) {
+            localStorage.setItem(`${table}_${id}`, JSON.stringify(data));
+          }
+          
+          return data as T;
+        } else if (query) {
+          // Fetch with query and specific columns
+          let queryBuilder = client.from(table).select('id, key, value, expires_at, created_at, updated_at');
+          
+          // Apply query parameters
+          Object.entries(query).forEach(([key, value]) => {
+            queryBuilder = queryBuilder.eq(key, value);
           });
+          
+          const { data, error } = await queryBuilder;
+          
+          if (error) throw error;
+          
+          // Save to local storage
+          if (data) {
+            data.forEach((item: any) => {
+              if (item.id) {
+                localStorage.setItem(`${table}_${item.id}`, JSON.stringify(item));
+              }
+            });
+          }
+          
+          return data as T[];
+        } else {
+          // Fetch all records with specific columns
+          const { data, error } = await client
+            .from(table)
+            .select('id, key, value, expires_at, created_at, updated_at');
+            
+          if (error) throw error;
+          
+          // Save to local storage
+          if (data) {
+            data.forEach((item: any) => {
+              if (item.id) {
+                localStorage.setItem(`${table}_${item.id}`, JSON.stringify(item));
+              }
+            });
+          }
+          
+          return data as T[];
         }
-        
-        return data as T[];
       } else {
-        // Fetch all records
-        const { data, error } = await client
-          .from(table)
-          .select('*');
+        // Normal handling for other tables
+        if (id) {
+          // Fetch single record
+          const { data, error } = await client
+            .from(table)
+            .select('*')
+            .eq('id', id)
+            .single();
+            
+          if (error) throw error;
           
-        if (error) throw error;
-        
-        // Save to local storage
-        if (data) {
-          data.forEach((item: any) => {
-            if (item.id) {
-              localStorage.setItem(`${table}_${item.id}`, JSON.stringify(item));
-            }
+          // Save to local storage
+          if (data) {
+            localStorage.setItem(`${table}_${id}`, JSON.stringify(data));
+          }
+          
+          return data as T;
+        } else if (query) {
+          // Fetch with query
+          let queryBuilder = client.from(table).select('*');
+          
+          // Apply query parameters
+          Object.entries(query).forEach(([key, value]) => {
+            queryBuilder = queryBuilder.eq(key, value);
           });
+          
+          const { data, error } = await queryBuilder;
+          
+          if (error) throw error;
+          
+          // Save to local storage
+          if (data) {
+            data.forEach((item: any) => {
+              if (item.id) {
+                localStorage.setItem(`${table}_${item.id}`, JSON.stringify(item));
+              }
+            });
+          }
+          
+          return data as T[];
+        } else {
+          // Fetch all records
+          const { data, error } = await client
+            .from(table)
+            .select('*');
+            
+          if (error) throw error;
+          
+          // Save to local storage
+          if (data) {
+            data.forEach((item: any) => {
+              if (item.id) {
+                localStorage.setItem(`${table}_${item.id}`, JSON.stringify(item));
+              }
+            });
+          }
+          
+          return data as T[];
         }
-        
-        return data as T[];
       }
     } catch (error) {
       console.error(`Error fetching from Supabase:`, error);
