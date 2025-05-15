@@ -42,6 +42,9 @@ export const hospitalOnboardingApi = {
       contactPerson: string;
     };
     adminSetup: {
+      email?: string;
+      firstName?: string;
+      lastName?: string;
       password: string;
       sendCredentials: boolean;
     };
