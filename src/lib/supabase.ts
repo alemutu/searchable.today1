@@ -24,9 +24,22 @@ export const supabase = createClient<Database>(
     global: {
       headers: {
         'X-Client-Info': 'hms-web-client'
+      },
+      // Add request timeout to prevent hanging on recursive queries
+      fetch: (url, options) => {
+        const timeoutController = new AbortController();
+        const { signal } = timeoutController;
+        
+        // Set a 10-second timeout
+        const timeoutId = setTimeout(() => timeoutController.abort(), 10000);
+        
+        return fetch(url, {
+          ...options,
+          signal,
+        }).finally(() => clearTimeout(timeoutId));
       }
     },
-    // Add request timeout settings
+    // Add database schema
     db: {
       schema: 'public'
     },

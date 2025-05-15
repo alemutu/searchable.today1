@@ -41,7 +41,7 @@ interface Hospital {
 
 interface NotificationState {
   notifications: Notification[];
-  notifiedEmergencies: Set<string>;
+  notifiedEmergencies: Set<string>; // Track emergency IDs that have been notified
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
   removeNotification: (id: string) => void;
   clearNotifications: () => void;
@@ -54,7 +54,7 @@ export interface Notification {
   message: string;
   type: 'success' | 'error' | 'warning' | 'info';
   timestamp: number;
-  duration?: number;
+  duration?: number; // in milliseconds, default will be 3000
 }
 
 // Retry configuration
@@ -120,7 +120,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         if (user) {
           set({ user });
           await get().fetchUserProfile();
-          await syncAllData();
+          await syncAllData(); // Sync any pending changes
         }
       }
     } catch (error: any) {
@@ -147,7 +147,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (data.user) {
         set({ user: data.user });
         await get().fetchUserProfile();
-        await syncAllData();
+        await syncAllData(); // Sync any pending changes
       }
     } catch (error: any) {
       console.error('Error logging in:', error.message);
@@ -204,6 +204,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isReceptionist: false
       });
       
+      // Clear sensitive data from localStorage
       clearSensitiveData();
       
     } catch (error: any) {
@@ -231,6 +232,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw userError;
       }
 
+      // Set role from user metadata
       if (currentUser?.user_metadata) {
         const { role } = currentUser.user_metadata;
         
@@ -242,6 +244,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
       }
       
+      // Fetch hospital information if available
       if (currentUser?.user_metadata?.hospital_id) {
         await get().fetchCurrentHospital();
       }
@@ -256,6 +259,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { user } = get();
       if (!user) return;
       
+      // Get hospital_id from user metadata
       const { data: { user: currentUser }, error: userError } = await retryOperation(async () => {
         const response = await supabase.auth.getUser();
         if (response.error) throw response.error;
@@ -284,6 +288,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         
         if (hospital) {
           set({ hospital });
+          // Save hospital to local storage for offline use
           localStorage.setItem(`hospitals_${hospital.id}`, JSON.stringify(hospital));
         }
       }
@@ -294,12 +299,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   }
 }));
 
+// Notification store
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   notifiedEmergencies: new Set<string>(),
   
   addNotification: (notification) => {
-    const id = uuidv4();
+    const id = uuidv4(); // Use UUID for secure random IDs
     set((state) => ({
       notifications: [
         ...state.notifications,
@@ -311,6 +317,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       ]
     }));
     
+    // Auto-remove notification after duration
     const duration = notification.duration || 3000;
     setTimeout(() => {
       set((state) => ({
