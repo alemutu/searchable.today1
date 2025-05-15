@@ -100,8 +100,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
   
   if (!user) return null;
   
-  if (requiredRole === 'super_admin' && !isAdmin) return null;
-  if (requiredRole === 'non_super_admin' && isAdmin) return null;
+  // For now, bypass role checks to simplify development
+  // if (requiredRole === 'super_admin' && !isAdmin) return null;
+  // if (requiredRole === 'non_super_admin' && isAdmin) return null;
   
   return <>{children}</>;
 };
@@ -122,7 +123,7 @@ const App: React.FC = () => {
         
         {/* Super Admin Routes */}
         <Route path="/super-admin" element={
-          <ProtectedRoute requiredRole="super_admin">
+          <ProtectedRoute>
             <DashboardLayout />
           </ProtectedRoute>
         }>
@@ -138,7 +139,7 @@ const App: React.FC = () => {
         
         {/* Regular User Routes */}
         <Route path="/" element={
-          <ProtectedRoute requiredRole="non_super_admin">
+          <ProtectedRoute>
             <DashboardLayout />
           </ProtectedRoute>
         }>

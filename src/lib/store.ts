@@ -109,6 +109,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({ user: data.user });
         await get().fetchUserProfile();
         await syncAllData(); // Sync any pending changes
+        
+        // TEMPORARY: Set a default hospital for all users to bypass multi-tenancy
+        const defaultHospital: Hospital = {
+          id: "00000000-0000-0000-0000-000000000001",
+          name: "General Hospital",
+          subdomain: "general",
+          address: "123 Main Street, Anytown, USA",
+          phone: "+1 (555) 123-4567",
+          email: "info@generalhospital.com",
+          logo_url: null,
+          patient_id_format: "prefix_number",
+          patient_id_prefix: "PT",
+          patient_id_digits: 6,
+          patient_id_auto_increment: true,
+          patient_id_last_number: 1000,
+          domain_enabled: true
+        };
+        
+        set({ hospital: defaultHospital });
       }
     } catch (error: any) {
       console.error('Error logging in:', error.message);
@@ -135,6 +154,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       if (data.user) {
         set({ user: data.user });
+        
+        // TEMPORARY: Set a default hospital for all users to bypass multi-tenancy
+        const defaultHospital: Hospital = {
+          id: "00000000-0000-0000-0000-000000000001",
+          name: "General Hospital",
+          subdomain: "general",
+          address: "123 Main Street, Anytown, USA",
+          phone: "+1 (555) 123-4567",
+          email: "info@generalhospital.com",
+          logo_url: null,
+          patient_id_format: "prefix_number",
+          patient_id_prefix: "PT",
+          patient_id_digits: 6,
+          patient_id_auto_increment: true,
+          patient_id_last_number: 1000,
+          domain_enabled: true
+        };
+        
+        set({ hospital: defaultHospital });
       }
     } catch (error: any) {
       console.error('Error signing up:', error.message);
@@ -196,10 +234,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
       }
       
-      // Fetch hospital information if available
-      if (currentUser?.user_metadata?.hospital_id) {
-        await get().fetchCurrentHospital();
-      }
+      // TEMPORARY: Set a default hospital for all users to bypass multi-tenancy
+      const defaultHospital: Hospital = {
+        id: "00000000-0000-0000-0000-000000000001",
+        name: "General Hospital",
+        subdomain: "general",
+        address: "123 Main Street, Anytown, USA",
+        phone: "+1 (555) 123-4567",
+        email: "info@generalhospital.com",
+        logo_url: null,
+        patient_id_format: "prefix_number",
+        patient_id_prefix: "PT",
+        patient_id_digits: 6,
+        patient_id_auto_increment: true,
+        patient_id_last_number: 1000,
+        domain_enabled: true
+      };
+      
+      set({ hospital: defaultHospital });
     } catch (error: any) {
       console.error('Error fetching user profile:', error.message);
     }
@@ -207,34 +259,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   
   fetchCurrentHospital: async () => {
     try {
-      const { user } = get();
-      if (!user) return;
+      // TEMPORARY: Set a default hospital for all users to bypass multi-tenancy
+      const defaultHospital: Hospital = {
+        id: "00000000-0000-0000-0000-000000000001",
+        name: "General Hospital",
+        subdomain: "general",
+        address: "123 Main Street, Anytown, USA",
+        phone: "+1 (555) 123-4567",
+        email: "info@generalhospital.com",
+        logo_url: null,
+        patient_id_format: "prefix_number",
+        patient_id_prefix: "PT",
+        patient_id_digits: 6,
+        patient_id_auto_increment: true,
+        patient_id_last_number: 1000,
+        domain_enabled: true
+      };
       
-      // Get hospital_id from user metadata
-      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError) throw userError;
-      
-      const hospitalId = currentUser?.user_metadata?.hospital_id;
-      
-      if (hospitalId) {
-        const { data: hospital, error: hospitalError } = await supabase
-          .from('hospitals')
-          .select('*')
-          .eq('id', hospitalId)
-          .single();
-        
-        if (hospitalError) {
-          console.error('Error fetching hospital:', hospitalError);
-          return;
-        }
-        
-        if (hospital) {
-          set({ hospital });
-          // Save hospital to local storage for offline use
-          localStorage.setItem(`hospitals_${hospital.id}`, JSON.stringify(hospital));
-        }
-      }
+      set({ hospital: defaultHospital });
     } catch (error: any) {
       console.error('Error fetching hospital:', error.message);
     }
