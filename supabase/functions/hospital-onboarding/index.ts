@@ -36,21 +36,19 @@ serve(async (req: Request) => {
       const subdomain = path[2]
 
       // Query the hospitals table to check if subdomain exists
-      const { data: existingHospitals, error: queryError } = await supabaseClient
+      const { data: existingHospital, error: queryError } = await supabaseClient
         .from('hospitals')
         .select('id')
         .eq('subdomain', subdomain)
+        .single()
 
       if (queryError) {
         throw new Error(`Database error: ${queryError.message}`)
       }
 
-      // Check if any hospitals were found with this subdomain
-      const isAvailable = !existingHospitals || existingHospitals.length === 0
-
       return new Response(
         JSON.stringify({
-          available: isAvailable,
+          available: !existingHospital,
         }),
         {
           headers: {
@@ -71,21 +69,7 @@ serve(async (req: Request) => {
         throw new Error('Missing required fields')
       }
 
-      // Check subdomain availability before creating
-      const { data: existingHospital, error: checkError } = await supabaseClient
-        .from('hospitals')
-        .select('id')
-        .eq('subdomain', body.hospitalProfile.subdomain)
-
-      if (checkError) {
-        throw new Error(`Database error: ${checkError.message}`)
-      }
-
-      if (existingHospital && existingHospital.length > 0) {
-        throw new Error('Subdomain is already taken')
-      }
-
-      // Create the hospital
+      // Start a transaction
       const { data: hospital, error: hospitalError } = await supabaseClient
         .from('hospitals')
         .insert({
@@ -172,21 +156,8 @@ serve(async (req: Request) => {
       )
     }
 
-    // If no route matches, return 404
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: 'Not Found',
-      }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-        status: 404,
-      }
-    )
-
+    // If no route matches
+    throw new Error('Not Found')
   } catch (error) {
     return new Response(
       JSON.stringify({

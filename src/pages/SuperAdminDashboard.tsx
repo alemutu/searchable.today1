@@ -64,14 +64,11 @@ const SuperAdminDashboard: React.FC = () => {
         .select('*')
         .order('name');
 
-      if (hospitalsError) {
-        console.error('Error fetching hospitals:', hospitalsError);
-        return false;
-      }
-
+      if (hospitalsError) throw hospitalsError;
       setHospitals(hospitalsData || []);
 
       // Create stats object from hospitals count and mock data for now
+      // In production, you would implement proper counting queries
       setStats({
         total_hospitals: hospitalsData?.length || 0,
         total_users: 25,
@@ -89,23 +86,19 @@ const SuperAdminDashboard: React.FC = () => {
 
       if (settingsError) {
         console.error('Error fetching system settings:', settingsError);
-        return false;
+      } else {
+        setSettings(settingsData || []);
+
+        const mainDomainSetting = settingsData?.find(s => s.key === 'system.main_domain');
+        if (mainDomainSetting?.value) {
+          const domain = typeof mainDomainSetting.value === 'string'
+            ? mainDomainSetting.value.replace(/"/g, '')
+            : mainDomainSetting.value;
+          setMainDomain(domain);
+        }
       }
-
-      setSettings(settingsData || []);
-
-      const mainDomainSetting = settingsData?.find(s => s.key === 'system.main_domain');
-      if (mainDomainSetting?.value) {
-        const domain = typeof mainDomainSetting.value === 'string'
-          ? mainDomainSetting.value.replace(/"/g, '')
-          : mainDomainSetting.value;
-        setMainDomain(domain);
-      }
-
-      return true;
     } catch (error) {
       console.error('Error fetching super admin data:', error);
-      return false;
     } finally {
       setIsLoading(false);
     }

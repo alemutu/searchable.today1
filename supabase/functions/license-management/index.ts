@@ -159,20 +159,4 @@ app.get('/metrics', async (req, res) => {
   }
 });
 
-// Default error handler
-app.use((err: Error, req: Request, res: Response) => {
-  console.error(err.stack);
-  res.status(500).json({
-    error: 'Internal server error',
-    message: err.message
-  });
-});
-
-// Serve the Express app
-serve(async (req) => {
-  const response = await app.callback()(req);
-  return new Response(response.body, {
-    status: response.status,
-    headers: response.headers
-  });
-});
+serve(app.callback());
