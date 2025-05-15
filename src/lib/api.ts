@@ -5,7 +5,7 @@ import { supabase } from './supabase';
  * This will be used to construct the full URL for each function
  */
 const getEdgeFunctionBaseUrl = () => {
-  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+  return `${import.meta.env.VITE_SUPABASE_URL || 'https://cyxlbkzxaoonahfcrfua.supabase.co'}/functions/v1`;
 };
 
 /**
@@ -17,7 +17,7 @@ const getHeaders = async () => {
   
   return {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+    'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5eGxia3p4YW9vbmFoZmNyZnVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDcyOTc4NDMsImV4cCI6MjA2Mjg3Mzg0M30.t0TahBAb4ORolqqK_KBFfRg7SXKHlJ8c4H3S-TPw4_w'}`,
     ...(data.session?.access_token 
       ? { 'Authorization': `Bearer ${data.session.access_token}` }
       : {})
