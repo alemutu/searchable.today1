@@ -41,7 +41,7 @@ interface Hospital {
 
 interface NotificationState {
   notifications: Notification[];
-  notifiedEmergencies: Set<string>; // Track emergency IDs that have been notified
+  notifiedEmergencies: Set<string>;
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
   removeNotification: (id: string) => void;
   clearNotifications: () => void;
@@ -54,8 +54,11 @@ export interface Notification {
   message: string;
   type: 'success' | 'error' | 'warning' | 'info';
   timestamp: number;
-  duration?: number; // in milliseconds, default will be 3000
+  duration?: number;
 }
+
+// Check network connectivity
+const isOnline = () => navigator.onLine;
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
@@ -69,21 +72,51 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   
   initialize: async () => {
     try {
-      set({ isLoading: true });
+      set({ isLoading: true, error: null });
       
       // Initialize storage system
       initializeStorage();
       
+      if (!isOnline()) {
+        console.log('Offline: Using cached session data');
+        const cachedUser = localStorage.getItem('cached_user');
+        if (cachedUser) {
+          set({ user: JSON.parse(cachedUser) });
+        }
+        return;
+      }
+      
       // Get current session
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        if (sessionError.message.includes('JWT')) {
+          // Invalid JWT token, clear the session
+          await supabase.auth.signOut();
+          set({ user: null });
+          return;
+        }
+        throw sessionError;
+      }
       
       if (session) {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user }, error: userError } = await supabase.auth.getUser();
+        
+        if (userError) {
+          if (userError.message.includes('user_not_found') || userError.status === 403) {
+            // User doesn't exist, sign out
+            await supabase.auth.signOut();
+            set({ user: null });
+            return;
+          }
+          throw userError;
+        }
         
         if (user) {
           set({ user });
+          localStorage.setItem('cached_user', JSON.stringify(user));
           await get().fetchUserProfile();
-          await syncAllData(); // Sync any pending changes
+          await syncAllData();
         }
       }
     } catch (error: any) {
@@ -98,6 +131,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
+      if (!isOnline()) {
+        throw new Error('Cannot login while offline');
+      }
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -107,8 +144,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       if (data.user) {
         set({ user: data.user });
+        localStorage.setItem('cached_user', JSON.stringify(data.user));
         await get().fetchUserProfile();
-        await syncAllData(); // Sync any pending changes
+        await syncAllData();
       }
     } catch (error: any) {
       console.error('Error logging in:', error.message);
@@ -123,6 +161,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
+      if (!isOnline()) {
+        throw new Error('Cannot sign up while offline');
+      }
+      
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
@@ -135,6 +177,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       if (data.user) {
         set({ user: data.user });
+        localStorage.setItem('cached_user', JSON.stringify(data.user));
       }
     } catch (error: any) {
       console.error('Error signing up:', error.message);
@@ -146,10 +189,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   
   logout: async () => {
     try {
-      set({ isLoading: true });
+      set({ isLoading: true, error: null });
+      
+      if (!isOnline()) {
+        // If offline, just clear local state
+        set({ 
+          user: null,
+          hospital: null,
+          isAdmin: false,
+          isDoctor: false,
+          isNurse: false,
+          isReceptionist: false
+        });
+        clearSensitiveData();
+        return;
+      }
       
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      if (error) {
+        if (error.message.includes('Failed to fetch')) {
+          // Network error during logout, just clear local state
+          console.log('Network error during logout, clearing local state');
+        } else {
+          throw error;
+        }
+      }
       
       set({ 
         user: null,
@@ -175,6 +239,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { user } = get();
       if (!user) return;
+
+      if (!isOnline()) {
+        console.log('Offline: Using cached profile data');
+        return;
+      }
 
       // Get user metadata directly from auth.users
       const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
@@ -224,6 +293,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       const { user } = get();
       if (!user) return;
+
+      if (!isOnline()) {
+        console.log('Offline: Using cached hospital data');
+        return;
+      }
       
       // Get hospital_id from user metadata
       const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
@@ -262,7 +336,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifiedEmergencies: new Set<string>(),
   
   addNotification: (notification) => {
-    const id = uuidv4(); // Use UUID for secure random IDs
+    const id = uuidv4();
     set((state) => ({
       notifications: [
         ...state.notifications,

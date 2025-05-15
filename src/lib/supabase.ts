@@ -17,18 +17,19 @@ export const supabase = createClient<Database>(
     auth: {
       autoRefreshToken: true,
       persistSession: true,
-      detectSessionInUrl: true,
+      detectSessionInUrl: false, // Changed to false to prevent URL parsing issues
+      storage: localStorage, // Explicitly set storage
       storageKey: 'hms-auth-token', // Custom storage key
       flowType: 'pkce' // Use PKCE flow for added security
-    },
-    db: {
-      schema: 'public'
     },
     global: {
       headers: {
         'X-Client-Info': 'hms-web-client'
       }
-    }
+    },
+    // Add retry configuration
+    retryAttempts: 3,
+    retryInterval: 1000
   }
 );
 
@@ -39,6 +40,9 @@ export const getClient = () => supabase;
 const SESSION_TIMEOUT = parseInt(import.meta.env.VITE_SESSION_TIMEOUT || '3600', 10) * 1000;
 let sessionTimeoutId: number | null = null;
 
+// Check network connectivity
+const isOnline = () => navigator.onLine;
+
 // Reset session timeout
 export const resetSessionTimeout = () => {
   if (sessionTimeoutId) {
@@ -47,8 +51,12 @@ export const resetSessionTimeout = () => {
   
   sessionTimeoutId = window.setTimeout(async () => {
     console.log('Session timeout reached, logging out');
-    await supabase.auth.signOut();
-    window.location.href = '/login?timeout=true';
+    if (isOnline()) {
+      await supabase.auth.signOut();
+      window.location.href = '/login?timeout=true';
+    } else {
+      console.log('Offline: Session timeout handling deferred');
+    }
   }, SESSION_TIMEOUT);
 };
 
