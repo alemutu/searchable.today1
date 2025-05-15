@@ -50,106 +50,25 @@ const Triage: React.FC = () => {
   }, [hospital]);
 
   const fetchPatients = async () => {
+    if (!hospital?.id) return;
+    
     try {
-      // In a real app, we would fetch from Supabase
-      // For now, we'll use mock data
-      const mockPatients = [
-        {
-          id: '00000000-0000-0000-0000-000000000001',
-          first_name: 'John',
-          last_name: 'Doe',
-          date_of_birth: '1980-05-15',
-          current_flow_step: 'registration',
-          priority_level: 'normal',
-          arrival_time: '09:15 AM',
-          last_updated: '2025-05-15T09:15:00Z',
-          chief_complaint: 'Fever and headache'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000002',
-          first_name: 'Jane',
-          last_name: 'Smith',
-          date_of_birth: '1992-08-22',
-          current_flow_step: 'triage',
-          priority_level: 'urgent',
-          arrival_time: '09:30 AM',
-          last_updated: '2025-05-15T09:30:00Z',
-          chief_complaint: 'Chest pain',
-          assigned_to: user?.id
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000003',
-          first_name: 'Robert',
-          last_name: 'Johnson',
-          date_of_birth: '1975-12-10',
-          current_flow_step: 'waiting_consultation',
-          priority_level: 'normal',
-          arrival_time: '08:45 AM',
-          last_updated: '2025-05-15T08:45:00Z',
-          chief_complaint: 'Back pain'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000004',
-          first_name: 'Emily',
-          last_name: 'Williams',
-          date_of_birth: '1988-03-30',
-          current_flow_step: 'consultation',
-          priority_level: 'normal',
-          arrival_time: '10:00 AM',
-          last_updated: '2025-05-15T10:00:00Z',
-          chief_complaint: 'Sore throat'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000005',
-          first_name: 'Michael',
-          last_name: 'Brown',
-          date_of_birth: '1965-07-18',
-          current_flow_step: 'emergency',
-          priority_level: 'critical',
-          arrival_time: '10:15 AM',
-          last_updated: '2025-05-15T10:15:00Z',
-          chief_complaint: 'Severe abdominal pain'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000006',
-          first_name: 'Sarah',
-          last_name: 'Davis',
-          date_of_birth: '1990-04-12',
-          current_flow_step: 'registration',
-          priority_level: 'urgent',
-          arrival_time: '10:30 AM',
-          last_updated: '2025-05-15T10:30:00Z',
-          chief_complaint: 'Difficulty breathing'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000007',
-          first_name: 'David',
-          last_name: 'Miller',
-          date_of_birth: '1982-09-28',
-          current_flow_step: 'registration',
-          priority_level: 'normal',
-          arrival_time: '10:45 AM',
-          last_updated: '2025-05-15T10:45:00Z',
-          chief_complaint: 'Sprained ankle'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000008',
-          first_name: 'Lisa',
-          last_name: 'Taylor',
-          date_of_birth: '1979-03-15',
-          current_flow_step: 'triage',
-          priority_level: 'normal',
-          arrival_time: '11:00 AM',
-          last_updated: '2025-05-15T11:00:00Z',
-          chief_complaint: 'Migraine',
-          assigned_to: '00000000-0000-0000-0000-000000000010' // Another nurse
-        }
-      ];
+      setIsLoading(true);
       
-      setPatients(mockPatients);
+      // Fetch patients in registration or triage stage
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('hospital_id', hospital.id)
+        .in('current_flow_step', ['registration', 'triage'])
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      setPatients(data || []);
       
       // Show notification for emergency cases
-      const emergencyCases = mockPatients.filter(patient => patient.priority_level === 'critical');
+      const emergencyCases = data?.filter(patient => patient.priority_level === 'critical') || [];
       if (emergencyCases.length > 0) {
         emergencyCases.forEach(emergency => {
           addNotification({
@@ -208,81 +127,109 @@ const Triage: React.FC = () => {
     return `${diffDays}d ago`;
   };
   
-  const handleAssignToMe = (patientId: string) => {
-    // Update the patient to assign it to the current user
-    const updatedPatients = patients.map(patient => {
-      if (patient.id === patientId) {
-        return {
-          ...patient,
-          assigned_to: user?.id,
+  const handleAssignToMe = async (patientId: string) => {
+    if (!user?.id) return;
+    
+    try {
+      // Update the patient in the database
+      const { error } = await supabase
+        .from('patients')
+        .update({
+          assigned_to: user.id,
           last_updated: new Date().toISOString()
-        };
+        })
+        .eq('id', patientId);
+
+      if (error) throw error;
+      
+      // Refresh the data
+      await fetchPatients();
+      
+      // Show notification
+      const patient = patients.find(p => p.id === patientId);
+      if (patient) {
+        addNotification({
+          message: `${patient.first_name} ${patient.last_name} assigned to you`,
+          type: 'success',
+          duration: 3000
+        });
       }
-      return patient;
-    });
-    
-    setPatients(updatedPatients);
-    
-    // Show notification
-    const patient = patients.find(p => p.id === patientId);
-    if (patient) {
+    } catch (error) {
+      console.error('Error assigning patient:', error);
       addNotification({
-        message: `${patient.first_name} ${patient.last_name} assigned to you`,
-        type: 'success',
-        duration: 3000
+        message: 'Failed to assign patient',
+        type: 'error'
       });
     }
   };
 
-  const handleReleaseAssignment = (patientId: string) => {
-    // Update the patient to unassign it
-    const updatedPatients = patients.map(patient => {
-      if (patient.id === patientId) {
-        return {
-          ...patient,
+  const handleReleaseAssignment = async (patientId: string) => {
+    try {
+      // Update the patient in the database
+      const { error } = await supabase
+        .from('patients')
+        .update({
           assigned_to: null,
           last_updated: new Date().toISOString()
-        };
+        })
+        .eq('id', patientId);
+
+      if (error) throw error;
+      
+      // Refresh the data
+      await fetchPatients();
+      
+      // Show notification
+      const patient = patients.find(p => p.id === patientId);
+      if (patient) {
+        addNotification({
+          message: `${patient.first_name} ${patient.last_name} released from your queue`,
+          type: 'info',
+          duration: 3000
+        });
       }
-      return patient;
-    });
-    
-    setPatients(updatedPatients);
-    
-    // Show notification
-    const patient = patients.find(p => p.id === patientId);
-    if (patient) {
+    } catch (error) {
+      console.error('Error releasing patient assignment:', error);
       addNotification({
-        message: `${patient.first_name} ${patient.last_name} released from your queue`,
-        type: 'info',
-        duration: 3000
+        message: 'Failed to release patient',
+        type: 'error'
       });
     }
   };
   
-  const handleStartTriage = (patientId: string) => {
-    // Update the patient status to triage
-    const updatedPatients = patients.map(patient => {
-      if (patient.id === patientId) {
-        return {
-          ...patient,
+  const handleStartTriage = async (patientId: string) => {
+    if (!user?.id) return;
+    
+    try {
+      // Update the patient in the database
+      const { error } = await supabase
+        .from('patients')
+        .update({
           current_flow_step: 'triage',
-          assigned_to: user?.id,
+          assigned_to: user.id,
           last_updated: new Date().toISOString()
-        };
+        })
+        .eq('id', patientId);
+
+      if (error) throw error;
+      
+      // Refresh the data
+      await fetchPatients();
+      
+      // Show notification
+      const patient = patients.find(p => p.id === patientId);
+      if (patient) {
+        addNotification({
+          message: `Started triage for ${patient.first_name} ${patient.last_name}`,
+          type: 'success',
+          duration: 3000
+        });
       }
-      return patient;
-    });
-    
-    setPatients(updatedPatients);
-    
-    // Show notification
-    const patient = patients.find(p => p.id === patientId);
-    if (patient) {
+    } catch (error) {
+      console.error('Error starting triage:', error);
       addNotification({
-        message: `Started triage for ${patient.first_name} ${patient.last_name}`,
-        type: 'success',
-        duration: 3000
+        message: 'Failed to start triage',
+        type: 'error'
       });
     }
   };

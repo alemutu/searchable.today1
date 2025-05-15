@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, DollarSign, FileText, AlertTriangle, Plus, Layers, Clock, XCircle, CheckCircle, CreditCard, Building2, Smartphone } from 'lucide-react';
+import { Search, Filter, DollarSign, FileText, AlertTriangle, Plus, ArrowLeft, Clock, FileImage, ChevronDown, Layers, XCircle, CheckCircle, CreditCard, Building2, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../lib/store';
@@ -40,210 +40,60 @@ const BillingList: React.FC = () => {
   const [assignedToMe, setAssignedToMe] = useState(false);
 
   useEffect(() => {
-    const fetchBills = async () => {
-      if (!hospital?.id) return;
-
-      try {
-        // In a real app, we would fetch from Supabase
-        // For now, we'll use mock data
-        const mockBills = [
-          {
-            id: '00000000-0000-0000-0000-000000000001',
-            created_at: '2025-05-15T09:15:00Z',
-            patient: {
-              id: '00000000-0000-0000-0000-000000000001',
-              first_name: 'John',
-              last_name: 'Doe'
-            },
-            services: [
-              {
-                name: 'Consultation',
-                amount: 150,
-                quantity: 1
-              },
-              {
-                name: 'Blood Test',
-                amount: 75,
-                quantity: 1
-              }
-            ],
-            total_amount: 225,
-            paid_amount: 0,
-            payment_status: 'pending',
-            insurance_info: null,
-            last_updated: '2025-05-15T09:15:00Z'
-          },
-          {
-            id: '00000000-0000-0000-0000-000000000002',
-            created_at: '2025-05-15T10:30:00Z',
-            patient: {
-              id: '00000000-0000-0000-0000-000000000002',
-              first_name: 'Jane',
-              last_name: 'Smith'
-            },
-            services: [
-              {
-                name: 'Emergency Consultation',
-                amount: 250,
-                quantity: 1
-              },
-              {
-                name: 'X-Ray',
-                amount: 120,
-                quantity: 1
-              }
-            ],
-            total_amount: 370,
-            paid_amount: 370,
-            payment_status: 'paid',
-            insurance_info: null,
-            assigned_to: user?.id,
-            last_updated: '2025-05-15T10:30:00Z'
-          },
-          {
-            id: '00000000-0000-0000-0000-000000000003',
-            created_at: '2025-05-15T11:45:00Z',
-            patient: {
-              id: '00000000-0000-0000-0000-000000000003',
-              first_name: 'Robert',
-              last_name: 'Johnson'
-            },
-            services: [
-              {
-                name: 'Consultation',
-                amount: 150,
-                quantity: 1
-              },
-              {
-                name: 'Medication',
-                amount: 85,
-                quantity: 1
-              }
-            ],
-            total_amount: 235,
-            paid_amount: 0,
-            payment_status: 'insured',
-            insurance_info: {
-              provider: 'HealthPlus',
-              policy_number: 'HP12345678',
-              coverage_percentage: 80
-            },
-            last_updated: '2025-05-15T11:45:00Z'
-          },
-          {
-            id: '00000000-0000-0000-0000-000000000004',
-            created_at: '2025-05-15T12:15:00Z',
-            patient: {
-              id: '00000000-0000-0000-0000-000000000004',
-              first_name: 'Emily',
-              last_name: 'Williams'
-            },
-            services: [
-              {
-                name: 'Consultation',
-                amount: 150,
-                quantity: 1
-              }
-            ],
-            total_amount: 150,
-            paid_amount: 75,
-            payment_status: 'partial',
-            insurance_info: null,
-            assigned_to: '00000000-0000-0000-0000-000000000010', // Another billing staff
-            last_updated: '2025-05-15T12:15:00Z'
-          },
-          {
-            id: '00000000-0000-0000-0000-000000000005',
-            created_at: '2025-05-15T13:00:00Z',
-            patient: {
-              id: '00000000-0000-0000-0000-000000000005',
-              first_name: 'Michael',
-              last_name: 'Brown'
-            },
-            services: [
-              {
-                name: 'Consultation',
-                amount: 150,
-                quantity: 1
-              },
-              {
-                name: 'ECG',
-                amount: 100,
-                quantity: 1
-              }
-            ],
-            total_amount: 250,
-            paid_amount: 250,
-            payment_status: 'paid',
-            insurance_info: null,
-            assigned_to: user?.id,
-            last_updated: '2025-05-15T13:00:00Z'
-          },
-          {
-            id: '00000000-0000-0000-0000-000000000006',
-            created_at: '2025-05-15T13:30:00Z',
-            patient: {
-              id: '00000000-0000-0000-0000-000000000006',
-              first_name: 'Sarah',
-              last_name: 'Davis'
-            },
-            services: [
-              {
-                name: 'Emergency Consultation',
-                amount: 250,
-                quantity: 1
-              },
-              {
-                name: 'CT Scan',
-                amount: 350,
-                quantity: 1
-              }
-            ],
-            total_amount: 600,
-            paid_amount: 0,
-            payment_status: 'pending',
-            insurance_info: null,
-            last_updated: '2025-05-15T13:30:00Z'
-          }
-        ];
-        
-        setBills(mockBills);
-        
-        // Show notification for urgent bills
-        const urgentBills = mockBills.filter(bill => 
-          bill.payment_status === 'pending' && 
-          bill.services.some(service => service.name.includes('Emergency'))
-        );
-        
-        urgentBills.forEach(bill => {
-          // Create a unique key for this emergency
-          const emergencyKey = `bill-${bill.id}-${bill.patient.id}`;
-          
-          // Only show notification if we haven't already notified about this emergency
-          if (!hasNotifiedAbout(emergencyKey)) {
-            addNotification({
-              message: `Urgent: Process payment for ${bill.patient.first_name} ${bill.patient.last_name}`,
-              type: 'warning',
-              duration: 5000
-            });
-            
-            // Mark this emergency as notified
-            markAsNotified(emergencyKey);
-          }
-        });
-      } catch (error) {
-        console.error('Error fetching bills:', error);
-        addNotification({
-          message: 'Failed to load billing information',
-          type: 'error'
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchBills();
-  }, [hospital, addNotification, user?.id]);
+  }, [hospital]);
+
+  const fetchBills = async () => {
+    if (!hospital?.id) return;
+
+    try {
+      setIsLoading(true);
+      
+      const { data, error } = await supabase
+        .from('billing')
+        .select(`
+          *,
+          patient:patient_id(id, first_name, last_name)
+        `)
+        .eq('hospital_id', hospital.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      setBills(data || []);
+      
+      // Show notification for urgent bills
+      const urgentBills = data?.filter(bill => 
+        bill.payment_status === 'pending' && 
+        bill.services.some((service: any) => service.name.includes('Emergency'))
+      ) || [];
+      
+      urgentBills.forEach(bill => {
+        // Create a unique key for this emergency
+        const emergencyKey = `bill-${bill.id}-${bill.patient.id}`;
+        
+        // Only show notification if we haven't already notified about this emergency
+        if (!hasNotifiedAbout(emergencyKey)) {
+          addNotification({
+            message: `Urgent: Process payment for ${bill.patient.first_name} ${bill.patient.last_name}`,
+            type: 'warning',
+            duration: 5000
+          });
+          
+          // Mark this emergency as notified
+          markAsNotified(emergencyKey);
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching bills:', error);
+      addNotification({
+        message: 'Failed to load billing information',
+        type: 'error'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
   
   const getTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
@@ -261,81 +111,109 @@ const BillingList: React.FC = () => {
     return `${diffDays}d ago`;
   };
   
-  const handleAssignToMe = (billId: string) => {
-    // Update the bill to assign it to the current user
-    const updatedBills = bills.map(bill => {
-      if (bill.id === billId) {
-        return {
-          ...bill,
-          assigned_to: user?.id,
+  const handleAssignToMe = async (billId: string) => {
+    if (!user?.id) return;
+    
+    try {
+      // Update the bill in the database
+      const { error } = await supabase
+        .from('billing')
+        .update({
+          assigned_to: user.id,
           last_updated: new Date().toISOString()
-        };
+        })
+        .eq('id', billId);
+
+      if (error) throw error;
+      
+      // Refresh the data
+      await fetchBills();
+      
+      // Show notification
+      const bill = bills.find(b => b.id === billId);
+      if (bill) {
+        addNotification({
+          message: `Bill for ${bill.patient.first_name} ${bill.patient.last_name} assigned to you`,
+          type: 'success',
+          duration: 3000
+        });
       }
-      return bill;
-    });
-    
-    setBills(updatedBills);
-    
-    // Show notification
-    const bill = bills.find(b => b.id === billId);
-    if (bill) {
+    } catch (error) {
+      console.error('Error assigning bill:', error);
       addNotification({
-        message: `Bill for ${bill.patient.first_name} ${bill.patient.last_name} assigned to you`,
-        type: 'success',
-        duration: 3000
+        message: 'Failed to assign bill',
+        type: 'error'
       });
     }
   };
 
-  const handleReleaseAssignment = (billId: string) => {
-    // Update the bill to unassign it
-    const updatedBills = bills.map(bill => {
-      if (bill.id === billId) {
-        return {
-          ...bill,
+  const handleReleaseAssignment = async (billId: string) => {
+    try {
+      // Update the bill in the database
+      const { error } = await supabase
+        .from('billing')
+        .update({
           assigned_to: null,
           last_updated: new Date().toISOString()
-        };
+        })
+        .eq('id', billId);
+
+      if (error) throw error;
+      
+      // Refresh the data
+      await fetchBills();
+      
+      // Show notification
+      const bill = bills.find(b => b.id === billId);
+      if (bill) {
+        addNotification({
+          message: `Bill for ${bill.patient.first_name} ${bill.patient.last_name} released from your queue`,
+          type: 'info',
+          duration: 3000
+        });
       }
-      return bill;
-    });
-    
-    setBills(updatedBills);
-    
-    // Show notification
-    const bill = bills.find(b => b.id === billId);
-    if (bill) {
+    } catch (error) {
+      console.error('Error releasing bill assignment:', error);
       addNotification({
-        message: `Bill for ${bill.patient.first_name} ${bill.patient.last_name} released from your queue`,
-        type: 'info',
-        duration: 3000
+        message: 'Failed to release bill',
+        type: 'error'
       });
     }
   };
   
-  const handleProcessBill = (billId: string) => {
-    // Update the bill status to processing
-    const updatedBills = bills.map(bill => {
-      if (bill.id === billId) {
-        return {
-          ...bill,
+  const handleProcessBill = async (billId: string) => {
+    if (!user?.id) return;
+    
+    try {
+      // Update the bill status to processing
+      const { error } = await supabase
+        .from('billing')
+        .update({
           payment_status: 'processing',
-          assigned_to: user?.id,
+          assigned_to: user.id,
           last_updated: new Date().toISOString()
-        };
+        })
+        .eq('id', billId);
+
+      if (error) throw error;
+      
+      // Refresh the data
+      await fetchBills();
+      
+      // Show notification
+      const bill = bills.find(b => b.id === billId);
+      if (bill) {
+        addNotification({
+          message: `Started processing bill for ${bill.patient.first_name} ${bill.patient.last_name}`,
+          type: 'success',
+          duration: 3000
+        });
       }
-      return bill;
-    });
-    
-    setBills(updatedBills);
-    
-    // Show notification
-    const bill = bills.find(b => b.id === billId);
-    if (bill) {
+    } catch (error) {
+      console.error('Error processing bill:', error);
       addNotification({
-        message: `Started processing bill for ${bill.patient.first_name} ${bill.patient.last_name}`,
-        type: 'success',
-        duration: 3000
+        message: 'Failed to process bill',
+        type: 'error'
       });
     }
   };
@@ -387,16 +265,26 @@ const BillingList: React.FC = () => {
   const insuredCount = bills.filter(b => b.payment_status === 'insured').length;
   const assignedToMeCount = bills.filter(b => b.assigned_to === user?.id).length;
 
+  if (isLoading) {
+    return (
+      <div className="flex justify-center p-6">
+        <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-3">
-      <div className="flex justify-between items-center">
-        <h1 className="text-xl font-bold text-gray-900">Billing</h1>
-        <Link to="/billing/new" className="btn btn-primary inline-flex items-center text-sm py-1.5 px-3">
-          <Plus className="h-4 w-4 mr-1.5" />
-          New Invoice
+      <div className="flex items-center space-x-2">
+        <Link to="/dashboard" className="text-gray-500 hover:text-gray-700">
+          <ArrowLeft className="w-4 h-4" />
         </Link>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Billing</h1>
+          <p className="text-xs text-gray-500">Payment Processing & Management</p>
+        </div>
       </div>
-      
+
       <div className="flex space-x-2">
         <div 
           className={`flex-1 rounded-lg p-2.5 flex items-center space-x-2 cursor-pointer ${
@@ -428,7 +316,7 @@ const BillingList: React.FC = () => {
           </span>
         </div>
       </div>
-      
+
       <div className="flex items-center space-x-2">
         <div className="relative flex-grow">
           <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
@@ -473,11 +361,11 @@ const BillingList: React.FC = () => {
           </label>
         </div>
       </div>
-      
+
       <div className="flex space-x-3">
         {/* Left Section - Bills List */}
         <div className="w-2/3">
-          <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="bg-white rounded-lg shadow-sm">
             {filteredBills.length === 0 ? (
               <div className="p-6 text-center">
                 <div className="mx-auto w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center mb-3">

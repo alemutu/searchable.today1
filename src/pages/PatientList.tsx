@@ -28,9 +28,11 @@ const PatientList: React.FC = () => {
   }, [hospital]);
   
   const fetchPatients = async () => {
-    if (!hospital) return;
+    if (!hospital?.id) return;
     
     try {
+      setIsLoading(true);
+      
       const { data, error } = await supabase
         .from('patients')
         .select('*')
@@ -45,9 +47,9 @@ const PatientList: React.FC = () => {
       setIsLoading(false);
     }
   };
-
+  
   const searchPatients = async () => {
-    if (!searchTerm || !hospital) return;
+    if (!searchTerm || !hospital?.id) return;
     
     try {
       setIsLoading(true);
@@ -55,7 +57,8 @@ const PatientList: React.FC = () => {
       // Use the search_patients function if the search term is complex
       if (searchTerm.length > 2) {
         const { data, error } = await supabase.rpc('search_patients', {
-          search_term: searchTerm
+          search_term: searchTerm,
+          hospital_id: hospital.id
         });
         
         if (error) throw error;
@@ -87,17 +90,17 @@ const PatientList: React.FC = () => {
   const getFlowStepColor = (step: string | null) => {
     switch (step) {
       case 'registration':
-        return 'bg-gray-100 text-gray-800';
+        return 'bg-blue-100 text-blue-800';
       case 'triage':
-        return 'bg-warning-100 text-warning-800';
+        return 'bg-yellow-100 text-yellow-800';
       case 'waiting_consultation':
-        return 'bg-primary-100 text-primary-800';
+        return 'bg-indigo-100 text-indigo-800';
       case 'consultation':
-        return 'bg-secondary-100 text-secondary-800';
+        return 'bg-purple-100 text-purple-800';
       case 'emergency':
-        return 'bg-error-100 text-error-800';
-      case 'post_consultation':
-        return 'bg-success-100 text-success-800';
+        return 'bg-red-100 text-red-800';
+      case 'completed':
+        return 'bg-gray-100 text-gray-800';
       default:
         return 'bg-gray-100 text-gray-800';
     }
@@ -245,7 +248,7 @@ const PatientList: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear()} years
+                        {calculateAge(patient.date_of_birth)} years
                       </div>
                       <div className="text-sm text-gray-500">{patient.gender}</div>
                     </td>

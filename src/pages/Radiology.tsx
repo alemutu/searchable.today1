@@ -46,134 +46,27 @@ const Radiology: React.FC = () => {
   }, [hospital]);
 
   const fetchRadiologyResults = async () => {
+    if (!hospital?.id) return;
+    
     try {
-      // In a real app, we would fetch from Supabase
-      // For now, we'll use mock data
-      const mockResults = [
-        {
-          id: '00000000-0000-0000-0000-000000000001',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000001',
-            first_name: 'John',
-            last_name: 'Doe'
-          },
-          scan_type: 'x_ray',
-          scan_date: '2025-05-15',
-          status: 'pending',
-          results: null,
-          reviewed_by: null,
-          is_emergency: false,
-          workflow_stage: 'pending',
-          last_updated: '2025-05-15T09:15:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000002',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000002',
-            first_name: 'Jane',
-            last_name: 'Smith'
-          },
-          scan_type: 'ct_scan',
-          scan_date: '2025-05-15',
-          status: 'in_progress',
-          results: null,
-          reviewed_by: null,
-          is_emergency: true,
-          workflow_stage: 'in_progress',
-          scan_info: {
-            scan_id: 'RAD-20250515-1234',
-            scan_time: '2025-05-15T10:30:00Z',
-            equipment_used: 'ct_scanner'
-          },
-          assigned_to: user?.id,
-          last_updated: '2025-05-15T10:35:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000003',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000003',
-            first_name: 'Robert',
-            last_name: 'Johnson'
-          },
-          scan_type: 'mri',
-          scan_date: '2025-05-14',
-          status: 'pending',
-          results: null,
-          reviewed_by: null,
-          is_emergency: false,
-          workflow_stage: 'pending',
-          assigned_to: '00000000-0000-0000-0000-000000000010', // Another technician
-          last_updated: '2025-05-14T15:00:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000004',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000004',
-            first_name: 'Emily',
-            last_name: 'Williams'
-          },
-          scan_type: 'ultrasound',
-          scan_date: '2025-05-14',
-          status: 'in_progress',
-          results: null,
-          reviewed_by: null,
-          is_emergency: false,
-          workflow_stage: 'in_progress',
-          scan_info: {
-            scan_id: 'RAD-20250514-5678',
-            scan_time: '2025-05-14T15:45:00Z',
-            equipment_used: 'ultrasound_machine'
-          },
-          assigned_to: user?.id,
-          last_updated: '2025-05-14T16:00:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000005',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000005',
-            first_name: 'Michael',
-            last_name: 'Brown'
-          },
-          scan_type: 'mammogram',
-          scan_date: '2025-05-15',
-          status: 'completed',
-          results: { findings: 'Normal study' },
-          reviewed_by: {
-            first_name: 'Doctor',
-            last_name: 'Smith'
-          },
-          is_emergency: false,
-          workflow_stage: 'completed',
-          scan_info: {
-            scan_id: 'RAD-20250515-9012',
-            scan_time: '2025-05-15T09:15:00Z',
-            equipment_used: 'mammography_unit'
-          },
-          assigned_to: user?.id,
-          last_updated: '2025-05-15T10:15:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000006',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000006',
-            first_name: 'Sarah',
-            last_name: 'Davis'
-          },
-          scan_type: 'x_ray',
-          scan_date: '2025-05-15',
-          status: 'pending',
-          results: null,
-          reviewed_by: null,
-          is_emergency: true,
-          workflow_stage: 'pending',
-          last_updated: '2025-05-15T11:00:00Z'
-        }
-      ];
+      setIsLoading(true);
       
-      setRadiologyResults(mockResults);
+      const { data, error } = await supabase
+        .from('radiology_results')
+        .select(`
+          *,
+          patient:patient_id(id, first_name, last_name),
+          reviewed_by:reviewed_by(first_name, last_name)
+        `)
+        .eq('hospital_id', hospital.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      
+      setRadiologyResults(data || []);
       
       // Show notification for emergency cases
-      const emergencyCases = mockResults.filter(result => result.is_emergency && (result.status === 'pending' || result.status === 'in_progress'));
+      const emergencyCases = data?.filter(result => result.is_emergency && (result.status === 'pending' || result.status === 'in_progress')) || [];
       
       emergencyCases.forEach(emergency => {
         // Create a unique key for this emergency
@@ -285,93 +178,136 @@ const Radiology: React.FC = () => {
   const assignedToMeCount = radiologyResults.filter(r => r.assigned_to === user?.id).length;
 
   const handleStartScan = async (scanId: string) => {
-    // Update the scan status to in_progress
-    const updatedResults = radiologyResults.map(result => {
-      if (result.id === scanId) {
-        return {
-          ...result,
+    if (!user?.id || !hospital?.id) return;
+    
+    try {
+      // Generate a scan ID
+      const date = new Date();
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const random = Math.floor(1000 + Math.random() * 9000);
+      const scanIdStr = `RAD-${year}${month}${day}-${random}`;
+      
+      // Get the scan to determine appropriate equipment
+      const scan = radiologyResults.find(r => r.id === scanId);
+      const equipmentUsed = scan?.scan_type === 'x_ray' ? 'x_ray_machine' : 
+                           scan?.scan_type === 'ct_scan' ? 'ct_scanner' :
+                           scan?.scan_type === 'mri' ? 'mri_scanner' :
+                           scan?.scan_type === 'ultrasound' ? 'ultrasound_machine' :
+                           scan?.scan_type === 'mammogram' ? 'mammography_unit' :
+                           scan?.scan_type === 'pet_scan' ? 'pet_scanner' :
+                           scan?.scan_type === 'dexa_scan' ? 'dexa_scanner' :
+                           'fluoroscopy_unit';
+      
+      // Update the scan in the database
+      const { error } = await supabase
+        .from('radiology_results')
+        .update({
           status: 'in_progress',
           workflow_stage: 'in_progress',
-          assigned_to: user?.id,
+          assigned_to: user.id,
           scan_info: {
-            scan_id: `RAD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
+            scan_id: scanIdStr,
             scan_time: new Date().toISOString(),
-            equipment_used: result.scan_type === 'x_ray' ? 'x_ray_machine' : 
-                           result.scan_type === 'ct_scan' ? 'ct_scanner' :
-                           result.scan_type === 'mri' ? 'mri_scanner' :
-                           result.scan_type === 'ultrasound' ? 'ultrasound_machine' :
-                           result.scan_type === 'mammogram' ? 'mammography_unit' :
-                           result.scan_type === 'pet_scan' ? 'pet_scanner' :
-                           result.scan_type === 'dexa_scan' ? 'dexa_scanner' :
-                           'fluoroscopy_unit'
+            equipment_used: equipmentUsed
           },
           last_updated: new Date().toISOString()
-        };
+        })
+        .eq('id', scanId);
+
+      if (error) throw error;
+      
+      // Refresh the data
+      await fetchRadiologyResults();
+      
+      // Navigate to the scan processing form
+      navigate(`/radiology/process/${scanId}`);
+      
+      // Show notification
+      const scan = radiologyResults.find(r => r.id === scanId);
+      if (scan) {
+        addNotification({
+          message: `Scan started for ${scan.patient.first_name} ${scan.patient.last_name}`,
+          type: 'success',
+          duration: 3000
+        });
       }
-      return result;
-    });
-    
-    setRadiologyResults(updatedResults);
-    
-    // Show notification
-    addNotification({
-      message: `Scan started for ${updatedResults.find(r => r.id === scanId)?.patient.first_name} ${updatedResults.find(r => r.id === scanId)?.patient.last_name}`,
-      type: 'success',
-      duration: 3000
-    });
-    
-    // Navigate to the scan processing form
-    navigate(`/radiology/process/${scanId}`);
+    } catch (error) {
+      console.error('Error starting scan:', error);
+      addNotification({
+        message: 'Failed to start scan',
+        type: 'error'
+      });
+    }
   };
 
   const handleProcessScan = (scanId: string) => {
     navigate(`/radiology/process/${scanId}`);
   };
 
-  const handleAssignToMe = (scanId: string) => {
-    // Update the scan to assign it to the current user
-    const updatedResults = radiologyResults.map(result => {
-      if (result.id === scanId) {
-        return {
-          ...result,
-          assigned_to: user?.id,
+  const handleAssignToMe = async (scanId: string) => {
+    if (!user?.id) return;
+    
+    try {
+      // Update the scan in the database
+      const { error } = await supabase
+        .from('radiology_results')
+        .update({
+          assigned_to: user.id,
           last_updated: new Date().toISOString()
-        };
-      }
-      return result;
-    });
-    
-    setRadiologyResults(updatedResults);
-    
-    // Show notification
-    addNotification({
-      message: `Scan assigned to you`,
-      type: 'success',
-      duration: 3000
-    });
+        })
+        .eq('id', scanId);
+
+      if (error) throw error;
+      
+      // Refresh the data
+      await fetchRadiologyResults();
+      
+      // Show notification
+      addNotification({
+        message: 'Scan assigned to you',
+        type: 'success',
+        duration: 3000
+      });
+    } catch (error) {
+      console.error('Error assigning scan:', error);
+      addNotification({
+        message: 'Failed to assign scan',
+        type: 'error'
+      });
+    }
   };
 
-  const handleReleaseAssignment = (scanId: string) => {
-    // Update the scan to unassign it
-    const updatedResults = radiologyResults.map(result => {
-      if (result.id === scanId) {
-        return {
-          ...result,
+  const handleReleaseAssignment = async (scanId: string) => {
+    try {
+      // Update the scan in the database
+      const { error } = await supabase
+        .from('radiology_results')
+        .update({
           assigned_to: null,
           last_updated: new Date().toISOString()
-        };
-      }
-      return result;
-    });
-    
-    setRadiologyResults(updatedResults);
-    
-    // Show notification
-    addNotification({
-      message: `Scan released from your queue`,
-      type: 'info',
-      duration: 3000
-    });
+        })
+        .eq('id', scanId);
+
+      if (error) throw error;
+      
+      // Refresh the data
+      await fetchRadiologyResults();
+      
+      // Show notification
+      addNotification({
+        message: 'Scan released from your queue',
+        type: 'info',
+        duration: 3000
+      });
+    } catch (error) {
+      console.error('Error releasing scan assignment:', error);
+      addNotification({
+        message: 'Failed to release scan',
+        type: 'error'
+      });
+    }
   };
 
   if (isLoading) {
