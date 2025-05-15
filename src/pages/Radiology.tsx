@@ -190,14 +190,14 @@ const Radiology: React.FC = () => {
       const scanIdStr = `RAD-${year}${month}${day}-${random}`;
       
       // Get the scan to determine appropriate equipment
-      const scan = radiologyResults.find(r => r.id === scanId);
-      const equipmentUsed = scan?.scan_type === 'x_ray' ? 'x_ray_machine' : 
-                           scan?.scan_type === 'ct_scan' ? 'ct_scanner' :
-                           scan?.scan_type === 'mri' ? 'mri_scanner' :
-                           scan?.scan_type === 'ultrasound' ? 'ultrasound_machine' :
-                           scan?.scan_type === 'mammogram' ? 'mammography_unit' :
-                           scan?.scan_type === 'pet_scan' ? 'pet_scanner' :
-                           scan?.scan_type === 'dexa_scan' ? 'dexa_scanner' :
+      const currentScan = radiologyResults.find(r => r.id === scanId);
+      const equipmentUsed = currentScan?.scan_type === 'x_ray' ? 'x_ray_machine' : 
+                           currentScan?.scan_type === 'ct_scan' ? 'ct_scanner' :
+                           currentScan?.scan_type === 'mri' ? 'mri_scanner' :
+                           currentScan?.scan_type === 'ultrasound' ? 'ultrasound_machine' :
+                           currentScan?.scan_type === 'mammogram' ? 'mammography_unit' :
+                           currentScan?.scan_type === 'pet_scan' ? 'pet_scanner' :
+                           currentScan?.scan_type === 'dexa_scan' ? 'dexa_scanner' :
                            'fluoroscopy_unit';
       
       // Update the scan in the database
@@ -225,10 +225,10 @@ const Radiology: React.FC = () => {
       navigate(`/radiology/process/${scanId}`);
       
       // Show notification
-      const scan = radiologyResults.find(r => r.id === scanId);
-      if (scan) {
+      const scanned = radiologyResults.find(r => r.id === scanId);
+      if (scanned) {
         addNotification({
-          message: `Scan started for ${scan.patient.first_name} ${scan.patient.last_name}`,
+          message: `Scan started for ${scanned.patient.first_name} ${scanned.patient.last_name}`,
           type: 'success',
           duration: 3000
         });
