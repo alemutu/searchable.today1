@@ -19,10 +19,13 @@ const supabaseAdmin = createClient(
   {
     auth: {
       autoRefreshToken: false,
-      persistSession: false
+      persistSession: false,
+      detectSessionInUrl: false
     },
-    db: {
-      schema: 'public'
+    global: {
+      headers: {
+        'X-Client-Info': 'hospital-onboarding-function'
+      }
     }
   }
 );
@@ -202,6 +205,21 @@ app.post('/hospitals', async (req, res) => {
 
     if (departmentsError) {
       console.error('Error creating default departments:', departmentsError);
+      // Non-critical error, continue
+    }
+
+    // Create hospital user mapping
+    const { error: hospitalUserError } = await supabaseAdmin
+      .from('hospital_users')
+      .insert([{
+        hospital_id: hospital.id,
+        user_id: user.id,
+        role: 'admin',
+        is_active: true
+      }]);
+
+    if (hospitalUserError) {
+      console.error('Error creating hospital user mapping:', hospitalUserError);
       // Non-critical error, continue
     }
 
