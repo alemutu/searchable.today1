@@ -240,6 +240,13 @@ const Laboratory: React.FC = () => {
     if (!user?.id || !hospital?.id) return;
     
     try {
+      // Get the test to determine appropriate sample type
+      const testResult = labResults.find(r => r.id === testId);
+      const sampleType = testResult?.test_type === 'urinalysis' ? 'urine' : 'blood';
+      const containerType = testResult?.test_type === 'urinalysis' ? 'urine_container' : 
+                           testResult?.test_type === 'complete_blood_count' ? 'purple_top_tube' :
+                           testResult?.test_type === 'blood_glucose' ? 'gray_top_tube' : 'red_top_tube';
+      
       // Generate a sample ID
       const date = new Date();
       const year = date.getFullYear();
@@ -247,13 +254,6 @@ const Laboratory: React.FC = () => {
       const day = String(date.getDate()).padStart(2, '0');
       const random = Math.floor(1000 + Math.random() * 9000);
       const sampleId = `LAB-${year}${month}${day}-${random}`;
-      
-      // Get the test to determine appropriate sample type
-      const test = labResults.find(r => r.id === testId);
-      const sampleType = test?.test_type === 'urinalysis' ? 'urine' : 'blood';
-      const containerType = test?.test_type === 'urinalysis' ? 'urine_container' : 
-                           test?.test_type === 'complete_blood_count' ? 'purple_top_tube' :
-                           test?.test_type === 'blood_glucose' ? 'gray_top_tube' : 'red_top_tube';
       
       // Update the test in the database
       const { error } = await supabase
@@ -278,10 +278,9 @@ const Laboratory: React.FC = () => {
       await fetchLabResults();
       
       // Show notification
-      const test = labResults.find(r => r.id === testId);
-      if (test) {
+      if (testResult) {
         addNotification({
-          message: `Sample collection started for ${test.patient.first_name} ${test.patient.last_name}`,
+          message: `Sample collection started for ${testResult.patient.first_name} ${testResult.patient.last_name}`,
           type: 'success',
           duration: 3000
         });
@@ -696,7 +695,7 @@ const Laboratory: React.FC = () => {
                                   </>
                                 ) : (
                                   <button 
-                                    onClick={() => handleAssignToMe(result.id)}
+                                    onClick={() => handleAssignToMe(result.i)}
                                     className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
                                     title="Take over this test"
                                   >
