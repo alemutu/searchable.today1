@@ -38,7 +38,7 @@ app.use(express.json());
 
 // Handle CORS preflight requests
 app.options('*', (req, res) => {
-  res.set(corsHeaders).status(204).send();
+  return res.set(corsHeaders).status(204).send();
 });
 
 // Add CORS middleware
@@ -232,14 +232,14 @@ app.post('/hospitals', async (req, res) => {
       console.log('Would send email to:', adminSetup.email || hospitalProfile.email);
     }
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       hospital: hospital,
       message: 'Hospital created successfully'
     });
   } catch (error) {
     console.error('Error in hospital onboarding:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -255,10 +255,10 @@ app.get('/check-subdomain/:subdomain', async (req, res) => {
 
     if (error) throw error;
     
-    res.json({ available: !data });
+    return res.json({ available: !data });
   } catch (error) {
     console.error('Error checking subdomain:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -271,10 +271,10 @@ app.get('/hospitals', async (req, res) => {
       .order('name');
 
     if (error) throw error;
-    res.json(data);
+    return res.json(data);
   } catch (error) {
     console.error('Error fetching hospitals:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -308,10 +308,10 @@ app.get('/hospitals/:id', async (req, res) => {
       .single();
 
     if (error) throw error;
-    res.json(data);
+    return res.json(data);
   } catch (error) {
     console.error('Error fetching hospital:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 

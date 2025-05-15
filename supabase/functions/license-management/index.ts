@@ -28,7 +28,7 @@ app.use(express.json());
 
 // Handle CORS preflight requests
 app.options('*', (req, res) => {
-  res.set(corsHeaders).status(204).send();
+  return res.set(corsHeaders).status(204).send();
 });
 
 // Add CORS middleware
@@ -51,10 +51,10 @@ app.get('/licenses', async (req, res) => {
 
     if (error) throw error;
 
-    res.json(data);
+    return res.json(data);
   } catch (error) {
     console.error('Error fetching licenses:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -98,10 +98,10 @@ app.post('/licenses', async (req, res) => {
 
     if (error) throw error;
 
-    res.status(201).json(data);
+    return res.status(201).json(data);
   } catch (error) {
     console.error('Error creating license:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -124,10 +124,10 @@ app.put('/licenses/:id/status', async (req, res) => {
 
     if (error) throw error;
 
-    res.json(data);
+    return res.json(data);
   } catch (error) {
     console.error('Error updating license status:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
@@ -152,10 +152,10 @@ app.get('/metrics', async (req, res) => {
       }).length
     };
 
-    res.json(metrics);
+    return res.json(metrics);
   } catch (error) {
     console.error('Error fetching metrics:', error);
-    res.status(500).json({ error: error.message });
+    return res.status(500).json({ error: error.message });
   }
 });
 
