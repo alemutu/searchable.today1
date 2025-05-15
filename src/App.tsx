@@ -53,6 +53,7 @@ import { OfflineIndicator } from './components/common/OfflineIndicator';
 import NotificationToast from './components/common/NotificationToast';
 import HospitalOnboarding from './pages/HospitalOnboarding';
 import Reports from './pages/Reports';
+import PasswordChange from './pages/PasswordChange';
 
 // Import department pages
 import GeneralMedicine from './pages/departments/GeneralMedicine';
@@ -106,6 +107,69 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
   return <>{children}</>;
 };
 
+const FirstLoginCheck: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isLoading } = useAuthStore();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isFirstLogin, setIsFirstLogin] = useState<boolean | null>(null);
+  const [isChecking, setIsChecking] = useState(true);
+  
+  useEffect(() => {
+    const checkFirstLogin = async () => {
+      if (!user) {
+        setIsChecking(false);
+        return;
+      }
+      
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('first_login')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) throw error;
+        
+        // If first_login is true or null (not set yet), consider it a first login
+        const firstLogin = data?.first_login !== false;
+        setIsFirstLogin(firstLogin);
+        
+        // If it's first login and not already on the password change page, redirect
+        if (firstLogin && location.pathname !== '/change-password') {
+          navigate('/change-password', { state: { from: location } });
+        }
+      } catch (error) {
+        console.error('Error checking first login status:', error);
+        // Default to false if there's an error
+        setIsFirstLogin(false);
+      } finally {
+        setIsChecking(false);
+      }
+    };
+    
+    if (!isLoading) {
+      checkFirstLogin();
+    }
+  }, [user, isLoading, navigate, location]);
+  
+  // If still checking or loading, show loading spinner
+  if (isLoading || isChecking) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+  
+  // If it's first login and not on password change page, don't render children
+  if (isFirstLogin && location.pathname !== '/change-password') {
+    return null;
+  }
+  
+  // Otherwise, render children
+  return <>{children}</>;
+};
+
 const App: React.FC = () => {
   const { initialize } = useAuthStore();
 
@@ -119,6 +183,7 @@ const App: React.FC = () => {
         <Route path="/login" element={<LoginForm />} />
         <Route path="/admin-login" element={<AdminLoginForm />} />
         <Route path="/register" element={<RegisterForm />} />
+        <Route path="/change-password" element={<PasswordChange />} />
         
         {/* Super Admin Routes */}
         <Route path="/super-admin" element={
@@ -139,7 +204,9 @@ const App: React.FC = () => {
         {/* Regular User Routes */}
         <Route path="/" element={
           <ProtectedRoute requiredRole="non_super_admin">
-            <DashboardLayout />
+            <FirstLoginCheck>
+              <DashboardLayout />
+            </FirstLoginCheck>
           </ProtectedRoute>
         }>
           <Route index element={<Navigate to="/dashboard" replace />} />

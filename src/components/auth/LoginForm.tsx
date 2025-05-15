@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
-import { Activity, WifiOff } from 'lucide-react';
+import { Activity, WifiOff, Eye, EyeOff } from 'lucide-react';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
 import { isValidEmail, isStrongPassword } from '../../lib/security';
 import { generateCsrfToken, storeCsrfToken } from '../../lib/security';
@@ -24,6 +24,7 @@ const LoginForm: React.FC = () => {
   const [loginAttempts, setLoginAttempts] = useState<number>(0);
   const [lockoutUntil, setLockoutUntil] = useState<Date | null>(null);
   const [resetEmailSent, setResetEmailSent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   
   // Check if user is already logged in and redirect accordingly
   useEffect(() => {
@@ -61,7 +62,7 @@ const LoginForm: React.FC = () => {
   const handlePasswordReset = async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
+        redirectTo: `${window.location.origin}/change-password`,
       });
       
       if (error) {
@@ -71,6 +72,7 @@ const LoginForm: React.FC = () => {
       setResetEmailSent(true);
     } catch (error: any) {
       console.error('Password reset error:', error.message);
+      setRoleError(`Error sending password reset: ${error.message}`);
     }
   };
   
@@ -205,15 +207,28 @@ const LoginForm: React.FC = () => {
               <label htmlFor="password" className="form-label">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                {...register('password', { 
-                  required: 'Password is required'
-                })}
-                className={`form-input ${errors.password ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  {...register('password', { 
+                    required: 'Password is required'
+                  })}
+                  className={`form-input pr-10 ${errors.password ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" />
+                  )}
+                </button>
+              </div>
               {errors.password && (
                 <p className="form-error">{errors.password.message}</p>
               )}

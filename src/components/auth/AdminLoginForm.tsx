@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
-import { Activity, WifiOff, Shield } from 'lucide-react';
+import { Activity, WifiOff, Shield, Eye, EyeOff } from 'lucide-react';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
 import { isValidEmail, generateCsrfToken, storeCsrfToken } from '../../lib/security';
+import { supabase } from '../../lib/supabase';
 
 interface AdminLoginFormData {
   email: string;
@@ -21,6 +22,8 @@ const AdminLoginForm: React.FC = () => {
   const [roleError, setRoleError] = useState<string | null>(null);
   const [loginAttempts, setLoginAttempts] = useState<number>(0);
   const [lockoutUntil, setLockoutUntil] = useState<Date | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  const [resetEmailSent, setResetEmailSent] = useState(false);
   
   // Check if user is already logged in and redirect accordingly
   useEffect(() => {
@@ -50,6 +53,23 @@ const AdminLoginForm: React.FC = () => {
     const csrfToken = generateCsrfToken();
     storeCsrfToken(csrfToken);
   }, [navigate]);
+  
+  const handlePasswordReset = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/change-password`,
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      setResetEmailSent(true);
+    } catch (error: any) {
+      console.error('Password reset error:', error.message);
+      setRoleError(`Error sending password reset: ${error.message}`);
+    }
+  };
   
   const onSubmit = async (data: AdminLoginFormData) => {
     if (isOffline) {
@@ -127,7 +147,7 @@ const AdminLoginForm: React.FC = () => {
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {error && (
             <div className="bg-error-50 border border-error-200 text-error-700 px-4 py-3 rounded-md">
-              {error}
+              The email or password you entered is incorrect. Please try again or reset your password.
             </div>
           )}
           
@@ -148,6 +168,12 @@ const AdminLoginForm: React.FC = () => {
             <div className="bg-warning-50 border border-warning-200 text-warning-700 px-4 py-3 rounded-md flex items-center">
               <WifiOff className="h-5 w-5 mr-2 text-warning-500" />
               You are currently offline. Login requires an internet connection.
+            </div>
+          )}
+          
+          {resetEmailSent && (
+            <div className="bg-success-50 border border-success-200 text-success-700 px-4 py-3 rounded-md">
+              Password reset instructions have been sent to your email address.
             </div>
           )}
           
@@ -178,15 +204,28 @@ const AdminLoginForm: React.FC = () => {
               <label htmlFor="password" className="form-label">
                 Password
               </label>
-              <input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                {...register('password', { 
-                  required: 'Password is required'
-                })}
-                className={`form-input ${errors.password ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
+                  {...register('password', { 
+                    required: 'Password is required'
+                  })}
+                  className={`form-input pr-10 ${errors.password ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" />
+                  )}
+                </button>
+              </div>
               {errors.password && (
                 <p className="form-error">{errors.password.message}</p>
               )}
@@ -207,9 +246,20 @@ const AdminLoginForm: React.FC = () => {
             </div>
 
             <div className="text-sm">
-              <a href="#" className="font-medium text-primary-600 hover:text-primary-500">
+              <button
+                type="button"
+                onClick={() => {
+                  const email = (document.getElementById('email') as HTMLInputElement)?.value;
+                  if (email && isValidEmail(email)) {
+                    handlePasswordReset(email);
+                  } else {
+                    setRoleError("Please enter a valid email address to reset your password.");
+                  }
+                }}
+                className="font-medium text-primary-600 hover:text-primary-500"
+              >
                 Forgot your password?
-              </a>
+              </button>
             </div>
           </div>
 
