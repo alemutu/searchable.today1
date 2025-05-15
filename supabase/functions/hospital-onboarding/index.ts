@@ -12,10 +12,16 @@ const corsHeaders = {
   'Content-Type': 'application/json'
 };
 
-// Initialize Supabase client
+// Initialize Supabase client with service role key to bypass RLS
 const supabaseClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
 );
 
 // Middleware to parse JSON bodies
@@ -65,7 +71,7 @@ app.post('/hospitals', async (req, res) => {
       return res.status(500).json({ error: hospitalError.message });
     }
 
-    // 2. Create admin user
+    // 2. Create admin user with service role permissions
     const { data: user, error: userError } = await supabaseClient.auth.admin.createUser({
       email: hospitalProfile.email,
       password: adminSetup.password,
