@@ -66,7 +66,7 @@ const SuperAdminDashboard: React.FC = () => {
 
       if (hospitalsError) {
         console.error('Error fetching hospitals:', hospitalsError);
-        return; // Early return on error
+        return false; // Early return on error
       }
 
       setHospitals(hospitalsData || []);
@@ -89,7 +89,7 @@ const SuperAdminDashboard: React.FC = () => {
 
       if (settingsError) {
         console.error('Error fetching system settings:', settingsError);
-        return; // Early return on error
+        return false; // Early return on error
       }
 
       setSettings(settingsData || []);

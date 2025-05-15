@@ -172,8 +172,21 @@ serve(async (req: Request) => {
       )
     }
 
-    // If no route matches
-    throw new Error('Not Found')
+    // If no route matches, return 404
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: 'Not Found',
+      }),
+      {
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+        status: 404,
+      }
+    )
+
   } catch (error) {
     return new Response(
       JSON.stringify({
