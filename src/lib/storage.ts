@@ -41,11 +41,6 @@ const isOnline = (): boolean => {
   return navigator.onLine;
 };
 
-// Generate a cache key
-const generateCacheKey = (table: string, id?: string): string => {
-  return `${table}_${id || 'new'}_${Date.now()}`;
-};
-
 // Add operation to queue
 const addToQueue = (operation: Omit<StorageOperation, 'id'>): void => {
   const operationWithId = {
@@ -70,15 +65,9 @@ export const processQueue = async (): Promise<void> => {
   for (const op of operations) {
     try {
       if (op.type === 'insert') {
-        await client.from(op.table).insert({
-          ...op.data,
-          key: generateCacheKey(op.table, op.id)
-        });
+        await client.from(op.table).insert(op.data);
       } else if (op.type === 'update' && op.id) {
-        await client.from(op.table).update({
-          ...op.data,
-          key: generateCacheKey(op.table, op.id)
-        }).eq('id', op.id);
+        await client.from(op.table).update(op.data).eq('id', op.id);
       } else if (op.type === 'delete' && op.id) {
         await client.from(op.table).delete().eq('id', op.id);
       }
@@ -134,16 +123,12 @@ export const saveData = async <T extends object>(
   if (isOnline()) {
     try {
       const client = getClient();
-      const dataWithKey = {
-        ...sanitizedData,
-        key: generateCacheKey(table, id)
-      };
       
       if (id) {
         // Update existing record
         const { error } = await client
           .from(table)
-          .update(dataWithKey)
+          .update(sanitizedData)
           .eq('id', id);
           
         if (error) throw error;
@@ -151,7 +136,7 @@ export const saveData = async <T extends object>(
         // Insert new record
         const { error } = await client
           .from(table)
-          .insert(dataWithKey);
+          .insert(sanitizedData);
           
         if (error) throw error;
       }
@@ -417,10 +402,7 @@ export const syncAllData = async (): Promise<void> => {
           if (id && id !== 'new') {
             try {
               const item = JSON.parse(localStorage.getItem(key) || '{}');
-              localItems.push({
-                ...item,
-                key: generateCacheKey(table, id)
-              });
+              localItems.push(item);
             } catch (e) {
               console.error('Error parsing local storage item:', e);
             }
