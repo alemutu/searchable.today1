@@ -9,7 +9,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables. Please check your .env file.');
 }
 
-// Create Supabase client with secure configuration
+// Create Supabase client with secure configuration and timeout settings
 export const supabase = createClient<Database>(
   supabaseUrl,
   supabaseAnonKey,
@@ -18,12 +18,21 @@ export const supabase = createClient<Database>(
       autoRefreshToken: true,
       persistSession: true,
       detectSessionInUrl: true,
-      storageKey: 'hms-auth-token', // Custom storage key
-      flowType: 'pkce' // Use PKCE flow for added security
+      storageKey: 'hms-auth-token',
+      flowType: 'pkce'
     },
     global: {
       headers: {
         'X-Client-Info': 'hms-web-client'
+      }
+    },
+    // Add request timeout settings
+    db: {
+      schema: 'public'
+    },
+    realtime: {
+      params: {
+        eventsPerSecond: 10
       }
     }
   }
@@ -51,12 +60,10 @@ export const resetSessionTimeout = () => {
 
 // Initialize session timeout
 export const initSessionTimeout = () => {
-  // Add event listeners to reset timeout on user activity
   ['mousedown', 'keypress', 'scroll', 'touchstart'].forEach(event => {
     document.addEventListener(event, resetSessionTimeout, { passive: true });
   });
   
-  // Initial timeout setup
   resetSessionTimeout();
 };
 
@@ -67,7 +74,6 @@ export const clearSessionTimeout = () => {
     sessionTimeoutId = null;
   }
   
-  // Remove event listeners
   ['mousedown', 'keypress', 'scroll', 'touchstart'].forEach(event => {
     document.removeEventListener(event, resetSessionTimeout);
   });

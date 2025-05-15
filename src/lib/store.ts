@@ -41,7 +41,7 @@ interface Hospital {
 
 interface NotificationState {
   notifications: Notification[];
-  notifiedEmergencies: Set<string>; // Track emergency IDs that have been notified
+  notifiedEmergencies: Set<string>;
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
   removeNotification: (id: string) => void;
   clearNotifications: () => void;
@@ -54,7 +54,36 @@ export interface Notification {
   message: string;
   type: 'success' | 'error' | 'warning' | 'info';
   timestamp: number;
-  duration?: number; // in milliseconds, default will be 3000
+  duration?: number;
+}
+
+// Retry configuration
+const RETRY_ATTEMPTS = 3;
+const RETRY_DELAY = 1000; // 1 second
+
+// Helper function to delay execution
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Helper function to retry failed operations
+async function retryOperation<T>(
+  operation: () => Promise<T>,
+  attempts: number = RETRY_ATTEMPTS,
+  delayMs: number = RETRY_DELAY
+): Promise<T> {
+  let lastError: Error | null = null;
+  
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await operation();
+    } catch (error: any) {
+      lastError = error;
+      if (i < attempts - 1) {
+        await delay(delayMs * Math.pow(2, i)); // Exponential backoff
+      }
+    }
+  }
+  
+  throw lastError;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -69,26 +98,34 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   
   initialize: async () => {
     try {
-      set({ isLoading: true });
+      set({ isLoading: true, error: null });
       
       // Initialize storage system
       initializeStorage();
       
-      // Get current session
-      const { data: { session } } = await supabase.auth.getSession();
+      // Get current session with retry
+      const { data: { session } } = await retryOperation(async () => {
+        const response = await supabase.auth.getSession();
+        if (response.error) throw response.error;
+        return response;
+      });
       
       if (session) {
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user } } = await retryOperation(async () => {
+          const response = await supabase.auth.getUser();
+          if (response.error) throw response.error;
+          return response;
+        });
         
         if (user) {
           set({ user });
           await get().fetchUserProfile();
-          await syncAllData(); // Sync any pending changes
+          await syncAllData();
         }
       }
     } catch (error: any) {
       console.error('Error initializing auth:', error.message);
-      set({ error: error.message });
+      set({ error: `Error initializing: ${error.message}` });
     } finally {
       set({ isLoading: false });
     }
@@ -98,17 +135,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password
+      const { data, error } = await retryOperation(async () => {
+        const response = await supabase.auth.signInWithPassword({
+          email,
+          password
+        });
+        if (response.error) throw response.error;
+        return response;
       });
-      
-      if (error) throw error;
       
       if (data.user) {
         set({ user: data.user });
         await get().fetchUserProfile();
-        await syncAllData(); // Sync any pending changes
+        await syncAllData();
       }
     } catch (error: any) {
       console.error('Error logging in:', error.message);
@@ -123,15 +162,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true, error: null });
       
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: metadata
-        }
+      const { data, error } = await retryOperation(async () => {
+        const response = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: metadata
+          }
+        });
+        if (response.error) throw response.error;
+        return response;
       });
-      
-      if (error) throw error;
       
       if (data.user) {
         set({ user: data.user });
@@ -148,8 +189,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true });
       
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      const { error } = await retryOperation(async () => {
+        const response = await supabase.auth.signOut();
+        if (response.error) throw response.error;
+        return response;
+      });
       
       set({ 
         user: null,
@@ -160,7 +204,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isReceptionist: false
       });
       
-      // Clear sensitive data from localStorage
       clearSensitiveData();
       
     } catch (error: any) {
@@ -176,15 +219,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { user } = get();
       if (!user) return;
 
-      // Get user metadata directly from auth.users
-      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+      // Get user metadata with retry
+      const { data: { user: currentUser }, error: userError } = await retryOperation(async () => {
+        const response = await supabase.auth.getUser();
+        if (response.error) throw response.error;
+        return response;
+      });
       
       if (userError) {
         console.error('Error fetching user data:', userError);
         throw userError;
       }
 
-      // Set role from user metadata
       if (currentUser?.user_metadata) {
         const { role } = currentUser.user_metadata;
         
@@ -196,12 +242,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
       }
       
-      // Fetch hospital information if available
       if (currentUser?.user_metadata?.hospital_id) {
         await get().fetchCurrentHospital();
       }
     } catch (error: any) {
       console.error('Error fetching user profile:', error.message);
+      throw new Error(`Error fetching user profile: ${error.message}`);
     }
   },
   
@@ -210,19 +256,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { user } = get();
       if (!user) return;
       
-      // Get hospital_id from user metadata
-      const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
+      const { data: { user: currentUser }, error: userError } = await retryOperation(async () => {
+        const response = await supabase.auth.getUser();
+        if (response.error) throw response.error;
+        return response;
+      });
       
       if (userError) throw userError;
       
       const hospitalId = currentUser?.user_metadata?.hospital_id;
       
       if (hospitalId) {
-        const { data: hospital, error: hospitalError } = await supabase
-          .from('hospitals')
-          .select('*')
-          .eq('id', hospitalId)
-          .single();
+        const { data: hospital, error: hospitalError } = await retryOperation(async () => {
+          const response = await supabase
+            .from('hospitals')
+            .select('*')
+            .eq('id', hospitalId)
+            .single();
+          if (response.error) throw response.error;
+          return response;
+        });
         
         if (hospitalError) {
           console.error('Error fetching hospital:', hospitalError);
@@ -231,23 +284,22 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         
         if (hospital) {
           set({ hospital });
-          // Save hospital to local storage for offline use
           localStorage.setItem(`hospitals_${hospital.id}`, JSON.stringify(hospital));
         }
       }
     } catch (error: any) {
       console.error('Error fetching hospital:', error.message);
+      throw new Error(`Error fetching hospital: ${error.message}`);
     }
   }
 }));
 
-// Notification store
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   notifiedEmergencies: new Set<string>(),
   
   addNotification: (notification) => {
-    const id = uuidv4(); // Use UUID for secure random IDs
+    const id = uuidv4();
     set((state) => ({
       notifications: [
         ...state.notifications,
@@ -259,7 +311,6 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       ]
     }));
     
-    // Auto-remove notification after duration
     const duration = notification.duration || 3000;
     setTimeout(() => {
       set((state) => ({
