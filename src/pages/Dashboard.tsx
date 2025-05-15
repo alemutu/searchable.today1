@@ -109,6 +109,7 @@ const Dashboard: React.FC = () => {
   });
   const [activePatients, setActivePatients] = useState<PatientTableRowProps[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
   const [analyticsData, setAnalyticsData] = useState({
     patientsByDepartment: [] as {department: string, count: number}[],
@@ -117,69 +118,76 @@ const Dashboard: React.FC = () => {
   });
   
   useEffect(() => {
-    fetchDashboardData();
+    if (hospital?.id) {
+      fetchDashboardData();
+    } else {
+      setIsLoading(false);
+      setError('No hospital selected');
+    }
   }, [hospital]);
   
   const fetchDashboardData = async () => {
-    if (!hospital) return;
+    if (!hospital?.id) return;
     
     setIsLoading(true);
+    setError(null);
+    
     try {
-      // Fetch total patients
+      // Fetch total patients with error handling
       const { count: patientsCount, error: patientsError } = await supabase
         .from('patients')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospital.id);
       
-      if (patientsError) throw patientsError;
+      if (patientsError) throw new Error(`Error fetching patients: ${patientsError.message}`);
       
       // Fetch today's appointments
       const today = new Date().toISOString().split('T')[0];
       const { count: appointmentsCount, error: appointmentsError } = await supabase
         .from('appointments')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospital.id)
         .eq('date', today);
       
-      if (appointmentsError) throw appointmentsError;
+      if (appointmentsError) throw new Error(`Error fetching appointments: ${appointmentsError.message}`);
       
       // Fetch active consultations
       const { count: consultationsCount, error: consultationsError } = await supabase
         .from('consultations')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospital.id)
         .gte('consultation_date', new Date().toISOString().split('T')[0]);
       
-      if (consultationsError) throw consultationsError;
+      if (consultationsError) throw new Error(`Error fetching consultations: ${consultationsError.message}`);
       
       // Fetch pending lab results
       const { count: labResultsCount, error: labResultsError } = await supabase
         .from('lab_results')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospital.id)
         .eq('status', 'pending');
       
-      if (labResultsError) throw labResultsError;
+      if (labResultsError) throw new Error(`Error fetching lab results: ${labResultsError.message}`);
       
       // Fetch pharmacy orders
       const { count: pharmacyCount, error: pharmacyError } = await supabase
         .from('pharmacy')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospital.id)
         .in('status', ['pending', 'processing']);
       
-      if (pharmacyError) throw pharmacyError;
+      if (pharmacyError) throw new Error(`Error fetching pharmacy orders: ${pharmacyError.message}`);
       
       // Fetch emergency cases
       const { count: emergencyCount, error: emergencyError } = await supabase
         .from('triage')
-        .select('id', { count: 'exact', head: true })
+        .select('*', { count: 'exact', head: true })
         .eq('hospital_id', hospital.id)
         .eq('is_emergency', true);
       
-      if (emergencyError) throw emergencyError;
+      if (emergencyError) throw new Error(`Error fetching emergency cases: ${emergencyError.message}`);
       
-      // Fetch active patients
+      // Fetch active patients with proper error handling
       const { data: activePatientsData, error: activePatientsError } = await supabase
         .from('patients')
         .select(`
@@ -188,17 +196,19 @@ const Dashboard: React.FC = () => {
           last_name,
           date_of_birth,
           current_flow_step,
-          departments:departments(name)
+          departments!inner (
+            name
+          )
         `)
         .eq('hospital_id', hospital.id)
         .not('current_flow_step', 'is', null)
         .order('created_at', { ascending: false })
         .limit(5);
       
-      if (activePatientsError) throw activePatientsError;
+      if (activePatientsError) throw new Error(`Error fetching active patients: ${activePatientsError.message}`);
       
-      // Transform active patients data
-      const activePatientsList = activePatientsData?.map(patient => {
+      // Transform active patients data with null checks
+      const activePatientsList = (activePatientsData || []).map(patient => {
         const age = calculateAge(patient.date_of_birth);
         const isEmergency = patient.current_flow_step === 'emergency';
         
@@ -211,11 +221,11 @@ const Dashboard: React.FC = () => {
           waitTime: calculateWaitTime(patient.current_flow_step),
           isEmergency
         };
-      }) || [];
+      });
       
       setActivePatients(activePatientsList);
       
-      // Set stats
+      // Set stats with null checks
       setStats({
         totalPatients: patientsCount || 0,
         appointmentsToday: appointmentsCount || 0,
@@ -230,6 +240,7 @@ const Dashboard: React.FC = () => {
       
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      setError(error instanceof Error ? error.message : 'An unknown error occurred');
     } finally {
       setIsLoading(false);
     }
@@ -462,6 +473,34 @@ const Dashboard: React.FC = () => {
     return (
       <div className="flex justify-center p-8">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-8">
+        <div className="bg-error-50 border border-error-200 rounded-lg p-4 text-error-700">
+          <h2 className="text-lg font-semibold mb-2">Error Loading Dashboard</h2>
+          <p>{error}</p>
+          <button 
+            onClick={() => fetchDashboardData()} 
+            className="mt-4 px-4 py-2 bg-error-100 text-error-700 rounded hover:bg-error-200"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hospital?.id) {
+    return (
+      <div className="p-8">
+        <div className="bg-warning-50 border border-warning-200 rounded-lg p-4 text-warning-700">
+          <h2 className="text-lg font-semibold mb-2">No Hospital Selected</h2>
+          <p>Please select a hospital to view the dashboard.</p>
+        </div>
       </div>
     );
   }
