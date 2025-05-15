@@ -49,7 +49,9 @@ app.get('/licenses', async (req, res) => {
       `)
       .order('created_at', { ascending: false });
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
 
     return res.json(data);
   } catch (error) {
@@ -64,7 +66,7 @@ app.post('/licenses', async (req, res) => {
     const { hospital_id, plan_id } = req.body;
 
     if (!hospital_id || !plan_id) {
-      throw new Error('Hospital ID and Plan ID are required');
+      return res.status(400).json({ error: 'Hospital ID and Plan ID are required' });
     }
 
     // Get plan details
@@ -74,7 +76,9 @@ app.post('/licenses', async (req, res) => {
       .eq('id', plan_id)
       .single();
 
-    if (planError) throw planError;
+    if (planError) {
+      return res.status(500).json({ error: planError.message });
+    }
 
     const licenseData = {
       hospital_id,
@@ -96,7 +100,9 @@ app.post('/licenses', async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
 
     return res.status(201).json(data);
   } catch (error) {
@@ -112,7 +118,7 @@ app.put('/licenses/:id/status', async (req, res) => {
     const { status } = req.body;
 
     if (!['active', 'suspended', 'cancelled'].includes(status)) {
-      throw new Error('Invalid status');
+      return res.status(400).json({ error: 'Invalid status' });
     }
 
     const { data, error } = await supabaseClient
@@ -122,7 +128,9 @@ app.put('/licenses/:id/status', async (req, res) => {
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
 
     return res.json(data);
   } catch (error) {
@@ -138,7 +146,9 @@ app.get('/metrics', async (req, res) => {
       .from('licenses')
       .select('*');
 
-    if (licensesError) throw licensesError;
+    if (licensesError) {
+      return res.status(500).json({ error: licensesError.message });
+    }
 
     const metrics = {
       total_active: licenses.filter(l => l.status === 'active').length,

@@ -253,7 +253,9 @@ app.get('/check-subdomain/:subdomain', async (req, res) => {
       .eq('subdomain', subdomain)
       .maybeSingle();
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
     
     return res.json({ available: !data });
   } catch (error) {
@@ -270,7 +272,9 @@ app.get('/hospitals', async (req, res) => {
       .select('*')
       .order('name');
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
     return res.json(data);
   } catch (error) {
     console.error('Error fetching hospitals:', error);
@@ -307,7 +311,9 @@ app.get('/hospitals/:id', async (req, res) => {
       .eq('id', id)
       .single();
 
-    if (error) throw error;
+    if (error) {
+      return res.status(500).json({ error: error.message });
+    }
     return res.json(data);
   } catch (error) {
     console.error('Error fetching hospital:', error);
