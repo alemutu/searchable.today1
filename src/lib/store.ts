@@ -21,7 +21,6 @@ interface AuthState {
   logout: () => Promise<void>;
   fetchUserProfile: () => Promise<void>;
   fetchCurrentHospital: () => Promise<void>;
-  clearAuthState: () => void;
 }
 
 interface Hospital {
@@ -42,7 +41,7 @@ interface Hospital {
 
 interface NotificationState {
   notifications: Notification[];
-  notifiedEmergencies: Set<string>;
+  notifiedEmergencies: Set<string>; // Track emergency IDs that have been notified
   addNotification: (notification: Omit<Notification, 'id' | 'timestamp'>) => void;
   removeNotification: (id: string) => void;
   clearNotifications: () => void;
@@ -55,7 +54,7 @@ export interface Notification {
   message: string;
   type: 'success' | 'error' | 'warning' | 'info';
   timestamp: number;
-  duration?: number;
+  duration?: number; // in milliseconds, default will be 3000
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -68,56 +67,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isReceptionist: false,
   error: null,
   
-  clearAuthState: () => {
-    set({
-      user: null,
-      hospital: null,
-      isAdmin: false,
-      isDoctor: false,
-      isNurse: false,
-      isReceptionist: false,
-      error: null
-    });
-    clearSensitiveData();
-  },
-  
   initialize: async () => {
     try {
       set({ isLoading: true });
       
+      // Initialize storage system
       initializeStorage();
       
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (sessionError) {
-        throw sessionError;
-      }
+      // Get current session
+      const { data: { session } } = await supabase.auth.getSession();
       
       if (session) {
-        try {
-          const { data: { user }, error: userError } = await supabase.auth.getUser();
-          
-          if (userError) {
-            // If we can't get the user, clear the auth state and force re-login
-            get().clearAuthState();
-            throw userError;
-          }
-          
-          if (user) {
-            set({ user });
-            await get().fetchUserProfile();
-            await syncAllData();
-          }
-        } catch (error: any) {
-          console.error('Error fetching user:', error.message);
-          // Clear auth state and force re-login on any user fetch error
-          await get().logout();
-          throw error;
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          set({ user });
+          await get().fetchUserProfile();
+          await syncAllData(); // Sync any pending changes
         }
       }
     } catch (error: any) {
       console.error('Error initializing auth:', error.message);
-      get().clearAuthState();
       set({ error: error.message });
     } finally {
       set({ isLoading: false });
@@ -138,11 +108,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (data.user) {
         set({ user: data.user });
         await get().fetchUserProfile();
-        await syncAllData();
+        await syncAllData(); // Sync any pending changes
       }
     } catch (error: any) {
       console.error('Error logging in:', error.message);
-      get().clearAuthState();
       set({ error: `Error logging in: ${error.message}` });
       throw error;
     } finally {
@@ -169,7 +138,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
     } catch (error: any) {
       console.error('Error signing up:', error.message);
-      get().clearAuthState();
       set({ error: error.message });
     } finally {
       set({ isLoading: false });
@@ -180,11 +148,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     try {
       set({ isLoading: true });
       
-      // Clear auth state before signing out to prevent race conditions
-      get().clearAuthState();
-      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
+      
+      set({ 
+        user: null,
+        hospital: null,
+        isAdmin: false,
+        isDoctor: false,
+        isNurse: false,
+        isReceptionist: false
+      });
+      
+      // Clear sensitive data from localStorage
+      clearSensitiveData();
       
     } catch (error: any) {
       console.error('Error logging out:', error.message);
@@ -199,17 +176,28 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { user } = get();
       if (!user) return;
 
+      // Get user metadata directly from auth.users
       const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
       
       if (userError) {
         console.error('Error fetching user data:', userError);
-        // If we get a 403 or user not found error, clear auth state and force re-login
-        if (userError.status === 403 || userError.message.includes('user_not_found')) {
+        // If user not found, log out and clear state
+        if (userError.message.includes('user_not_found') || userError.status === 403) {
+          console.log('User not found in auth.users table, logging out');
           await get().logout();
+          return;
         }
         throw userError;
       }
 
+      // If user is null, they don't exist in auth.users anymore
+      if (!currentUser) {
+        console.log('User not found in auth.users table, logging out');
+        await get().logout();
+        return;
+      }
+
+      // Set role from user metadata
       if (currentUser?.user_metadata) {
         const { role } = currentUser.user_metadata;
         
@@ -221,14 +209,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         });
       }
       
+      // Fetch hospital information if available
       if (currentUser?.user_metadata?.hospital_id) {
         await get().fetchCurrentHospital();
       }
     } catch (error: any) {
       console.error('Error fetching user profile:', error.message);
-      if (error.status === 403 || error.message.includes('user_not_found')) {
-        await get().logout();
-      }
+      // If there's any error fetching the profile, log out as a safety measure
+      await get().logout();
     }
   },
   
@@ -237,14 +225,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const { user } = get();
       if (!user) return;
       
+      // Get hospital_id from user metadata
       const { data: { user: currentUser }, error: userError } = await supabase.auth.getUser();
       
-      if (userError) {
-        if (userError.status === 403 || userError.message.includes('user_not_found')) {
-          await get().logout();
-        }
-        throw userError;
-      }
+      if (userError) throw userError;
       
       const hospitalId = currentUser?.user_metadata?.hospital_id;
       
@@ -262,24 +246,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         
         if (hospital) {
           set({ hospital });
+          // Save hospital to local storage for offline use
           localStorage.setItem(`hospitals_${hospital.id}`, JSON.stringify(hospital));
         }
       }
     } catch (error: any) {
       console.error('Error fetching hospital:', error.message);
-      if (error.status === 403 || error.message.includes('user_not_found')) {
-        await get().logout();
-      }
     }
   }
 }));
 
+// Notification store
 export const useNotificationStore = create<NotificationState>((set, get) => ({
   notifications: [],
   notifiedEmergencies: new Set<string>(),
   
   addNotification: (notification) => {
-    const id = uuidv4();
+    const id = uuidv4(); // Use UUID for secure random IDs
     set((state) => ({
       notifications: [
         ...state.notifications,
@@ -291,6 +274,7 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       ]
     }));
     
+    // Auto-remove notification after duration
     const duration = notification.duration || 3000;
     setTimeout(() => {
       set((state) => ({
