@@ -182,37 +182,46 @@ const TriageForm: React.FC = () => {
 
   const fetchDepartments = async () => {
     try {
-      if (import.meta.env.DEV) {
-        // Use mock data in development
-        const mockDepartments: Department[] = [
-          { id: '1', name: 'Emergency' },
-          { id: '2', name: 'General Medicine' },
-          { id: '3', name: 'Cardiology' },
-          { id: '4', name: 'Pediatrics' },
-          { id: '5', name: 'Orthopedics' }
-        ];
-        setDepartments(mockDepartments);
-        
-        // Auto-select General Medicine department
-        const generalMedicineDept = mockDepartments.find(dept => dept.name === 'General Medicine');
-        if (generalMedicineDept) {
-          setValue('departmentId', generalMedicineDept.id);
-        }
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('departments')
-        .select('id, name')
-        .order('name');
-
-      if (error) throw error;
-      setDepartments(data || []);
+      // Create mock departments for development
+      const mockDepartments: Department[] = [
+        { id: '1', name: 'Emergency' },
+        { id: '2', name: 'General Medicine' },
+        { id: '3', name: 'Cardiology' },
+        { id: '4', name: 'Pediatrics' },
+        { id: '5', name: 'Orthopedics' },
+        { id: '6', name: 'Gynecology' },
+        { id: '7', name: 'Surgical' },
+        { id: '8', name: 'Dental' },
+        { id: '9', name: 'Eye Clinic' },
+        { id: '10', name: 'Physiotherapy' }
+      ];
+      
+      setDepartments(mockDepartments);
       
       // Auto-select General Medicine department
-      const generalMedicineDept = data?.find(dept => dept.name === 'General Medicine');
+      const generalMedicineDept = mockDepartments.find(dept => dept.name === 'General Medicine');
       if (generalMedicineDept) {
         setValue('departmentId', generalMedicineDept.id);
+      }
+      
+      // In a real app, we would fetch from Supabase
+      if (!import.meta.env.DEV) {
+        const { data, error } = await supabase
+          .from('departments')
+          .select('id, name')
+          .order('name');
+
+        if (error) throw error;
+        
+        if (data && data.length > 0) {
+          setDepartments(data);
+          
+          // Auto-select General Medicine department
+          const generalMedicineDept = data.find(dept => dept.name === 'General Medicine');
+          if (generalMedicineDept) {
+            setValue('departmentId', generalMedicineDept.id);
+          }
+        }
       }
     } catch (error) {
       console.error('Error loading departments:', error);
@@ -322,9 +331,29 @@ const TriageForm: React.FC = () => {
     try {
       setIsSaving(true);
       
+      console.log('Triage form submitted:', data);
+      
+      // Validate required fields
+      if (!data.chiefComplaint) {
+        addNotification({
+          message: 'Chief complaint is required',
+          type: 'error'
+        });
+        setActiveTab('assessment');
+        return;
+      }
+      
+      if (!data.departmentId) {
+        addNotification({
+          message: 'Please select a department',
+          type: 'error'
+        });
+        setActiveTab('assessment');
+        return;
+      }
+      
       if (import.meta.env.DEV) {
         // Simulate successful submission in development
-        console.log('Triage form submitted:', data);
         await new Promise(resolve => setTimeout(resolve, 1000));
         
         // Show success notification
@@ -864,12 +893,12 @@ const TriageForm: React.FC = () => {
             </div>
             
             <div className="mt-2">
-              <label className="form-label text-xs">Department</label>
+              <label className="form-label text-xs required">Department</label>
               <div className="flex items-center">
                 <Building2 className="h-3 w-3 text-gray-400 mr-1" />
                 <select
-                  {...register('departmentId')}
-                  className="form-input py-1 text-sm"
+                  {...register('departmentId', { required: 'Department is required' })}
+                  className="form-input py-1 text-sm w-full"
                 >
                   <option value="">Select department</option>
                   {departments.map((dept) => (
@@ -877,6 +906,9 @@ const TriageForm: React.FC = () => {
                   ))}
                 </select>
               </div>
+              {errors.departmentId && (
+                <p className="form-error text-xs">{errors.departmentId.message}</p>
+              )}
             </div>
             
             <div className="mt-2">
