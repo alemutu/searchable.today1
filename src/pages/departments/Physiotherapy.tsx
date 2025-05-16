@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useAuthStore } from '../../lib/store';
+import { useHybridStorage } from '../../lib/hooks/useHybridStorage';
+import { useNotificationStore } from '../../lib/store';
 import { 
   Search, 
   Filter, 
@@ -29,94 +29,29 @@ interface Patient {
   wait_time?: string;
   condition?: string;
   session_number?: number;
+  chief_complaint?: string;
+  assigned_to?: string;
+  last_updated?: string;
 }
 
 const Physiotherapy: React.FC = () => {
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPriority, setFilterPriority] = useState('all');
-  const { hospital } = useAuthStore();
   const [activeTab, setActiveTab] = useState<'waiting' | 'in_progress'>('waiting');
+  const [assignedToMe, setAssignedToMe] = useState(false);
+  const { addNotification } = useNotificationStore();
+  
+  const { 
+    data: patients, 
+    loading: isLoading, 
+    error, 
+    saveItem, 
+    fetchItems 
+  } = useHybridStorage<Patient>('patients');
 
   useEffect(() => {
-    fetchPatients();
-  }, [hospital]);
-
-  const fetchPatients = async () => {
-    try {
-      // In a real app, we would fetch from Supabase
-      // For now, we'll use mock data
-      const mockPatients = [
-        {
-          id: '00000000-0000-0000-0000-000000000001',
-          first_name: 'Richard',
-          last_name: 'Taylor',
-          date_of_birth: '1980-05-15',
-          current_flow_step: 'waiting_consultation',
-          priority_level: 'normal',
-          arrival_time: '09:15 AM',
-          wait_time: '15 min',
-          condition: 'Lower back pain',
-          session_number: 3
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000002',
-          first_name: 'Karen',
-          last_name: 'Smith',
-          date_of_birth: '1992-08-22',
-          current_flow_step: 'consultation',
-          priority_level: 'urgent',
-          arrival_time: '09:30 AM',
-          wait_time: '0 min',
-          condition: 'Post-surgery rehabilitation',
-          session_number: 1
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000003',
-          first_name: 'Robert',
-          last_name: 'Johnson',
-          date_of_birth: '1975-12-10',
-          current_flow_step: 'waiting_consultation',
-          priority_level: 'normal',
-          arrival_time: '08:45 AM',
-          wait_time: '45 min',
-          condition: 'Shoulder injury',
-          session_number: 5
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000004',
-          first_name: 'Emily',
-          last_name: 'Williams',
-          date_of_birth: '1988-03-30',
-          current_flow_step: 'waiting_consultation',
-          priority_level: 'normal',
-          arrival_time: '10:00 AM',
-          wait_time: '5 min',
-          condition: 'Knee rehabilitation',
-          session_number: 2
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000005',
-          first_name: 'Michael',
-          last_name: 'Brown',
-          date_of_birth: '1965-07-18',
-          current_flow_step: 'consultation',
-          priority_level: 'critical',
-          arrival_time: '10:15 AM',
-          wait_time: '0 min',
-          condition: 'Spinal cord injury',
-          session_number: 8
-        }
-      ];
-      
-      setPatients(mockPatients);
-    } catch (error) {
-      console.error('Error fetching patients:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    fetchItems();
+  }, [fetchItems]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -144,29 +79,122 @@ const Physiotherapy: React.FC = () => {
     return age;
   };
 
+  const getTimeAgo = (dateString: string) => {
+    if (!dateString) return 'Unknown';
+    
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.round(diffMs / 60000);
+    
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
+
+  const handleAssignToMe = async (patientId: string) => {
+    if (!Array.isArray(patients)) return;
+    
+    const patient = patients.find(p => p.id === patientId);
+    if (!patient) return;
+    
+    try {
+      // Update the patient
+      const updatedPatient: Patient = {
+        ...patient,
+        assigned_to: 'current_user', // Replace with actual user ID
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedPatient, patientId);
+      
+      // Show notification
+      addNotification({
+        message: `${patient.first_name} ${patient.last_name} assigned to you`,
+        type: 'success',
+        duration: 3000
+      });
+    } catch (error: any) {
+      console.error('Error assigning patient:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    }
+  };
+
+  const handleStartConsultation = async (patientId: string) => {
+    if (!Array.isArray(patients)) return;
+    
+    const patient = patients.find(p => p.id === patientId);
+    if (!patient) return;
+    
+    try {
+      // Update the patient status to in_progress
+      const updatedPatient: Patient = {
+        ...patient,
+        current_flow_step: 'consultation',
+        assigned_to: 'current_user', // Replace with actual user ID
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedPatient, patientId);
+      
+      // Show notification
+      addNotification({
+        message: `Started therapy for ${patient.first_name} ${patient.last_name}`,
+        type: 'success',
+        duration: 3000
+      });
+    } catch (error: any) {
+      console.error('Error starting therapy:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    }
+  };
+
   // Filter patients based on their current flow step and the active tab
-  const filteredPatients = patients.filter(patient => {
+  const filteredPatients = Array.isArray(patients) ? patients.filter(patient => {
     const matchesSearch = patient.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          patient.last_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPriority = filterPriority === 'all' || patient.priority_level === filterPriority;
+    const matchesAssigned = !assignedToMe || patient.assigned_to === 'current_user';
     
     if (activeTab === 'waiting') {
-      return patient.current_flow_step === 'waiting_consultation' && matchesSearch && matchesPriority;
+      return patient.current_flow_step === 'waiting_consultation' && matchesSearch && matchesPriority && matchesAssigned;
     } else {
-      return patient.current_flow_step === 'consultation' && matchesSearch && matchesPriority;
+      return patient.current_flow_step === 'consultation' && matchesSearch && matchesPriority && matchesAssigned;
     }
-  });
+  }) : [];
 
   // Count patients in each category
-  const waitingCount = patients.filter(p => p.current_flow_step === 'waiting_consultation').length;
-  const inProgressCount = patients.filter(p => p.current_flow_step === 'consultation').length;
-  const completedCount = patients.filter(p => p.current_flow_step === 'post_consultation').length;
-  const urgentCount = patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length;
+  const waitingCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'waiting_consultation').length : 0;
+  const inProgressCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'consultation').length : 0;
+  const completedCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'post_consultation').length : 0;
+  const urgentCount = Array.isArray(patients) ? patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length : 0;
+  const assignedToMeCount = Array.isArray(patients) ? patients.filter(p => p.assigned_to === 'current_user').length : 0;
 
   if (isLoading) {
     return (
       <div className="flex justify-center p-6">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-center">
+        <AlertTriangle className="h-12 w-12 text-error-500 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900">Error loading department data</h3>
+        <p className="text-gray-500 mt-2">{error.message}</p>
       </div>
     );
   }
@@ -244,6 +272,19 @@ const Physiotherapy: React.FC = () => {
             <ChevronDown className="h-3 w-3 text-gray-500" />
           </div>
         </div>
+        
+        <div className="flex items-center">
+          <input
+            type="checkbox"
+            id="assignedToMe"
+            checked={assignedToMe}
+            onChange={(e) => setAssignedToMe(e.target.checked)}
+            className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+          />
+          <label htmlFor="assignedToMe" className="ml-2 text-xs text-gray-700">
+            Assigned to me ({assignedToMeCount})
+          </label>
+        </div>
       </div>
 
       <div className="flex space-x-3">
@@ -272,7 +313,13 @@ const Physiotherapy: React.FC = () => {
                             <h3 className="text-base font-medium text-gray-900">{patient.first_name} {patient.last_name}</h3>
                             <div className="flex items-center text-xs text-gray-500">
                               <Clock className="h-3 w-3 mr-1" />
-                              <span>Wait time: {patient.wait_time}</span>
+                              <span>{getTimeAgo(patient.last_updated || '')}</span>
+                              {patient.wait_time && (
+                                <>
+                                  <span className="mx-1">•</span>
+                                  <span>Wait time: {patient.wait_time}</span>
+                                </>
+                              )}
                               {patient.session_number && (
                                 <>
                                   <span className="mx-1">•</span>
@@ -285,18 +332,57 @@ const Physiotherapy: React.FC = () => {
                             <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-medium rounded-full ${getPriorityColor(patient.priority_level)}`}>
                               {patient.priority_level}
                             </span>
-                            <Link 
-                              to={`/patients/${patient.id}/consultation`}
-                              className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
-                            >
-                              {activeTab === 'waiting' ? 'Start Therapy' : 'Continue'} <ActivitySquare className="h-3 w-3 ml-1" />
-                            </Link>
+                            
+                            {patient.assigned_to && patient.assigned_to !== 'current_user' && (
+                              <span className="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-gray-100 text-gray-800">
+                                Assigned
+                              </span>
+                            )}
+                            
+                            {activeTab === 'waiting' ? (
+                              <div className="flex space-x-1">
+                                {!patient.assigned_to && (
+                                  <button 
+                                    onClick={() => handleAssignToMe(patient.id)}
+                                    className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                    title="Assign to me"
+                                  >
+                                    Assign to me
+                                  </button>
+                                )}
+                                
+                                {patient.assigned_to === 'current_user' && (
+                                  <button 
+                                    onClick={() => handleStartConsultation(patient.id)}
+                                    className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
+                                  >
+                                    Start Therapy <ActivitySquare className="h-3 w-3 ml-1" />
+                                  </button>
+                                )}
+                              </div>
+                            ) : (
+                              <Link 
+                                to={`/patients/${patient.id}/consultation`}
+                                className="btn btn-primary inline-flex items-center text-xs py-1 px-2"
+                              >
+                                Continue <ActivitySquare className="h-3 w-3 ml-1" />
+                              </Link>
+                            )}
                           </div>
                         </div>
                         <div className="mt-0.5 flex items-center">
-                          <span className="text-xs">{calculateAge(patient.date_of_birth)} years • </span>
-                          {patient.condition && (
-                            <span className="text-xs ml-1 font-medium text-primary-600">{patient.condition}</span>
+                          <span className="text-xs">{calculateAge(patient.date_of_birth)} years</span>
+                          {patient.chief_complaint && (
+                            <>
+                              <span className="mx-1">•</span>
+                              <span className="text-xs text-primary-600 font-medium">{patient.chief_complaint}</span>
+                            </>
+                          )}
+                          {patient.condition && !patient.chief_complaint && (
+                            <>
+                              <span className="mx-1">•</span>
+                              <span className="text-xs text-primary-600 font-medium">{patient.condition}</span>
+                            </>
                           )}
                         </div>
                       </div>

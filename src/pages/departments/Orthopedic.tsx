@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
-import { useAuthStore, useNotificationStore } from '../../lib/store';
+import { useHybridStorage } from '../../lib/hooks/useHybridStorage';
+import { useNotificationStore } from '../../lib/store';
 import { 
   Search, 
   Filter, 
@@ -38,159 +38,30 @@ interface Patient {
   condition?: string;
   assigned_to?: string;
   last_updated?: string;
+  chief_complaint?: string;
   external_location?: string; // lab, radiology, pharmacy, billing, etc.
   external_status?: string;
   expected_return_time?: string;
 }
 
 const Orthopedic: React.FC = () => {
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPriority, setFilterPriority] = useState('all');
-  const { hospital, user } = useAuthStore();
-  const { addNotification } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'waiting' | 'in_progress'>('waiting');
   const [assignedToMe, setAssignedToMe] = useState(false);
+  const { addNotification } = useNotificationStore();
+  
+  const { 
+    data: patients, 
+    loading: isLoading, 
+    error, 
+    saveItem, 
+    fetchItems 
+  } = useHybridStorage<Patient>('patients');
 
   useEffect(() => {
-    fetchPatients();
-  }, [hospital]);
-
-  const fetchPatients = async () => {
-    try {
-      // In a real app, we would fetch from Supabase
-      // For now, we'll use mock data
-      const mockPatients = [
-        {
-          id: '00000000-0000-0000-0000-000000000001',
-          first_name: 'Thomas',
-          last_name: 'Anderson',
-          date_of_birth: '1980-05-15',
-          current_flow_step: 'waiting_consultation',
-          priority_level: 'normal',
-          arrival_time: '09:15 AM',
-          wait_time: '15 min',
-          condition: 'Knee pain',
-          last_updated: '2025-05-15T09:15:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000002',
-          first_name: 'Sarah',
-          last_name: 'Smith',
-          date_of_birth: '1992-08-22',
-          current_flow_step: 'consultation',
-          priority_level: 'urgent',
-          arrival_time: '09:30 AM',
-          wait_time: '0 min',
-          condition: 'Fractured wrist',
-          assigned_to: user?.id,
-          last_updated: '2025-05-15T09:30:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000003',
-          first_name: 'Robert',
-          last_name: 'Johnson',
-          date_of_birth: '1975-12-10',
-          current_flow_step: 'waiting_consultation',
-          priority_level: 'normal',
-          arrival_time: '08:45 AM',
-          wait_time: '45 min',
-          condition: 'Lower back pain',
-          last_updated: '2025-05-15T08:45:00Z',
-          external_location: 'radiology',
-          external_status: 'in_progress',
-          expected_return_time: '2025-05-15T10:15:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000004',
-          first_name: 'Emily',
-          last_name: 'Williams',
-          date_of_birth: '1988-03-30',
-          current_flow_step: 'waiting_consultation',
-          priority_level: 'normal',
-          arrival_time: '10:00 AM',
-          wait_time: '5 min',
-          condition: 'Shoulder pain',
-          last_updated: '2025-05-15T10:00:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000005',
-          first_name: 'Michael',
-          last_name: 'Brown',
-          date_of_birth: '1965-07-18',
-          current_flow_step: 'consultation',
-          priority_level: 'critical',
-          arrival_time: '10:15 AM',
-          wait_time: '0 min',
-          condition: 'Open fracture',
-          assigned_to: '00000000-0000-0000-0000-000000000010', // Another doctor
-          last_updated: '2025-05-15T10:15:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000006',
-          first_name: 'Jessica',
-          last_name: 'Davis',
-          date_of_birth: '1990-04-12',
-          current_flow_step: 'waiting_consultation',
-          priority_level: 'urgent',
-          arrival_time: '10:30 AM',
-          wait_time: '10 min',
-          condition: 'Ankle sprain',
-          last_updated: '2025-05-15T10:30:00Z',
-          external_location: 'laboratory',
-          external_status: 'sample_collected',
-          expected_return_time: '2025-05-15T10:45:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000007',
-          first_name: 'David',
-          last_name: 'Miller',
-          date_of_birth: '1982-09-28',
-          current_flow_step: 'consultation',
-          priority_level: 'normal',
-          arrival_time: '10:45 AM',
-          wait_time: '0 min',
-          condition: 'Hip pain',
-          assigned_to: user?.id,
-          last_updated: '2025-05-15T10:45:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000008',
-          first_name: 'Lisa',
-          last_name: 'Taylor',
-          date_of_birth: '1979-03-15',
-          current_flow_step: 'waiting_consultation',
-          priority_level: 'normal',
-          arrival_time: '11:00 AM',
-          wait_time: '20 min',
-          condition: 'Tennis elbow',
-          last_updated: '2025-05-15T11:00:00Z',
-          external_location: 'pharmacy',
-          external_status: 'dispensing',
-          expected_return_time: '2025-05-15T11:20:00Z'
-        }
-      ];
-      
-      setPatients(mockPatients);
-      
-      // Show notification for emergency cases
-      const emergencyCases = mockPatients.filter(patient => patient.priority_level === 'critical');
-      if (emergencyCases.length > 0) {
-        emergencyCases.forEach(emergency => {
-          addNotification({
-            message: `EMERGENCY: ${emergency.first_name} ${emergency.last_name} needs immediate attention`,
-            type: 'error',
-            duration: 5000
-          });
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching patients:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    fetchItems();
+  }, [fetchItems]);
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -219,6 +90,8 @@ const Orthopedic: React.FC = () => {
   };
 
   const getTimeAgo = (dateString: string) => {
+    if (!dateString) return 'Unknown';
+    
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -304,111 +177,136 @@ const Orthopedic: React.FC = () => {
     return `Expected in ${diffHours}h`;
   };
 
+  const handleAssignToMe = async (patientId: string) => {
+    if (!Array.isArray(patients)) return;
+    
+    const patient = patients.find(p => p.id === patientId);
+    if (!patient) return;
+    
+    try {
+      // Update the patient
+      const updatedPatient: Patient = {
+        ...patient,
+        assigned_to: 'current_user', // Replace with actual user ID
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedPatient, patientId);
+      
+      // Show notification
+      addNotification({
+        message: `${patient.first_name} ${patient.last_name} assigned to you`,
+        type: 'success',
+        duration: 3000
+      });
+    } catch (error: any) {
+      console.error('Error assigning patient:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    }
+  };
+
+  const handleReleaseAssignment = async (patientId: string) => {
+    if (!Array.isArray(patients)) return;
+    
+    const patient = patients.find(p => p.id === patientId);
+    if (!patient) return;
+    
+    try {
+      // Update the patient
+      const updatedPatient: Patient = {
+        ...patient,
+        assigned_to: undefined,
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedPatient, patientId);
+      
+      // Show notification
+      addNotification({
+        message: `${patient.first_name} ${patient.last_name} released from your queue`,
+        type: 'info',
+        duration: 3000
+      });
+    } catch (error: any) {
+      console.error('Error releasing patient assignment:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    }
+  };
+
+  const handleStartConsultation = async (patientId: string) => {
+    if (!Array.isArray(patients)) return;
+    
+    const patient = patients.find(p => p.id === patientId);
+    if (!patient) return;
+    
+    try {
+      // Update the patient status to in_progress
+      const updatedPatient: Patient = {
+        ...patient,
+        current_flow_step: 'consultation',
+        assigned_to: 'current_user', // Replace with actual user ID
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedPatient, patientId);
+      
+      // Show notification
+      addNotification({
+        message: `Started consultation for ${patient.first_name} ${patient.last_name}`,
+        type: 'success',
+        duration: 3000
+      });
+    } catch (error: any) {
+      console.error('Error starting consultation:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    }
+  };
+
   // Filter patients based on their current flow step and the active tab
-  const filteredPatients = patients.filter(patient => {
+  const filteredPatients = Array.isArray(patients) ? patients.filter(patient => {
     const matchesSearch = patient.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                          patient.last_name.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesPriority = filterPriority === 'all' || patient.priority_level === filterPriority;
-    const matchesAssigned = !assignedToMe || patient.assigned_to === user?.id;
+    const matchesAssigned = !assignedToMe || patient.assigned_to === 'current_user'; // Replace with actual user ID
     
     if (activeTab === 'waiting') {
       return patient.current_flow_step === 'waiting_consultation' && matchesSearch && matchesPriority && matchesAssigned;
     } else {
       return patient.current_flow_step === 'consultation' && matchesSearch && matchesPriority && matchesAssigned;
     }
-  });
+  }) : [];
 
   // Count patients in each category
-  const waitingCount = patients.filter(p => p.current_flow_step === 'waiting_consultation').length;
-  const inProgressCount = patients.filter(p => p.current_flow_step === 'consultation').length;
-  const completedCount = patients.filter(p => p.current_flow_step === 'post_consultation').length;
-  const urgentCount = patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length;
-  const assignedToMeCount = patients.filter(p => p.assigned_to === user?.id).length;
-  const externalCount = patients.filter(p => p.external_location).length;
-
-  const handleAssignToMe = (patientId: string) => {
-    // Update the patient to assign it to the current user
-    const updatedPatients = patients.map(patient => {
-      if (patient.id === patientId) {
-        return {
-          ...patient,
-          assigned_to: user?.id,
-          last_updated: new Date().toISOString()
-        };
-      }
-      return patient;
-    });
-    
-    setPatients(updatedPatients);
-    
-    // Show notification
-    const patient = patients.find(p => p.id === patientId);
-    if (patient) {
-      addNotification({
-        message: `${patient.first_name} ${patient.last_name} assigned to you`,
-        type: 'success',
-        duration: 3000
-      });
-    }
-  };
-
-  const handleReleaseAssignment = (patientId: string) => {
-    // Update the patient to unassign it
-    const updatedPatients = patients.map(patient => {
-      if (patient.id === patientId) {
-        return {
-          ...patient,
-          assigned_to: null,
-          last_updated: new Date().toISOString()
-        };
-      }
-      return patient;
-    });
-    
-    setPatients(updatedPatients);
-    
-    // Show notification
-    const patient = patients.find(p => p.id === patientId);
-    if (patient) {
-      addNotification({
-        message: `${patient.first_name} ${patient.last_name} released from your queue`,
-        type: 'info',
-        duration: 3000
-      });
-    }
-  };
-
-  const handleStartConsultation = (patientId: string) => {
-    // Update the patient status to in_progress
-    const updatedPatients = patients.map(patient => {
-      if (patient.id === patientId) {
-        return {
-          ...patient,
-          current_flow_step: 'consultation',
-          assigned_to: user?.id,
-          last_updated: new Date().toISOString()
-        };
-      }
-      return patient;
-    });
-    
-    setPatients(updatedPatients);
-    
-    // Show notification
-    const patient = patients.find(p => p.id === patientId);
-    if (patient) {
-      addNotification({
-        message: `Started consultation for ${patient.first_name} ${patient.last_name}`,
-        type: 'success',
-        duration: 3000
-      });
-    }
-  };
+  const waitingCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'waiting_consultation').length : 0;
+  const inProgressCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'consultation').length : 0;
+  const completedCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'post_consultation').length : 0;
+  const urgentCount = Array.isArray(patients) ? patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length : 0;
+  const assignedToMeCount = Array.isArray(patients) ? patients.filter(p => p.assigned_to === 'current_user').length : 0; // Replace with actual user ID
+  const externalCount = Array.isArray(patients) ? patients.filter(p => p.external_location).length : 0;
 
   if (isLoading) {
     return (
       <div className="flex justify-center p-6">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-center">
+        <AlertTriangle className="h-12 w-12 text-error-500 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900">Error loading department data</h3>
+        <p className="text-gray-500 mt-2">{error.message}</p>
       </div>
     );
   }
@@ -541,7 +439,7 @@ const Orthopedic: React.FC = () => {
                               {patient.priority_level}
                             </span>
                             
-                            {patient.assigned_to && patient.assigned_to !== user?.id && (
+                            {patient.assigned_to && patient.assigned_to !== 'current_user' && (
                               <span className="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-gray-100 text-gray-800">
                                 Assigned
                               </span>
@@ -559,7 +457,7 @@ const Orthopedic: React.FC = () => {
                                   </button>
                                 )}
                                 
-                                {patient.assigned_to === user?.id && !patient.external_location && (
+                                {patient.assigned_to === 'current_user' && !patient.external_location && (
                                   <>
                                     <button 
                                       onClick={() => handleStartConsultation(patient.id)}
@@ -586,7 +484,7 @@ const Orthopedic: React.FC = () => {
                               </div>
                             ) : (
                               <div className="flex space-x-1">
-                                {patient.assigned_to === user?.id ? (
+                                {patient.assigned_to === 'current_user' ? (
                                   <>
                                     <Link 
                                       to={`/patients/${patient.id}/consultation`}
@@ -617,10 +515,10 @@ const Orthopedic: React.FC = () => {
                         </div>
                         <div className="mt-0.5 flex items-center">
                           <span className="text-xs">{calculateAge(patient.date_of_birth)} years</span>
-                          {patient.condition && (
+                          {patient.chief_complaint && (
                             <>
                               <span className="mx-1">•</span>
-                              <span className="text-xs text-primary-600 font-medium">{patient.condition}</span>
+                              <span className="text-xs text-primary-600 font-medium">{patient.chief_complaint}</span>
                             </>
                           )}
                           
@@ -654,17 +552,17 @@ const Orthopedic: React.FC = () => {
                 <Layers className="h-4 w-4 text-primary-500 mr-1.5" />
                 <h2 className="text-sm font-medium text-gray-900">My Patients</h2>
               </div>
-              <span className="text-xs text-gray-500">{patients.filter(p => p.assigned_to === user?.id).length} patients</span>
+              <span className="text-xs text-gray-500">{assignedToMeCount} patients</span>
             </div>
             <div className="p-3">
-              {patients.filter(p => p.assigned_to === user?.id).length === 0 ? (
+              {assignedToMeCount === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-sm text-gray-500">No patients currently assigned to you</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {patients
-                    .filter(p => p.assigned_to === user?.id)
+                  {Array.isArray(patients) && patients
+                    .filter(p => p.assigned_to === 'current_user')
                     .sort((a, b) => {
                       // Sort by priority first
                       const priorityOrder = { 'critical': 0, 'urgent': 1, 'normal': 2 };
@@ -698,7 +596,7 @@ const Orthopedic: React.FC = () => {
                               {patient.first_name} {patient.last_name}
                             </p>
                             <p className="text-xs text-gray-500 line-clamp-1">
-                              {patient.condition || `${calculateAge(patient.date_of_birth)} years`}
+                              {patient.chief_complaint || `${calculateAge(patient.date_of_birth)} years`}
                             </p>
                           </div>
                         </div>
@@ -711,10 +609,10 @@ const Orthopedic: React.FC = () => {
                       </div>
                     ))}
                   
-                  {patients.filter(p => p.assigned_to === user?.id).length > 5 && (
+                  {patients && Array.isArray(patients) && patients.filter(p => p.assigned_to === 'current_user').length > 5 && (
                     <div className="text-center pt-1">
                       <button className="text-xs text-primary-600 hover:text-primary-800">
-                        View all ({patients.filter(p => p.assigned_to === user?.id).length})
+                        View all ({patients.filter(p => p.assigned_to === 'current_user').length})
                       </button>
                     </div>
                   )}
@@ -739,7 +637,7 @@ const Orthopedic: React.FC = () => {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {patients
+                  {Array.isArray(patients) && patients
                     .filter(p => p.external_location)
                     .map(patient => (
                       <div key={patient.id} className="p-2 rounded-lg border border-gray-200 flex items-center justify-between">

@@ -26,6 +26,7 @@ import {
   CheckCircle,
   ChevronRight
 } from 'lucide-react';
+import { useHybridStorage } from '../../lib/hooks/useHybridStorage';
 
 interface TriageFormData {
   vitalSigns: {
@@ -82,18 +83,31 @@ interface Department {
 }
 
 const TriageForm: React.FC = () => {
-  const { hospital, user } = useAuthStore();
+  const { user } = useAuthStore();
   const { addNotification } = useNotificationStore();
   const { patientId } = useParams();
   const navigate = useNavigate();
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState<'vitals' | 'medical-history' | 'assessment'>('vitals');
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  
+  const { 
+    data: patient,
+    loading: patientLoading,
+    error: patientError,
+    fetchById: fetchPatient
+  } = useHybridStorage<Patient>('patients');
+  
+  const { 
+    data: departmentsData,
+    loading: departmentsLoading,
+    error: departmentsError,
+    fetchItems: fetchDepartments
+  } = useHybridStorage<Department>('departments');
   
   const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<TriageFormData>({
     defaultValues: {
@@ -136,11 +150,24 @@ const TriageForm: React.FC = () => {
     fetchDepartments();
     
     if (patientId) {
-      fetchPatient();
+      fetchPatient(patientId);
     } else {
       setIsLoading(false);
     }
-  }, [hospital, patientId]);
+  }, [patientId, fetchPatient, fetchDepartments]);
+  
+  useEffect(() => {
+    // Set default department when departments are loaded
+    if (departmentsData && Array.isArray(departmentsData) && departmentsData.length > 0) {
+      const generalMedicineDept = departmentsData.find(dept => dept.name === 'General Medicine');
+      if (generalMedicineDept) {
+        setValue('departmentId', generalMedicineDept.id);
+      } else if (departmentsData.length > 0) {
+        // If no General Medicine department, use the first one
+        setValue('departmentId', departmentsData[0].id);
+      }
+    }
+  }, [departmentsData, setValue]);
   
   useEffect(() => {
     // Calculate BMI if height and weight are available
@@ -151,103 +178,17 @@ const TriageForm: React.FC = () => {
     }
   }, [vitalSigns.height, vitalSigns.weight, setValue]);
 
-  const fetchPatient = async () => {
-    try {
-      if (import.meta.env.DEV) {
-        // Use mock data in development
-        const mockPatient: Patient = {
-          id: patientId || '00000000-0000-0000-0000-000000000001',
-          first_name: 'John',
-          last_name: 'Doe',
-          date_of_birth: '1980-05-15',
-          gender: 'Male',
-          contact_number: '555-1234',
-          email: 'john.doe@example.com',
-          address: '123 Main St',
-          emergency_contact: {
-            name: 'Jane Doe',
-            relationship: 'Spouse',
-            phone: '555-5678'
-          },
-          medical_history: {
-            allergies: [
-              { allergen: 'Penicillin', reaction: 'Rash', severity: 'moderate' }
-            ],
-            chronicConditions: ['Hypertension'],
-            currentMedications: [
-              { name: 'Lisinopril', dosage: '10mg', frequency: 'Daily' }
-            ]
-          },
-          status: 'active',
-          current_flow_step: 'registration'
-        };
-        setPatient(mockPatient);
-        setIsLoading(false);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('patients')
-        .select('*')
-        .eq('id', patientId)
-        .single();
-
-      if (error) throw error;
-      setPatient(data);
-    } catch (error) {
-      console.error('Error loading patient:', error);
-    } finally {
+  useEffect(() => {
+    // Set departments from fetched data
+    if (departmentsData && Array.isArray(departmentsData)) {
+      setDepartments(departmentsData);
+    }
+    
+    // Set loading state based on both data fetches
+    if (!patientLoading && !departmentsLoading) {
       setIsLoading(false);
     }
-  };
-
-  const fetchDepartments = async () => {
-    try {
-      // Create mock departments for development
-      const mockDepartments: Department[] = [
-        { id: '1', name: 'Emergency' },
-        { id: '2', name: 'General Medicine' },
-        { id: '3', name: 'Cardiology' },
-        { id: '4', name: 'Pediatrics' },
-        { id: '5', name: 'Orthopedics' },
-        { id: '6', name: 'Gynecology' },
-        { id: '7', name: 'Surgical' },
-        { id: '8', name: 'Dental' },
-        { id: '9', name: 'Eye Clinic' },
-        { id: '10', name: 'Physiotherapy' }
-      ];
-      
-      setDepartments(mockDepartments);
-      
-      // Auto-select General Medicine department
-      const generalMedicineDept = mockDepartments.find(dept => dept.name === 'General Medicine');
-      if (generalMedicineDept) {
-        setValue('departmentId', generalMedicineDept.id);
-      }
-      
-      // In a real app, we would fetch from Supabase
-      if (!import.meta.env.DEV) {
-        const { data, error } = await supabase
-          .from('departments')
-          .select('id, name')
-          .order('name');
-
-        if (error) throw error;
-        
-        if (data && data.length > 0) {
-          setDepartments(data);
-          
-          // Auto-select General Medicine department
-          const generalMedicineDept = data.find(dept => dept.name === 'General Medicine');
-          if (generalMedicineDept) {
-            setValue('departmentId', generalMedicineDept.id);
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error loading departments:', error);
-    }
-  };
+  }, [departmentsData, patientLoading, departmentsLoading]);
 
   const calculateAge = (dateOfBirth: string) => {
     const birthDate = new Date(dateOfBirth);
@@ -395,36 +336,6 @@ const TriageForm: React.FC = () => {
         return;
       }
       
-      if (import.meta.env.DEV) {
-        // Simulate successful submission in development
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Show success notification
-        addNotification({
-          message: 'Triage completed successfully',
-          type: 'success'
-        });
-        
-        navigate('/patients');
-        return;
-      }
-      
-      // Create triage record
-      const { error: triageError } = await supabase
-        .from('triage')
-        .insert({
-          patient_id: patient.id,
-          vital_signs: data.vitalSigns,
-          chief_complaint: data.chiefComplaint,
-          acuity_level: data.acuityLevel,
-          notes: data.notes,
-          triaged_by: user.id,
-          department_id: data.departmentId || null,
-          is_emergency: data.isEmergency
-        });
-
-      if (triageError) throw triageError;
-      
       // Determine the next flow step based on department and emergency status
       let nextStep = 'waiting_consultation';
       
@@ -440,23 +351,38 @@ const TriageForm: React.FC = () => {
       }
       
       // Update patient's current flow step and medical history
-      const { error: patientError } = await supabase
-        .from('patients')
-        .update({
-          current_flow_step: nextStep,
-          medical_history: {
-            chronicConditions: data.medicalHistory.chronicConditions,
-            allergies: data.medicalHistory.allergies.hasAllergies ? 
-              data.medicalHistory.allergies.allergyList.split(',').map(a => a.trim()) : [],
-            currentMedications: data.medicalHistory.currentMedications ? 
-              data.medicalHistory.currentMedications.split(',').map(m => ({ name: m.trim() })) : [],
-            familyHistory: data.medicalHistory.familyHistory,
-            otherConditions: data.medicalHistory.otherConditions
-          }
-        })
-        .eq('id', patient.id);
-
-      if (patientError) throw patientError;
+      const updatedPatient = {
+        ...patient,
+        current_flow_step: nextStep,
+        medical_history: {
+          ...patient.medical_history,
+          chronicConditions: data.medicalHistory.chronicConditions,
+          allergies: data.medicalHistory.allergies.hasAllergies ? 
+            data.medicalHistory.allergies.allergyList.split(',').map(a => a.trim()) : [],
+          currentMedications: data.medicalHistory.currentMedications ? 
+            data.medicalHistory.currentMedications.split(',').map(m => ({ name: m.trim() })) : [],
+          familyHistory: data.medicalHistory.familyHistory,
+          otherConditions: data.medicalHistory.otherConditions
+        }
+      };
+      
+      // Save the updated patient
+      const { saveItem } = useHybridStorage<Patient>('patients');
+      await saveItem(updatedPatient, patient.id);
+      
+      // Create triage record in local storage
+      const { saveItem: saveTriageItem } = useHybridStorage('triage');
+      await saveTriageItem({
+        patient_id: patient.id,
+        vital_signs: data.vitalSigns,
+        chief_complaint: data.chiefComplaint,
+        acuity_level: data.acuityLevel,
+        notes: data.notes,
+        triaged_by: user.id,
+        department_id: data.departmentId || null,
+        is_emergency: data.isEmergency,
+        created_at: new Date().toISOString()
+      });
       
       // Show success notification
       addNotification({
@@ -482,6 +408,14 @@ const TriageForm: React.FC = () => {
     return (
       <div className="flex justify-center p-3">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  if (patientError) {
+    return (
+      <div className="text-center p-3">
+        <p className="text-error-500">Error loading patient: {patientError.message}</p>
       </div>
     );
   }
