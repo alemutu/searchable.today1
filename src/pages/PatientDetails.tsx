@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { useHybridStorage } from '../lib/hooks/useHybridStorage';
-import { useNotificationStore } from '../lib/store';
+import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../lib/store';
 import { 
   User, 
   Phone, 
@@ -60,24 +60,33 @@ interface Patient {
 const PatientDetails: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
-  const { addNotification } = useNotificationStore();
-  const { data: patients, loading, error } = useHybridStorage<Patient>('patients');
   const [patient, setPatient] = useState<Patient | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
+  const { isAdmin } = useAuthStore();
 
   useEffect(() => {
-    if (patientId && Array.isArray(patients)) {
-      const foundPatient = patients.find(p => p.id === patientId);
-      if (foundPatient) {
-        setPatient(foundPatient);
-      } else {
-        addNotification({
-          message: 'Patient not found',
-          type: 'error'
-        });
-      }
+    if (patientId) {
+      fetchPatient();
     }
-  }, [patientId, patients, addNotification]);
+  }, [patientId]);
+
+  const fetchPatient = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .eq('id', patientId)
+        .single();
+
+      if (error) throw error;
+      setPatient(data);
+    } catch (error) {
+      console.error('Error fetching patient:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const calculateAge = (dateOfBirth: string) => {
     const birthDate = new Date(dateOfBirth);
@@ -109,18 +118,10 @@ const PatientDetails: React.FC = () => {
     return `PT${paddedNumber}`;
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="flex justify-center p-8">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center p-8">
-        <p className="text-gray-500">Error loading patient data: {error.message}</p>
       </div>
     );
   }
@@ -166,17 +167,17 @@ const PatientDetails: React.FC = () => {
           </div>
           
           <div className="mt-4 md:mt-0 flex flex-wrap gap-2">
-            <Link 
-              to={`/patient-workflow/${patient.id}`}
+            <button 
+              onClick={() => navigate(`/patients/${patient.id}/consultation`)}
               className="btn btn-primary"
             >
-              Patient Workflow
-            </Link>
+              New Consultation
+            </button>
             <button 
-              onClick={() => navigate(`/patient-consultation/${patient.id}`)}
+              onClick={() => navigate(`/patients/${patient.id}/triage`)}
               className="btn btn-outline"
             >
-              New Consultation
+              Triage
             </button>
           </div>
         </div>
@@ -322,10 +323,13 @@ const PatientDetails: React.FC = () => {
                         <AlertTriangle className="h-5 w-5 text-error-500 mr-2" />
                         <h3 className="text-lg font-medium text-gray-900">Allergies</h3>
                       </div>
+                      <Link to={`/patients/${patient.id}/allergies`} className="text-sm text-primary-600 hover:text-primary-800">
+                        View All
+                      </Link>
                     </div>
                     <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
                       <div className="space-y-4">
-                        {patient.medical_info.allergies.map((allergy, index) => (
+                        {patient.medical_info.allergies.slice(0, 3).map((allergy, index) => (
                           <div key={index} className="flex items-start">
                             <div className={`px-2 py-1 rounded-full text-xs font-medium ${
                               allergy.severity === 'severe' || allergy.severity === 'life_threatening' 
@@ -340,6 +344,11 @@ const PatientDetails: React.FC = () => {
                             </div>
                           </div>
                         ))}
+                        {patient.medical_info.allergies.length > 3 && (
+                          <p className="text-sm text-gray-500">
+                            +{patient.medical_info.allergies.length - 3} more allergies
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -353,15 +362,23 @@ const PatientDetails: React.FC = () => {
                         <Activity className="h-5 w-5 text-warning-500 mr-2" />
                         <h3 className="text-lg font-medium text-gray-900">Chronic Conditions</h3>
                       </div>
+                      <Link to={`/patients/${patient.id}/medical-history`} className="text-sm text-primary-600 hover:text-primary-800">
+                        View All
+                      </Link>
                     </div>
                     <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
                       <div className="space-y-2">
-                        {patient.medical_info.chronicConditions.map((condition, index) => (
+                        {patient.medical_info.chronicConditions.slice(0, 5).map((condition, index) => (
                           <div key={index} className="flex items-center">
                             <div className="w-2 h-2 rounded-full bg-warning-500 mr-3"></div>
                             <p className="text-gray-900">{condition}</p>
                           </div>
                         ))}
+                        {patient.medical_info.chronicConditions.length > 5 && (
+                          <p className="text-sm text-gray-500">
+                            +{patient.medical_info.chronicConditions.length - 5} more conditions
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -375,10 +392,13 @@ const PatientDetails: React.FC = () => {
                         <Pill className="h-5 w-5 text-primary-500 mr-2" />
                         <h3 className="text-lg font-medium text-gray-900">Current Medications</h3>
                       </div>
+                      <Link to={`/patients/${patient.id}/prescriptions`} className="text-sm text-primary-600 hover:text-primary-800">
+                        View All
+                      </Link>
                     </div>
                     <div className="border-t border-gray-200 px-4 py-5 sm:p-6">
                       <div className="space-y-4">
-                        {patient.medical_info.currentMedications.map((medication, index) => (
+                        {patient.medical_info.currentMedications.slice(0, 3).map((medication, index) => (
                           <div key={index} className="flex items-start">
                             <Pill className="h-5 w-5 text-gray-400 mr-3 mt-0.5" />
                             <div>
@@ -387,6 +407,11 @@ const PatientDetails: React.FC = () => {
                             </div>
                           </div>
                         ))}
+                        {patient.medical_info.currentMedications.length > 3 && (
+                          <p className="text-sm text-gray-500">
+                            +{patient.medical_info.currentMedications.length - 3} more medications
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -398,101 +423,101 @@ const PatientDetails: React.FC = () => {
           {activeTab === 'medical_records' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <Link to={`/patients/${patient.id}/consultations`} className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-4">
                     <FileText className="h-8 w-8 text-primary-500 mr-3" />
                     <h3 className="text-lg font-medium text-gray-900">Consultations</h3>
                   </div>
                   <p className="text-gray-600">View all consultation notes and diagnoses</p>
-                </div>
+                </Link>
                 
-                <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <Link to={`/patients/${patient.id}/prescriptions`} className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-4">
                     <Pill className="h-8 w-8 text-success-500 mr-3" />
                     <h3 className="text-lg font-medium text-gray-900">Prescriptions</h3>
                   </div>
                   <p className="text-gray-600">View medication history and current prescriptions</p>
-                </div>
+                </Link>
                 
-                <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <Link to={`/patients/${patient.id}/lab-results`} className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-4">
                     <Microscope className="h-8 w-8 text-warning-500 mr-3" />
                     <h3 className="text-lg font-medium text-gray-900">Lab Results</h3>
                   </div>
                   <p className="text-gray-600">View laboratory test results and reports</p>
-                </div>
+                </Link>
                 
-                <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <Link to={`/patients/${patient.id}/radiology`} className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-4">
                     <FileImage className="h-8 w-8 text-error-500 mr-3" />
                     <h3 className="text-lg font-medium text-gray-900">Radiology</h3>
                   </div>
                   <p className="text-gray-600">View imaging studies and radiology reports</p>
-                </div>
+                </Link>
                 
-                <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <Link to={`/patients/${patient.id}/immunizations`} className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-4">
                     <Syringe className="h-8 w-8 text-accent-500 mr-3" />
                     <h3 className="text-lg font-medium text-gray-900">Immunizations</h3>
                   </div>
                   <p className="text-gray-600">View vaccination history and schedule</p>
-                </div>
+                </Link>
                 
-                <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <Link to={`/patients/${patient.id}/allergies`} className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-4">
                     <AlertTriangle className="h-8 w-8 text-error-500 mr-3" />
                     <h3 className="text-lg font-medium text-gray-900">Allergies</h3>
                   </div>
                   <p className="text-gray-600">View documented allergies and reactions</p>
-                </div>
+                </Link>
                 
-                <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <Link to={`/patients/${patient.id}/vital-signs`} className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-4">
                     <Activity className="h-8 w-8 text-primary-500 mr-3" />
                     <h3 className="text-lg font-medium text-gray-900">Vital Signs</h3>
                   </div>
                   <p className="text-gray-600">View vital signs history and trends</p>
-                </div>
+                </Link>
                 
-                <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <Link to={`/patients/${patient.id}/growth-charts`} className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-4">
                     <LineChart className="h-8 w-8 text-success-500 mr-3" />
                     <h3 className="text-lg font-medium text-gray-900">Growth Charts</h3>
                   </div>
                   <p className="text-gray-600">View growth and development metrics</p>
-                </div>
+                </Link>
                 
-                <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <Link to={`/patients/${patient.id}/medical-history`} className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-4">
                     <FileBarChart2 className="h-8 w-8 text-warning-500 mr-3" />
                     <h3 className="text-lg font-medium text-gray-900">Medical History</h3>
                   </div>
                   <p className="text-gray-600">View past and current medical conditions</p>
-                </div>
+                </Link>
 
-                <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <Link to={`/patients/${patient.id}/documents`} className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-4">
                     <FolderOpen className="h-8 w-8 text-accent-500 mr-3" />
                     <h3 className="text-lg font-medium text-gray-900">Documents</h3>
                   </div>
                   <p className="text-gray-600">View uploaded medical documents</p>
-                </div>
+                </Link>
 
-                <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <Link to={`/patients/${patient.id}/care-plans`} className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-4">
                     <ClipboardList className="h-8 w-8 text-primary-500 mr-3" />
                     <h3 className="text-lg font-medium text-gray-900">Care Plans</h3>
                   </div>
                   <p className="text-gray-600">View treatment and care plans</p>
-                </div>
+                </Link>
 
-                <div className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
+                <Link to={`/patients/${patient.id}/referrals`} className="bg-white p-6 rounded-lg border border-gray-200 hover:shadow-md transition-shadow">
                   <div className="flex items-center mb-4">
                     <ArrowUpRight className="h-8 w-8 text-error-500 mr-3" />
                     <h3 className="text-lg font-medium text-gray-900">Referrals</h3>
                   </div>
                   <p className="text-gray-600">View specialist referrals</p>
-                </div>
+                </Link>
               </div>
             </div>
           )}
@@ -501,9 +526,9 @@ const PatientDetails: React.FC = () => {
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium text-gray-900">Appointments</h3>
-                <button className="btn btn-primary btn-sm">
+                <Link to={`/appointments/new?patientId=${patient.id}`} className="btn btn-primary btn-sm">
                   Schedule Appointment
-                </button>
+                </Link>
               </div>
               
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
@@ -545,9 +570,9 @@ const PatientDetails: React.FC = () => {
             <div className="space-y-6">
               <div className="flex justify-between items-center">
                 <h3 className="text-lg font-medium text-gray-900">Billing History</h3>
-                <button className="btn btn-primary btn-sm">
+                <Link to={`/billing/new?patientId=${patient.id}`} className="btn btn-primary btn-sm">
                   Create Invoice
-                </button>
+                </Link>
               </div>
               
               <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
