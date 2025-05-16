@@ -3,7 +3,29 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
-import { User, Activity, FileText, Pill, AlertTriangle, Stethoscope, Building2, Save, ArrowLeft, Brain, Thermometer, Ruler, Droplets, Scale, Hash, Heart, Clock, Calculator, AlertCircle } from 'lucide-react';
+import { 
+  User, 
+  Activity, 
+  FileText, 
+  Pill, 
+  AlertTriangle, 
+  Stethoscope, 
+  Building2, 
+  Save, 
+  ArrowLeft, 
+  Brain, 
+  Thermometer, 
+  Ruler, 
+  Droplets, 
+  Scale, 
+  Hash, 
+  Heart, 
+  Clock, 
+  Calculator, 
+  AlertCircle,
+  CheckCircle,
+  ChevronRight
+} from 'lucide-react';
 
 interface TriageFormData {
   vitalSigns: {
@@ -71,6 +93,7 @@ const TriageForm: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'vitals' | 'medical-history' | 'assessment'>('vitals');
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [currentStep, setCurrentStep] = useState(1);
   
   const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<TriageFormData>({
     defaultValues: {
@@ -325,6 +348,26 @@ const TriageForm: React.FC = () => {
     }`;
   };
 
+  const nextStep = () => {
+    if (currentStep < 3) {
+      setCurrentStep(currentStep + 1);
+      
+      // Map step to tab
+      if (currentStep === 1) setActiveTab('medical-history');
+      if (currentStep === 2) setActiveTab('assessment');
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+      
+      // Map step to tab
+      if (currentStep === 2) setActiveTab('vitals');
+      if (currentStep === 3) setActiveTab('medical-history');
+    }
+  };
+
   const onSubmit = async (data: TriageFormData) => {
     if (!user || !patient) return;
     
@@ -455,21 +498,21 @@ const TriageForm: React.FC = () => {
     <div className="max-w-4xl mx-auto">
       <form onSubmit={handleSubmit(onSubmit)}>
         {/* Patient Header */}
-        <div className="bg-gradient-to-r from-primary-700 to-primary-600 rounded-lg shadow-sm p-2.5 mb-2.5">
+        <div className="bg-gradient-to-r from-primary-700 to-primary-600 rounded-lg shadow-md p-4 mb-4">
           <div className="flex items-center">
-            <div className="h-9 w-9 rounded-full bg-white text-primary-600 flex items-center justify-center text-base font-bold shadow-sm">
+            <div className="h-12 w-12 rounded-full bg-white text-primary-600 flex items-center justify-center text-lg font-bold shadow-md">
               {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
             </div>
-            <div className="ml-2.5">
-              <h2 className="text-base font-bold text-white">
+            <div className="ml-4">
+              <h2 className="text-xl font-bold text-white">
                 {patient.first_name} {patient.last_name}
               </h2>
-              <div className="flex items-center text-primary-100 text-xs">
-                <User className="h-3 w-3 mr-1" />
+              <div className="flex items-center text-primary-100 text-sm">
+                <User className="h-4 w-4 mr-1" />
                 <span>{calculateAge(patient.date_of_birth)} years • {patient.gender}</span>
-                <span className="mx-1">•</span>
-                <Clock className="h-3 w-3 mr-1" />
-                <span className="bg-black bg-opacity-20 px-1.5 py-0.5 rounded">
+                <span className="mx-2">•</span>
+                <Clock className="h-4 w-4 mr-1" />
+                <span className="bg-black bg-opacity-20 px-2 py-0.5 rounded">
                   {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                 </span>
               </div>
@@ -477,492 +520,548 @@ const TriageForm: React.FC = () => {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-2.5">
-          <div className="flex border-b border-gray-200">
-            <button
-              type="button"
-              className={`flex-1 py-1.5 px-2.5 text-center text-xs font-medium ${
-                activeTab === 'vitals'
-                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => setActiveTab('vitals')}
-            >
-              <Activity className="h-3 w-3 inline mr-1" />
-              Vital Signs
-            </button>
-            <button
-              type="button"
-              className={`flex-1 py-1.5 px-2.5 text-center text-xs font-medium ${
-                activeTab === 'medical-history'
-                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => setActiveTab('medical-history')}
-            >
-              <FileText className="h-3 w-3 inline mr-1" />
-              Medical History
-            </button>
-            <button
-              type="button"
-              className={`flex-1 py-1.5 px-2.5 text-center text-xs font-medium ${
-                activeTab === 'assessment'
-                  ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              onClick={() => setActiveTab('assessment')}
-            >
-              <Stethoscope className="h-3 w-3 inline mr-1" />
-              Assessment
-            </button>
+        {/* Progress Steps */}
+        <div className="bg-white rounded-lg shadow-md mb-4">
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  currentStep >= 1 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'
+                }`}>
+                  {currentStep > 1 ? <CheckCircle className="h-5 w-5" /> : 1}
+                </div>
+                <div className={`h-1 w-12 ${
+                  currentStep > 1 ? 'bg-primary-500' : 'bg-gray-200'
+                }`}></div>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  currentStep >= 2 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'
+                }`}>
+                  {currentStep > 2 ? <CheckCircle className="h-5 w-5" /> : 2}
+                </div>
+                <div className={`h-1 w-12 ${
+                  currentStep > 2 ? 'bg-primary-500' : 'bg-gray-200'
+                }`}></div>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  currentStep >= 3 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'
+                }`}>
+                  3
+                </div>
+              </div>
+              <div className="text-sm text-gray-500">
+                Step {currentStep} of 3
+              </div>
+            </div>
+            <div className="flex justify-between mt-2 text-xs text-gray-500">
+              <div className={currentStep === 1 ? 'text-primary-600 font-medium' : ''}>Vital Signs</div>
+              <div className={currentStep === 2 ? 'text-primary-600 font-medium' : ''}>Medical History</div>
+              <div className={currentStep === 3 ? 'text-primary-600 font-medium' : ''}>Assessment</div>
+            </div>
           </div>
         </div>
 
-        {/* Vital Signs Tab */}
-        {activeTab === 'vitals' && (
-          <div className="bg-white rounded-lg shadow-sm p-3 mb-2.5">
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="text-sm font-medium text-gray-900">Vital Signs</h3>
-              <button
-                type="button"
-                onClick={analyzeVitals}
-                disabled={isAnalyzing}
-                className="btn btn-sm btn-outline flex items-center text-xs"
-              >
-                {isAnalyzing ? (
-                  <>
-                    <div className="animate-spin rounded-full h-3 w-3 border-t-2 border-b-2 border-primary-500 mr-1"></div>
-                    Analyzing...
-                  </>
-                ) : (
-                  <>
-                    <Brain className="h-3 w-3 mr-1" />
-                    Analyze Vitals
-                  </>
-                )}
-              </button>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="form-label text-xs">Temperature (°C)</label>
-                <div className="flex items-center">
-                  <Thermometer className="h-3 w-3 text-gray-400 mr-1" />
-                  <input
-                    type="number"
-                    step="0.1"
-                    {...register('vitalSigns.temperature')}
-                    className="form-input py-1 text-sm"
-                    placeholder="36.5"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="form-label text-xs">Heart Rate (bpm)</label>
-                <div className="flex items-center">
-                  <Heart className="h-3 w-3 text-gray-400 mr-1" />
-                  <input
-                    type="number"
-                    {...register('vitalSigns.heartRate')}
-                    className="form-input py-1 text-sm"
-                    placeholder="75"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="form-label text-xs">Respiratory Rate (breaths/min)</label>
-                <div className="flex items-center">
-                  <Activity className="h-3 w-3 text-gray-400 mr-1" />
-                  <input
-                    type="number"
-                    {...register('vitalSigns.respiratoryRate')}
-                    className="form-input py-1 text-sm"
-                    placeholder="16"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="form-label text-xs">Blood Pressure (mmHg)</label>
-                <div className="flex items-center space-x-1">
-                  <input
-                    type="number"
-                    {...register('vitalSigns.bloodPressureSystolic')}
-                    className="form-input py-1 text-sm w-1/2"
-                    placeholder="120"
-                  />
-                  <span className="text-gray-500">/</span>
-                  <input
-                    type="number"
-                    {...register('vitalSigns.bloodPressureDiastolic')}
-                    className="form-input py-1 text-sm w-1/2"
-                    placeholder="80"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="form-label text-xs">Oxygen Saturation (%)</label>
-                <div className="flex items-center">
-                  <Droplets className="h-3 w-3 text-gray-400 mr-1" />
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    {...register('vitalSigns.oxygenSaturation')}
-                    className="form-input py-1 text-sm"
-                    placeholder="98"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="form-label text-xs">Pain Level (0-10)</label>
-                <Controller
-                  name="vitalSigns.painLevel"
-                  control={control}
-                  render={({ field }) => (
-                    <div className="flex items-center">
-                      <input
-                        type="range"
-                        min="0"
-                        max="10"
-                        step="1"
-                        {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value))}
-                        className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <span className="ml-2 text-sm font-medium">{field.value || 0}</span>
-                    </div>
+        {/* Step Content */}
+        <div className="bg-white rounded-lg shadow-md p-6 mb-4">
+          {/* Step 1: Vital Signs */}
+          {currentStep === 1 && (
+            <div>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">Vital Signs</h3>
+                <button
+                  type="button"
+                  onClick={analyzeVitals}
+                  disabled={isAnalyzing}
+                  className="btn btn-outline flex items-center text-sm"
+                >
+                  {isAnalyzing ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary-500 mr-2"></div>
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Brain className="h-4 w-4 mr-2" />
+                      Analyze Vitals
+                    </>
                   )}
-                />
+                </button>
               </div>
               
-              <div>
-                <label className="form-label text-xs">Weight (kg)</label>
-                <div className="flex items-center">
-                  <Scale className="h-3 w-3 text-gray-400 mr-1" />
-                  <input
-                    type="number"
-                    step="0.1"
-                    {...register('vitalSigns.weight')}
-                    className="form-input py-1 text-sm"
-                    placeholder="70"
-                  />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="form-label text-sm">Temperature (°C)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Thermometer className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      step="0.1"
+                      {...register('vitalSigns.temperature')}
+                      className="form-input pl-9 py-2 text-sm"
+                      placeholder="36.5"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="form-label text-sm">Heart Rate (bpm)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Heart className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      {...register('vitalSigns.heartRate')}
+                      className="form-input pl-9 py-2 text-sm"
+                      placeholder="75"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="form-label text-sm">Respiratory Rate (breaths/min)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Activity className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      {...register('vitalSigns.respiratoryRate')}
+                      className="form-input pl-9 py-2 text-sm"
+                      placeholder="16"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="form-label text-sm">Blood Pressure (mmHg)</label>
+                  <div className="flex items-center space-x-2">
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        {...register('vitalSigns.bloodPressureSystolic')}
+                        className="form-input py-2 text-sm"
+                        placeholder="120"
+                      />
+                    </div>
+                    <span className="text-gray-500">/</span>
+                    <div className="relative flex-1">
+                      <input
+                        type="number"
+                        {...register('vitalSigns.bloodPressureDiastolic')}
+                        className="form-input py-2 text-sm"
+                        placeholder="80"
+                      />
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="form-label text-sm">Oxygen Saturation (%)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Droplets className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      {...register('vitalSigns.oxygenSaturation')}
+                      className="form-input pl-9 py-2 text-sm"
+                      placeholder="98"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="form-label text-sm">Pain Level (0-10)</label>
+                  <div className="space-y-2">
+                    <Controller
+                      name="vitalSigns.painLevel"
+                      control={control}
+                      render={({ field }) => (
+                        <div className="flex items-center">
+                          <input
+                            type="range"
+                            min="0"
+                            max="10"
+                            step="1"
+                            {...field}
+                            onChange={(e) => field.onChange(parseInt(e.target.value))}
+                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                          />
+                          <span className="ml-2 text-sm font-medium bg-primary-100 text-primary-800 px-2 py-1 rounded-md min-w-[2rem] text-center">
+                            {field.value || 0}
+                          </span>
+                        </div>
+                      )}
+                    />
+                    <div className="flex justify-between text-xs text-gray-500">
+                      <span>No pain</span>
+                      <span>Moderate</span>
+                      <span>Severe</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="form-label text-sm">Weight (kg)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Scale className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      step="0.1"
+                      {...register('vitalSigns.weight')}
+                      className="form-input pl-9 py-2 text-sm"
+                      placeholder="70"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="form-label text-sm">Height (cm)</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Ruler className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      {...register('vitalSigns.height')}
+                      className="form-input pl-9 py-2 text-sm"
+                      placeholder="170"
+                    />
+                  </div>
+                </div>
+                
+                <div className="space-y-1">
+                  <label className="form-label text-sm">BMI</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Calculator className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      step="0.1"
+                      {...register('vitalSigns.bmi')}
+                      className="form-input pl-9 py-2 text-sm bg-gray-50"
+                      placeholder="Calculated"
+                      readOnly
+                    />
+                  </div>
                 </div>
               </div>
               
-              <div>
-                <label className="form-label text-xs">Height (cm)</label>
-                <div className="flex items-center">
-                  <Ruler className="h-3 w-3 text-gray-400 mr-1" />
-                  <input
-                    type="number"
-                    {...register('vitalSigns.height')}
-                    className="form-input py-1 text-sm"
-                    placeholder="170"
+              {aiAnalysis && (
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                  <div className="flex items-start">
+                    <Brain className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-700">AI Analysis</h4>
+                      <pre className="text-sm text-blue-600 whitespace-pre-wrap font-sans mt-2">{aiAnalysis}</pre>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Step 2: Medical History */}
+          {currentStep === 2 && (
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Medical History</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="form-label text-sm">Chronic Conditions</label>
+                  <div className="grid grid-cols-2 gap-2 mb-2">
+                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                      <input
+                        type="checkbox"
+                        id="diabetes"
+                        value="Diabetes Mellitus"
+                        {...register('medicalHistory.chronicConditions')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="diabetes" className="text-sm text-gray-700">
+                        Diabetes Mellitus
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                      <input
+                        type="checkbox"
+                        id="hypertension"
+                        value="Hypertension"
+                        {...register('medicalHistory.chronicConditions')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="hypertension" className="text-sm text-gray-700">
+                        Hypertension
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                      <input
+                        type="checkbox"
+                        id="heartDisease"
+                        value="Heart Disease"
+                        {...register('medicalHistory.chronicConditions')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="heartDisease" className="text-sm text-gray-700">
+                        Heart Disease
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                      <input
+                        type="checkbox"
+                        id="asthma"
+                        value="Asthma"
+                        {...register('medicalHistory.chronicConditions')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="asthma" className="text-sm text-gray-700">
+                        Asthma
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                      <input
+                        type="checkbox"
+                        id="cancer"
+                        value="Cancer"
+                        {...register('medicalHistory.chronicConditions')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="cancer" className="text-sm text-gray-700">
+                        Cancer
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                      <input
+                        type="checkbox"
+                        id="surgeries"
+                        value="Previous Surgeries"
+                        {...register('medicalHistory.chronicConditions')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="surgeries" className="text-sm text-gray-700">
+                        Previous Surgeries
+                      </label>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <label className="form-label text-sm">Other Chronic Illnesses</label>
+                    <textarea
+                      {...register('medicalHistory.otherConditions')}
+                      className="form-input py-2 text-sm"
+                      rows={2}
+                      placeholder="Enter any other chronic illnesses..."
+                    />
+                  </div>
+                </div>
+                
+                <div className="p-4 bg-gray-50 rounded-lg">
+                  <div className="flex items-center mb-2">
+                    <AlertCircle className="h-4 w-4 text-warning-500 mr-2" />
+                    <label className="form-label text-sm mb-0 font-medium">Allergies</label>
+                  </div>
+                  <div className="flex items-center mb-2">
+                    <input
+                      type="checkbox"
+                      id="hasAllergies"
+                      {...register('medicalHistory.allergies.hasAllergies')}
+                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    />
+                    <label htmlFor="hasAllergies" className="ml-2 text-sm text-gray-700">
+                      Patient has allergies
+                    </label>
+                  </div>
+                  
+                  {hasAllergies && (
+                    <textarea
+                      {...register('medicalHistory.allergies.allergyList')}
+                      className="form-input py-2 text-sm w-full"
+                      rows={2}
+                      placeholder="List allergies, separated by commas (e.g., Penicillin, Peanuts, Latex)..."
+                    />
+                  )}
+                </div>
+                
+                <div>
+                  <div className="flex items-center mb-2">
+                    <Pill className="h-4 w-4 text-gray-400 mr-2" />
+                    <label className="form-label text-sm mb-0">Current Medications</label>
+                  </div>
+                  <textarea
+                    {...register('medicalHistory.currentMedications')}
+                    className="form-input py-2 text-sm"
+                    rows={2}
+                    placeholder="Enter current medications, separated by commas (e.g., Lisinopril 10mg, Metformin 500mg)..."
                   />
                 </div>
-              </div>
-              
-              <div>
-                <label className="form-label text-xs">BMI</label>
-                <div className="flex items-center">
-                  <Calculator className="h-3 w-3 text-gray-400 mr-1" />
-                  <input
-                    type="number"
-                    step="0.1"
-                    {...register('vitalSigns.bmi')}
-                    className="form-input py-1 text-sm bg-gray-50"
-                    placeholder="Calculated"
-                    readOnly
+                
+                <div>
+                  <label className="form-label text-sm">Family History</label>
+                  <textarea
+                    {...register('medicalHistory.familyHistory')}
+                    className="form-input py-2 text-sm"
+                    rows={2}
+                    placeholder="Enter relevant family medical history..."
                   />
                 </div>
               </div>
             </div>
-            
-            {aiAnalysis && (
-              <div className="mt-3 p-2 bg-blue-50 border border-blue-100 rounded-md">
-                <div className="flex items-start">
-                  <Brain className="h-4 w-4 text-blue-500 mt-0.5 mr-1.5 flex-shrink-0" />
-                  <div>
-                    <h4 className="text-xs font-medium text-blue-700">AI Analysis</h4>
-                    <pre className="text-xs text-blue-600 whitespace-pre-wrap font-sans mt-1">{aiAnalysis}</pre>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+          )}
 
-        {/* Medical History Tab */}
-        {activeTab === 'medical-history' && (
-          <div className="bg-white rounded-lg shadow-sm p-3 mb-2.5">
-            <h3 className="text-sm font-medium text-gray-900 mb-2">Medical History</h3>
-            
-            <div className="space-y-2">
-              <div>
-                <label className="form-label text-xs">Chronic Conditions</label>
-                <div className="grid grid-cols-2 gap-1 mb-1">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="diabetes"
-                      value="Diabetes Mellitus"
-                      {...register('medicalHistory.chronicConditions')}
-                      className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="diabetes" className="ml-1 text-xs text-gray-700">
-                      Diabetes Mellitus
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="hypertension"
-                      value="Hypertension"
-                      {...register('medicalHistory.chronicConditions')}
-                      className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="hypertension" className="ml-1 text-xs text-gray-700">
-                      Hypertension
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="heartDisease"
-                      value="Heart Disease"
-                      {...register('medicalHistory.chronicConditions')}
-                      className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="heartDisease" className="ml-1 text-xs text-gray-700">
-                      Heart Disease
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="asthma"
-                      value="Asthma"
-                      {...register('medicalHistory.chronicConditions')}
-                      className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="asthma" className="ml-1 text-xs text-gray-700">
-                      Asthma
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="cancer"
-                      value="Cancer"
-                      {...register('medicalHistory.chronicConditions')}
-                      className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="cancer" className="ml-1 text-xs text-gray-700">
-                      Cancer
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      id="surgeries"
-                      value="Previous Surgeries"
-                      {...register('medicalHistory.chronicConditions')}
-                      className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                    />
-                    <label htmlFor="surgeries" className="ml-1 text-xs text-gray-700">
-                      Previous Surgeries
-                    </label>
+          {/* Step 3: Assessment */}
+          {currentStep === 3 && (
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Assessment</h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="form-label text-sm required">Chief Complaint</label>
+                  <textarea
+                    {...register('chiefComplaint', { required: 'Chief complaint is required' })}
+                    className={`form-input py-2 text-sm ${errors.chiefComplaint ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    rows={3}
+                    placeholder="Describe the patient's main complaint"
+                  />
+                  {errors.chiefComplaint && (
+                    <p className="form-error text-sm mt-1">{errors.chiefComplaint.message}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <label className="form-label text-sm required">Acuity Level</label>
+                  <div className="grid grid-cols-5 gap-2">
+                    {[1, 2, 3, 4, 5].map((level) => (
+                      <button
+                        key={level}
+                        type="button"
+                        onClick={() => setValue('acuityLevel', level)}
+                        className={`p-3 text-sm font-medium rounded-lg flex flex-col items-center justify-center transition-colors ${
+                          acuityLevel === level
+                            ? level === 1 ? 'bg-red-100 text-red-800 border border-red-200'
+                            : level === 2 ? 'bg-orange-100 text-orange-800 border border-orange-200'
+                            : level === 3 ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
+                            : level === 4 ? 'bg-green-100 text-green-800 border border-green-200'
+                            : 'bg-blue-100 text-blue-800 border border-blue-200'
+                            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+                        }`}
+                      >
+                        <span className="text-lg font-bold mb-1">{level}</span>
+                        <span className="text-xs">
+                          {level === 1 ? 'Critical' 
+                          : level === 2 ? 'Emergency'
+                          : level === 3 ? 'Urgent'
+                          : level === 4 ? 'Standard'
+                          : 'Non-urgent'}
+                        </span>
+                      </button>
+                    ))}
                   </div>
                 </div>
                 
                 <div>
-                  <label className="form-label text-xs">Other Chronic Illnesses</label>
-                  <textarea
-                    {...register('medicalHistory.otherConditions')}
-                    className="form-input py-1 text-sm"
-                    rows={2}
-                    placeholder="Enter any other chronic illnesses..."
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <div className="flex items-center mb-1">
-                  <AlertCircle className="h-3 w-3 text-warning-500 mr-1" />
-                  <label className="form-label text-xs mb-0">Allergies</label>
-                </div>
-                <div className="flex items-center mb-1">
-                  <input
-                    type="checkbox"
-                    id="hasAllergies"
-                    {...register('medicalHistory.allergies.hasAllergies')}
-                    className="h-3 w-3 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
-                  />
-                  <label htmlFor="hasAllergies" className="ml-1 text-xs text-gray-700">
-                    Patient has allergies
-                  </label>
+                  <label className="form-label text-sm required">Department</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Building2 className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <select
+                      {...register('departmentId', { required: 'Department is required' })}
+                      className={`form-input pl-9 py-2 text-sm w-full ${errors.departmentId ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    >
+                      <option value="">Select department</option>
+                      {departments.map((dept) => (
+                        <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {errors.departmentId && (
+                    <p className="form-error text-sm mt-1">{errors.departmentId.message}</p>
+                  )}
                 </div>
                 
-                {hasAllergies && (
+                <div>
+                  <label className="form-label text-sm">Notes</label>
                   <textarea
-                    {...register('medicalHistory.allergies.allergyList')}
-                    className="form-input py-1 text-sm"
-                    rows={2}
-                    placeholder="List allergies, separated by commas..."
+                    {...register('notes')}
+                    className="form-input py-2 text-sm"
+                    rows={3}
+                    placeholder="Additional notes about the patient's condition"
                   />
-                )}
-              </div>
-              
-              <div>
-                <div className="flex items-center mb-1">
-                  <Pill className="h-3 w-3 text-gray-400 mr-1" />
-                  <label className="form-label text-xs mb-0">Current Medications</label>
                 </div>
-                <textarea
-                  {...register('medicalHistory.currentMedications')}
-                  className="form-input py-1 text-sm"
-                  rows={2}
-                  placeholder="Enter current medications..."
-                />
-              </div>
-              
-              <div>
-                <label className="form-label text-xs">Family History</label>
-                <textarea
-                  {...register('medicalHistory.familyHistory')}
-                  className="form-input py-1 text-sm"
-                  rows={2}
-                  placeholder="Enter family history..."
-                />
+                
+                <div className="flex items-center p-4 bg-gray-50 rounded-lg">
+                  <input
+                    type="checkbox"
+                    id="isEmergency"
+                    {...register('isEmergency')}
+                    className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                  />
+                  <label htmlFor="isEmergency" className="ml-2 flex items-center text-sm font-medium text-red-700">
+                    <AlertTriangle className="h-4 w-4 mr-1 text-red-500" />
+                    Mark as Emergency Case
+                  </label>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
 
-        {/* Assessment Tab */}
-        {activeTab === 'assessment' && (
-          <div className="bg-white rounded-lg shadow-sm p-3 mb-2.5">
-            <div>
-              <label className="form-label text-xs required">Chief Complaint</label>
-              <textarea
-                {...register('chiefComplaint', { required: 'Chief complaint is required' })}
-                className="form-input py-1 text-sm"
-                rows={2}
-                placeholder="Describe the patient's main complaint"
-              />
-              {errors.chiefComplaint && (
-                <p className="form-error text-xs">{errors.chiefComplaint.message}</p>
-              )}
-            </div>
-            
-            <div className="mt-2">
-              <label className="form-label text-xs required">Acuity Level</label>
-              <div className="grid grid-cols-5 gap-1">
-                {[1, 2, 3, 4, 5].map((level) => (
-                  <button
-                    key={level}
-                    type="button"
-                    onClick={() => setValue('acuityLevel', level)}
-                    className={`py-1 px-2 text-xs font-medium rounded-md flex flex-col items-center justify-center ${
-                      acuityLevel === level
-                        ? level === 1 ? 'bg-red-100 text-red-800 border border-red-200'
-                        : level === 2 ? 'bg-orange-100 text-orange-800 border border-orange-200'
-                        : level === 3 ? 'bg-yellow-100 text-yellow-800 border border-yellow-200'
-                        : level === 4 ? 'bg-green-100 text-green-800 border border-green-200'
-                        : 'bg-blue-100 text-blue-800 border border-blue-200'
-                        : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-                    }`}
-                  >
-                    <span>{level}</span>
-                    <span className="text-[10px]">
-                      {level === 1 ? 'Critical' 
-                      : level === 2 ? 'Emergency'
-                      : level === 3 ? 'Urgent'
-                      : level === 4 ? 'Standard'
-                      : 'Non-urgent'}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            
-            <div className="mt-2">
-              <label className="form-label text-xs required">Department</label>
-              <div className="flex items-center">
-                <Building2 className="h-3 w-3 text-gray-400 mr-1" />
-                <select
-                  {...register('departmentId', { required: 'Department is required' })}
-                  className="form-input py-1 text-sm w-full"
-                >
-                  <option value="">Select department</option>
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>{dept.name}</option>
-                  ))}
-                </select>
-              </div>
-              {errors.departmentId && (
-                <p className="form-error text-xs">{errors.departmentId.message}</p>
-              )}
-            </div>
-            
-            <div className="mt-2">
-              <label className="form-label text-xs">Notes</label>
-              <textarea
-                {...register('notes')}
-                className="form-input py-1 text-sm"
-                rows={2}
-                placeholder="Additional notes about the patient's condition"
-              />
-            </div>
-            
-            <div className="mt-2 flex items-center">
-              <input
-                type="checkbox"
-                id="isEmergency"
-                {...register('isEmergency')}
-                className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-              />
-              <label htmlFor="isEmergency" className="ml-2 flex items-center text-xs font-medium text-red-700 bg-red-50 px-2 py-1 rounded">
-                <AlertTriangle className="h-3 w-3 mr-1 text-red-500" />
-                Mark as Emergency Case
-              </label>
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
+        {/* Navigation Buttons */}
         <div className="flex justify-between">
-          <button
-            type="button"
-            onClick={() => navigate('/patients')}
-            className="btn btn-sm btn-outline flex items-center"
-          >
-            <ArrowLeft className="h-4 w-4 mr-1" />
-            Back
-          </button>
-          <button
-            type="submit"
-            disabled={isSaving}
-            className="btn btn-sm btn-primary flex items-center"
-          >
-            {isSaving ? (
-              <>
-                <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-1"></div>
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4 mr-1" />
-                Complete Triage
-              </>
-            )}
-          </button>
+          {currentStep > 1 ? (
+            <button
+              type="button"
+              onClick={prevStep}
+              className="btn btn-outline flex items-center"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => navigate('/patients')}
+              className="btn btn-outline flex items-center"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Cancel
+            </button>
+          )}
+
+          {currentStep < 3 ? (
+            <button
+              type="button"
+              onClick={nextStep}
+              className="btn btn-primary flex items-center"
+            >
+              Next
+              <ChevronRight className="h-4 w-4 ml-2" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="btn btn-primary flex items-center"
+            >
+              {isSaving ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4 mr-2" />
+                  Complete Triage
+                </>
+              )}
+            </button>
+          )}
         </div>
       </form>
     </div>
