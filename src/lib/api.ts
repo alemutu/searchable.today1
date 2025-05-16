@@ -6,8 +6,11 @@ import { sanitizeInput, safeEncodeURIComponent, apiRateLimiter } from './securit
  * This will be used to construct the full URL for each function
  */
 const getEdgeFunctionBaseUrl = () => {
-  // Use the actual Supabase URL for edge functions
-  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+  const url = import.meta.env.VITE_SUPABASE_URL;
+  if (!url) {
+    throw new Error('VITE_SUPABASE_URL environment variable is not set');
+  }
+  return `${url}/functions/v1`;
 };
 
 /**
@@ -27,10 +30,49 @@ const getHeaders = async () => {
     headers['Authorization'] = `Bearer ${data.session.access_token}`;
   } else {
     // For development/testing, use the anon key when no session is available
-    headers['Authorization'] = `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
+    const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!anonKey) {
+      throw new Error('VITE_SUPABASE_ANON_KEY environment variable is not set');
+    }
+    headers['Authorization'] = `Bearer ${anonKey}`;
   }
   
   return headers;
+};
+
+/**
+ * Make a secure API request with retry logic
+ */
+const makeSecureRequest = async (url: string, options: RequestInit, retries = 3): Promise<Response> => {
+  let lastError: Error | null = null;
+  
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const response = await fetch(url, {
+        ...options,
+        credentials: 'include',
+        mode: 'cors'
+      });
+      
+      // Check if the response is ok
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
+        throw new Error(errorData.error || `HTTP error ${response.status}`);
+      }
+      
+      return response;
+    } catch (error: any) {
+      console.error(`Attempt ${attempt + 1} failed:`, error);
+      lastError = error;
+      
+      // Wait before retrying (exponential backoff)
+      if (attempt < retries - 1) {
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+      }
+    }
+  }
+  
+  throw lastError || new Error('Failed to make request after multiple attempts');
 };
 
 /**
@@ -120,20 +162,11 @@ export const hospitalOnboardingApi = {
       console.log('Calling edge function with URL:', url);
       console.log('Request data:', JSON.stringify(sanitizedData, null, 2));
 
-      const response = await fetch(url, {
+      const response = await makeSecureRequest(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(sanitizedData),
-        credentials: 'include'
-      }).catch(error => {
-        console.error('Network error:', error);
-        throw new Error('Failed to connect to the server. Please check your internet connection.');
+        body: JSON.stringify(sanitizedData)
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-        throw new Error(errorData.error || `Failed to create hospital: ${response.statusText}`);
-      }
 
       const result = await response.json();
       console.log('Edge function response:', result);
@@ -154,19 +187,10 @@ export const hospitalOnboardingApi = {
 
       console.log('Fetching hospitals from:', url);
 
-      const response = await fetch(url, {
+      const response = await makeSecureRequest(url, {
         method: 'GET',
-        headers,
-        credentials: 'include'
-      }).catch(error => {
-        console.error('Network error:', error);
-        throw new Error('Failed to connect to the server. Please check your internet connection.');
+        headers
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-        throw new Error(errorData.error || `Failed to fetch hospitals: ${response.statusText}`);
-      }
 
       const result = await response.json();
       console.log('Hospitals fetched:', result);
@@ -192,19 +216,10 @@ export const hospitalOnboardingApi = {
 
       console.log('Fetching hospital details from:', url);
 
-      const response = await fetch(url, {
+      const response = await makeSecureRequest(url, {
         method: 'GET',
-        headers,
-        credentials: 'include'
-      }).catch(error => {
-        console.error('Network error:', error);
-        throw new Error('Failed to connect to the server. Please check your internet connection.');
+        headers
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-        throw new Error(errorData.error || `Failed to fetch hospital: ${response.statusText}`);
-      }
 
       const result = await response.json();
       console.log('Hospital details fetched:', result);
@@ -219,6 +234,12 @@ export const hospitalOnboardingApi = {
    * Check if a subdomain is available
    */
   checkSubdomain: async (subdomain: string) => {
+    // Rate limit check
+    const clientIp = 'client-ip'; // In a real app, this would be the client's IP
+    if (!apiRateLimiter.attempt(clientIp)) {
+      throw new Error('Rate limit exceeded. Please try again later.');
+    }
+    
     // Validate subdomain format
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(subdomain)) {
       throw new Error('Invalid subdomain format');
@@ -227,29 +248,20 @@ export const hospitalOnboardingApi = {
     try {
       const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/check-subdomain/${safeEncodeURIComponent(subdomain)}`;
       const headers = await getHeaders();
-
+      
       console.log('Checking subdomain availability at:', url);
-
-      const response = await fetch(url, {
+      
+      const response = await makeSecureRequest(url, {
         method: 'GET',
-        headers,
-        credentials: 'include'
-      }).catch(error => {
-        console.error('Network error:', error);
-        throw new Error('Failed to connect to the server. Please check your internet connection.');
+        headers
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-        throw new Error(errorData.error || `Failed to check subdomain: ${response.statusText}`);
-      }
-
+      
       const result = await response.json();
       console.log('Subdomain check result:', result);
       return result;
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking subdomain:', error);
-      throw error;
+      throw new Error('Failed to check subdomain availability. Please try again later.');
     }
   }
 };
@@ -269,19 +281,10 @@ export const licenseApi = {
 
       console.log('Fetching licenses from:', url);
 
-      const response = await fetch(url, {
+      const response = await makeSecureRequest(url, {
         method: 'GET',
-        headers,
-        credentials: 'include'
-      }).catch(error => {
-        console.error('Network error:', error);
-        throw new Error('Failed to connect to the server. Please check your internet connection.');
+        headers
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-        throw new Error(errorData.error || `Failed to fetch licenses: ${response.statusText}`);
-      }
 
       const result = await response.json();
       console.log('Licenses fetched:', result);
@@ -312,20 +315,11 @@ export const licenseApi = {
       console.log('Creating license at:', url);
       console.log('License data:', data);
 
-      const response = await fetch(url, {
+      const response = await makeSecureRequest(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(data),
-        credentials: 'include'
-      }).catch(error => {
-        console.error('Network error:', error);
-        throw new Error('Failed to connect to the server. Please check your internet connection.');
+        body: JSON.stringify(data)
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-        throw new Error(errorData.error || `Failed to create license: ${response.statusText}`);
-      }
 
       const result = await response.json();
       console.log('License created:', result);
@@ -357,20 +351,11 @@ export const licenseApi = {
       console.log('Updating license status at:', url);
       console.log('Status update:', { status });
 
-      const response = await fetch(url, {
+      const response = await makeSecureRequest(url, {
         method: 'PUT',
         headers,
-        body: JSON.stringify({ status }),
-        credentials: 'include'
-      }).catch(error => {
-        console.error('Network error:', error);
-        throw new Error('Failed to connect to the server. Please check your internet connection.');
+        body: JSON.stringify({ status })
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-        throw new Error(errorData.error || `Failed to update license status: ${response.statusText}`);
-      }
 
       const result = await response.json();
       console.log('License status updated:', result);
@@ -391,19 +376,10 @@ export const licenseApi = {
 
       console.log('Fetching license metrics from:', url);
 
-      const response = await fetch(url, {
+      const response = await makeSecureRequest(url, {
         method: 'GET',
-        headers,
-        credentials: 'include'
-      }).catch(error => {
-        console.error('Network error:', error);
-        throw new Error('Failed to connect to the server. Please check your internet connection.');
+        headers
       });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-        throw new Error(errorData.error || `Failed to fetch license metrics: ${response.statusText}`);
-      }
 
       const result = await response.json();
       console.log('License metrics fetched:', result);
@@ -414,8 +390,6 @@ export const licenseApi = {
     }
   }
 };
-
-// Utility functions for secure API calls
 
 /**
  * Make a secure GET request
@@ -445,19 +419,10 @@ export const secureGet = async (url: string, params?: Record<string, string>): P
   }
   
   try {
-    const response = await fetch(url, {
+    const response = await makeSecureRequest(url, {
       method: 'GET',
-      headers,
-      credentials: 'include'
-    }).catch(error => {
-      console.error('Network error:', error);
-      throw new Error('Failed to connect to the server. Please check your internet connection.');
+      headers
     });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-      throw new Error(errorData.error || `HTTP error ${response.status}`);
-    }
     
     return response.json();
   } catch (error) {
@@ -485,20 +450,11 @@ export const securePost = async (url: string, data: any): Promise<any> => {
   }
   
   try {
-    const response = await fetch(url, {
+    const response = await makeSecureRequest(url, {
       method: 'POST',
       headers,
-      credentials: 'include',
       body: JSON.stringify(data)
-    }).catch(error => {
-      console.error('Network error:', error);
-      throw new Error('Failed to connect to the server. Please check your internet connection.');
     });
-    
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-      throw new Error(errorData.error || `HTTP error ${response.status}`);
-    }
     
     return response.json();
   } catch (error) {
