@@ -206,11 +206,54 @@ const SuperAdminDashboard: React.FC = () => {
   };
 
   const handleDeleteHospital = async (id: string) => {
-    if (!window.confirm('Are you sure you want to delete this hospital? This action cannot be undone.')) {
+    if (!window.confirm('Are you sure you want to delete this hospital? This action cannot be undone and will delete all associated data.')) {
       return;
     }
 
     try {
+      // Delete all associated data in the correct order to respect foreign key constraints
+      const tables = [
+        'hospital_modules',
+        'hospital_users',
+        'clinical_settings',
+        'clinical_protocols',
+        'billing_settings',
+        'support_tickets',
+        'reports',
+        'report_executions',
+        'report_schedules',
+        'report_subscriptions',
+        'vital_signs',
+        'allergies',
+        'medical_history',
+        'documents',
+        'pharmacy',
+        'lab_results',
+        'radiology_results',
+        'referrals',
+        'care_plans',
+        'consultations',
+        'appointments',
+        'inpatients',
+        'billing',
+        'triage',
+        'departments' // Delete departments last before the hospital
+      ];
+
+      // Delete data from each table
+      for (const table of tables) {
+        const { error } = await supabase
+          .from(table)
+          .delete()
+          .eq('hospital_id', id);
+        
+        if (error) {
+          console.error(`Error deleting from ${table}:`, error);
+          throw error;
+        }
+      }
+
+      // Finally delete the hospital
       const { error } = await supabase
         .from('hospitals')
         .delete()
@@ -222,7 +265,7 @@ const SuperAdminDashboard: React.FC = () => {
       await fetchData();
     } catch (error: any) {
       console.error('Error deleting hospital:', error.message);
-      alert(error.message);
+      alert(`Error deleting hospital: ${error.message}`);
     }
   };
 
