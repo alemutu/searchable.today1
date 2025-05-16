@@ -1,92 +1,25 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 
+// Auth store types
 interface AuthState {
-  user: any | null;
-  hospital: any | null;
-  isLoading: boolean;
-  error: string | null;
-  isAdmin: boolean;
-  isDoctor: boolean;
-  isNurse: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  signup: (email: string, password: string, metadata?: any) => Promise<void>;
+  isAuthenticated: boolean;
+  user: User | null;
+  setUser: (user: User | null) => void;
+  logout: () => void;
 }
 
+interface User {
+  id: string;
+  email: string;
+}
+
+// Auth store
 export const useAuthStore = create<AuthState>((set) => ({
+  isAuthenticated: false,
   user: null,
-  hospital: null,
-  isLoading: false,
-  error: null,
-  isAdmin: false,
-  isDoctor: false,
-  isNurse: false,
-  
-  login: async (email, password) => {
-    set({ isLoading: true, error: null });
-    try {
-      // Simulate login - in a real app, this would call supabase.auth.signInWithPassword
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Mock user data
-      const user = {
-        id: '1',
-        email,
-        role: email.includes('admin') ? 'admin' : 
-              email.includes('doctor') ? 'doctor' : 
-              email.includes('nurse') ? 'nurse' : 'user'
-      };
-      
-      // Mock hospital data
-      const hospital = {
-        id: '1',
-        name: 'General Hospital',
-        subdomain: 'general',
-        address: '123 Medical Center Dr',
-        phone: '555-123-4567',
-        email: 'info@generalhospital.com'
-      };
-      
-      set({ 
-        user, 
-        hospital,
-        isAdmin: user.role === 'admin',
-        isDoctor: user.role === 'doctor',
-        isNurse: user.role === 'nurse',
-        isLoading: false 
-      });
-    } catch (error: any) {
-      set({ error: error.message, isLoading: false });
-      throw error;
-    }
-  },
-  
-  logout: async () => {
-    set({ isLoading: true });
-    try {
-      // Simulate logout - in a real app, this would call supabase.auth.signOut
-      await new Promise(resolve => setTimeout(resolve, 300));
-      set({ user: null, hospital: null, isAdmin: false, isDoctor: false, isNurse: false, isLoading: false });
-    } catch (error: any) {
-      set({ error: error.message, isLoading: false });
-      throw error;
-    }
-  },
-  
-  signup: async (email, password, metadata) => {
-    set({ isLoading: true, error: null });
-    try {
-      // Simulate signup - in a real app, this would call supabase.auth.signUp
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      // Don't log in the user automatically after signup
-      set({ isLoading: false });
-    } catch (error: any) {
-      set({ error: error.message, isLoading: false });
-      throw error;
-    }
-  }
+  setUser: (user) => set({ user, isAuthenticated: !!user }),
+  logout: () => set({ user: null, isAuthenticated: false })
 }));
 
 // Notification store types
