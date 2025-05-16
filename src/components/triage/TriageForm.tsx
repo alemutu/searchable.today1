@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
-import { User, Activity, FileText, Pill, AlertTriangle, Syringe, Calculator, Clock, AlertCircle, Stethoscope, Building2, Save, ArrowLeft, Brain, Thermometer, Ruler, Droplets, Scale, Hash, Heart } from 'lucide-react';
+import { User, Activity, FileText, Pill, AlertTriangle, Stethoscope, Building2, Save, ArrowLeft, Brain, Thermometer, Ruler, Droplets, Scale, Hash, Heart } from 'lucide-react';
 
 interface TriageFormData {
   vitalSigns: {
@@ -425,7 +425,7 @@ const TriageForm: React.FC = () => {
               className={`flex-1 py-1.5 px-2.5 text-center text-xs font-medium ${
                 activeTab === 'vitals'
                   ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
               onClick={() => setActiveTab('vitals')}
             >
@@ -437,7 +437,7 @@ const TriageForm: React.FC = () => {
               className={`flex-1 py-1.5 px-2.5 text-center text-xs font-medium ${
                 activeTab === 'medical-history'
                   ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
               onClick={() => setActiveTab('medical-history')}
             >
@@ -449,7 +449,7 @@ const TriageForm: React.FC = () => {
               className={`flex-1 py-1.5 px-2.5 text-center text-xs font-medium ${
                 activeTab === 'assessment'
                   ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
-                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                  : 'text-gray-500 hover:text-gray-700 hover:border-gray-300'
               }`}
               onClick={() => setActiveTab('assessment')}
             >
