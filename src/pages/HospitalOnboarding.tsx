@@ -1300,3 +1300,5 @@ const HospitalOnboarding: React.FC = () => {
 };
 
 export default HospitalOnboarding;
+
+export default HospitalOnboarding
