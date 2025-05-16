@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuthStore, useNotificationStore } from '../lib/store';
+import { useHybridStorage } from '../lib/hooks/useHybridStorage';
+import { useNotificationStore } from '../lib/store';
 import { Search, Filter, FlaskRound as Flask, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, FileImage, ChevronDown, Beaker, ArrowRight, Loader2, MoreHorizontal, Layers } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -34,193 +34,22 @@ interface LabResult {
 const Laboratory: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [labResults, setLabResults] = useState<LabResult[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { hospital, user } = useAuthStore();
-  const { addNotification, hasNotifiedAbout, markAsNotified } = useNotificationStore();
-  const [activeTab, setActiveTab] = useState<'pending' | 'in_progress' | 'review'>('pending');
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState<'pending' | 'in_progress' | 'review'>('pending');
   const [assignedToMe, setAssignedToMe] = useState(false);
+  const { addNotification } = useNotificationStore();
+  
+  const { 
+    data: labResults, 
+    loading: isLoading, 
+    error, 
+    saveItem, 
+    fetchItems 
+  } = useHybridStorage<LabResult>('lab_results');
 
   useEffect(() => {
-    fetchLabResults();
-  }, [hospital]);
-
-  const fetchLabResults = async () => {
-    try {
-      // In a real app, we would fetch from Supabase
-      // For now, we'll use mock data
-      const mockResults = [
-        {
-          id: '00000000-0000-0000-0000-000000000001',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000001',
-            first_name: 'John',
-            last_name: 'Doe'
-          },
-          test_type: 'complete_blood_count',
-          test_date: '2025-05-15',
-          status: 'pending',
-          results: null,
-          reviewed_by: null,
-          is_emergency: false,
-          workflow_stage: 'pending',
-          last_updated: '2025-05-15T09:15:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000002',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000002',
-            first_name: 'Jane',
-            last_name: 'Smith'
-          },
-          test_type: 'liver_function',
-          test_date: '2025-05-15',
-          status: 'in_progress',
-          results: null,
-          reviewed_by: null,
-          is_emergency: true,
-          workflow_stage: 'sample_collected',
-          sample_info: {
-            sample_id: 'LAB-20250515-1234',
-            sample_type: 'blood',
-            collection_time: '2025-05-15T10:30:00Z',
-            container_type: 'red_top_tube'
-          },
-          assigned_to: user?.id,
-          last_updated: '2025-05-15T10:35:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000003',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000003',
-            first_name: 'Robert',
-            last_name: 'Johnson'
-          },
-          test_type: 'kidney_function',
-          test_date: '2025-05-14',
-          status: 'in_progress',
-          results: null,
-          reviewed_by: null,
-          is_emergency: false,
-          workflow_stage: 'testing',
-          sample_info: {
-            sample_id: 'LAB-20250514-5678',
-            sample_type: 'blood',
-            collection_time: '2025-05-14T14:45:00Z',
-            container_type: 'green_top_tube'
-          },
-          assigned_to: '00000000-0000-0000-0000-000000000010', // Another technician
-          last_updated: '2025-05-14T15:00:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000004',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000004',
-            first_name: 'Emily',
-            last_name: 'Williams'
-          },
-          test_type: 'lipid_profile',
-          test_date: '2025-05-14',
-          status: 'in_progress',
-          results: {
-            cholesterol: 180,
-            triglycerides: 150,
-            hdl: 45,
-            ldl: 110
-          },
-          reviewed_by: null,
-          is_emergency: false,
-          workflow_stage: 'review',
-          sample_info: {
-            sample_id: 'LAB-20250514-9012',
-            sample_type: 'blood',
-            collection_time: '2025-05-14T16:15:00Z',
-            container_type: 'purple_top_tube'
-          },
-          assigned_to: user?.id,
-          last_updated: '2025-05-14T17:30:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000005',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000005',
-            first_name: 'Michael',
-            last_name: 'Brown'
-          },
-          test_type: 'blood_glucose',
-          test_date: '2025-05-15',
-          status: 'completed',
-          results: { 
-            glucose: 95,
-            units: 'mg/dL',
-            reference_range: '70-99',
-            interpretation: 'Normal'
-          },
-          reviewed_by: {
-            first_name: 'Doctor',
-            last_name: 'Smith'
-          },
-          is_emergency: false,
-          workflow_stage: 'completed',
-          sample_info: {
-            sample_id: 'LAB-20250515-3456',
-            sample_type: 'blood',
-            collection_time: '2025-05-15T09:00:00Z',
-            container_type: 'gray_top_tube'
-          },
-          assigned_to: user?.id,
-          last_updated: '2025-05-15T10:15:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000006',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000006',
-            first_name: 'Sarah',
-            last_name: 'Davis'
-          },
-          test_type: 'urinalysis',
-          test_date: '2025-05-15',
-          status: 'pending',
-          results: null,
-          reviewed_by: null,
-          is_emergency: true,
-          workflow_stage: 'pending',
-          last_updated: '2025-05-15T11:00:00Z'
-        }
-      ];
-      
-      setLabResults(mockResults);
-      
-      // Show notification for emergency cases
-      const emergencyCases = mockResults.filter(result => result.is_emergency && (result.status === 'pending' || result.status === 'in_progress'));
-      
-      emergencyCases.forEach(emergency => {
-        // Create a unique key for this emergency
-        const emergencyKey = `lab-${emergency.id}-${emergency.patient.id}`;
-        
-        // Only show notification if we haven't already notified about this emergency
-        if (!hasNotifiedAbout(emergencyKey)) {
-          addNotification({
-            message: `EMERGENCY: ${getTestTypeLabel(emergency.test_type)} needed for ${emergency.patient.first_name} ${emergency.patient.last_name}`,
-            type: 'warning',
-            duration: 5000
-          });
-          
-          // Mark this emergency as notified
-          markAsNotified(emergencyKey);
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching laboratory results:', error);
-      addNotification({
-        message: 'Failed to load laboratory data',
-        type: 'error'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    fetchItems();
+  }, [fetchItems]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -337,12 +166,12 @@ const Laboratory: React.FC = () => {
     return `${diffDays}d ago`;
   };
 
-  const filteredResults = labResults.filter(result => {
+  const filteredResults = Array.isArray(labResults) ? labResults.filter(result => {
     const patientName = `${result.patient.first_name} ${result.patient.last_name}`.toLowerCase();
     const matchesSearch = patientName.includes(searchTerm.toLowerCase()) ||
                          result.test_type.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || result.status === filterStatus;
-    const matchesAssigned = !assignedToMe || result.assigned_to === user?.id;
+    const matchesAssigned = !assignedToMe || result.assigned_to === 'current_user'; // Replace with actual user ID
     
     if (activeTab === 'pending') {
       return result.workflow_stage === 'pending' && matchesSearch && matchesFilter && matchesAssigned;
@@ -352,126 +181,145 @@ const Laboratory: React.FC = () => {
     } else {
       return result.workflow_stage === 'review' && matchesSearch && matchesFilter && matchesAssigned;
     }
-  });
+  }) : [];
 
   // Count tests in each category
-  const pendingCount = labResults.filter(r => r.workflow_stage === 'pending').length;
-  const inProgressCount = labResults.filter(r => r.workflow_stage === 'sample_collected' || r.workflow_stage === 'testing').length;
-  const reviewCount = labResults.filter(r => r.workflow_stage === 'review').length;
-  const completedCount = labResults.filter(r => r.workflow_stage === 'completed').length;
-  const urgentCount = labResults.filter(r => r.is_emergency).length;
-  const assignedToMeCount = labResults.filter(r => r.assigned_to === user?.id).length;
+  const pendingCount = Array.isArray(labResults) ? labResults.filter(r => r.workflow_stage === 'pending').length : 0;
+  const inProgressCount = Array.isArray(labResults) ? labResults.filter(r => r.workflow_stage === 'sample_collected' || r.workflow_stage === 'testing').length : 0;
+  const reviewCount = Array.isArray(labResults) ? labResults.filter(r => r.workflow_stage === 'review').length : 0;
+  const completedCount = Array.isArray(labResults) ? labResults.filter(r => r.workflow_stage === 'completed').length : 0;
+  const urgentCount = Array.isArray(labResults) ? labResults.filter(r => r.is_emergency).length : 0;
+  const assignedToMeCount = Array.isArray(labResults) ? labResults.filter(r => r.assigned_to === 'current_user').length : 0; // Replace with actual user ID
 
   const handleStartTest = async (testId: string) => {
-    // Update the test status to in_progress
-    const updatedResults = labResults.map(result => {
-      if (result.id === testId) {
-        return {
-          ...result,
-          status: 'in_progress',
-          workflow_stage: 'sample_collected',
-          assigned_to: user?.id,
-          sample_info: {
-            sample_id: `LAB-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
-            sample_type: result.test_type === 'urinalysis' ? 'urine' : 'blood',
-            collection_time: new Date().toISOString(),
-            container_type: result.test_type === 'urinalysis' ? 'urine_container' : 
-                           result.test_type === 'complete_blood_count' ? 'purple_top_tube' :
-                           result.test_type === 'blood_glucose' ? 'gray_top_tube' : 'red_top_tube'
-          },
-          last_updated: new Date().toISOString()
-        };
-      }
-      return result;
-    });
+    if (!Array.isArray(labResults)) return;
     
-    setLabResults(updatedResults);
+    const test = labResults.find(r => r.id === testId);
+    if (!test) return;
     
-    // Show notification
-    addNotification({
-      message: `Sample collection started for ${updatedResults.find(r => r.id === testId)?.patient.first_name} ${updatedResults.find(r => r.id === testId)?.patient.last_name}`,
-      type: 'success',
-      duration: 3000
-    });
+    try {
+      // Create a sample ID
+      const date = new Date();
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const random = Math.floor(1000 + Math.random() * 9000);
+      const sampleId = `LAB-${year}${month}${day}-${random}`;
+      
+      // Update the test
+      const updatedTest: LabResult = {
+        ...test,
+        status: 'in_progress',
+        workflow_stage: 'sample_collected',
+        assigned_to: 'current_user', // Replace with actual user ID
+        sample_info: {
+          sample_id: sampleId,
+          sample_type: test.test_type === 'urinalysis' ? 'urine' : 'blood',
+          collection_time: new Date().toISOString(),
+          container_type: test.test_type === 'urinalysis' ? 'urine_container' : 
+                         test.test_type === 'complete_blood_count' ? 'purple_top_tube' :
+                         test.test_type === 'blood_glucose' ? 'gray_top_tube' : 'red_top_tube'
+        },
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedTest, testId);
+      
+      // Show notification
+      addNotification({
+        message: `Sample collection started for ${test.patient.first_name} ${test.patient.last_name}`,
+        type: 'success',
+        duration: 3000
+      });
+    } catch (error: any) {
+      console.error('Error starting test:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    }
   };
 
   const handleProcessTest = (testId: string) => {
     navigate(`/laboratory/process/${testId}`);
   };
 
-  const handleAssignToMe = (testId: string) => {
-    // Update the test to assign it to the current user
-    const updatedResults = labResults.map(result => {
-      if (result.id === testId) {
-        return {
-          ...result,
-          assigned_to: user?.id,
-          last_updated: new Date().toISOString()
-        };
-      }
-      return result;
-    });
+  const handleAssignToMe = async (testId: string) => {
+    if (!Array.isArray(labResults)) return;
     
-    setLabResults(updatedResults);
+    const test = labResults.find(r => r.id === testId);
+    if (!test) return;
     
-    // Show notification
-    addNotification({
-      message: `Test assigned to you`,
-      type: 'success',
-      duration: 3000
-    });
+    try {
+      // Update the test
+      const updatedTest: LabResult = {
+        ...test,
+        assigned_to: 'current_user', // Replace with actual user ID
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedTest, testId);
+      
+      // Show notification
+      addNotification({
+        message: `Test assigned to you`,
+        type: 'success',
+        duration: 3000
+      });
+    } catch (error: any) {
+      console.error('Error assigning test:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    }
   };
 
-  const handleReleaseAssignment = (testId: string) => {
-    // Update the test to unassign it
-    const updatedResults = labResults.map(result => {
-      if (result.id === testId) {
-        return {
-          ...result,
-          assigned_to: null,
-          last_updated: new Date().toISOString()
-        };
-      }
-      return result;
-    });
+  const handleReleaseAssignment = async (testId: string) => {
+    if (!Array.isArray(labResults)) return;
     
-    setLabResults(updatedResults);
+    const test = labResults.find(r => r.id === testId);
+    if (!test) return;
     
-    // Show notification
-    addNotification({
-      message: `Test released from your queue`,
-      type: 'info',
-      duration: 3000
-    });
-  };
-
-  const handleUpdateWorkflowStage = (testId: string, newStage: 'sample_collected' | 'testing' | 'review' | 'completed') => {
-    // Update the test workflow stage
-    const updatedResults = labResults.map(result => {
-      if (result.id === testId) {
-        return {
-          ...result,
-          workflow_stage: newStage,
-          last_updated: new Date().toISOString()
-        };
-      }
-      return result;
-    });
-    
-    setLabResults(updatedResults);
-    
-    // Show notification
-    addNotification({
-      message: `Test moved to ${getWorkflowStageLabel(newStage)}`,
-      type: 'success',
-      duration: 3000
-    });
+    try {
+      // Update the test
+      const updatedTest: LabResult = {
+        ...test,
+        assigned_to: undefined,
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedTest, testId);
+      
+      // Show notification
+      addNotification({
+        message: `Test released from your queue`,
+        type: 'info',
+        duration: 3000
+      });
+    } catch (error: any) {
+      console.error('Error releasing test assignment:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    }
   };
 
   if (isLoading) {
     return (
       <div className="flex justify-center p-6">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-center">
+        <AlertTriangle className="h-12 w-12 text-error-500 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900">Error loading laboratory data</h3>
+        <p className="text-gray-500 mt-2">{error.message}</p>
       </div>
     );
   }
@@ -713,7 +561,7 @@ const Laboratory: React.FC = () => {
                               </span>
                             )}
                             
-                            {result.assigned_to && result.assigned_to !== user?.id && (
+                            {result.assigned_to && result.assigned_to !== 'current_user' && (
                               <span className="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-gray-100 text-gray-800">
                                 Assigned
                               </span>
@@ -731,7 +579,7 @@ const Laboratory: React.FC = () => {
                                   </button>
                                 )}
                                 
-                                {result.assigned_to === user?.id && (
+                                {result.assigned_to === 'current_user' && (
                                   <>
                                     <button 
                                       onClick={() => handleStartTest(result.id)}
@@ -751,7 +599,7 @@ const Laboratory: React.FC = () => {
                               </div>
                             ) : activeTab === 'in_progress' ? (
                               <div className="flex space-x-1">
-                                {result.assigned_to === user?.id ? (
+                                {result.assigned_to === 'current_user' ? (
                                   <>
                                     <button 
                                       onClick={() => handleProcessTest(result.id)}
@@ -780,7 +628,7 @@ const Laboratory: React.FC = () => {
                               </div>
                             ) : (
                               <div className="flex space-x-1">
-                                {result.assigned_to === user?.id ? (
+                                {result.assigned_to === 'current_user' ? (
                                   <>
                                     <button 
                                       onClick={() => handleProcessTest(result.id)}
@@ -860,17 +708,17 @@ const Laboratory: React.FC = () => {
                 <Layers className="h-4 w-4 text-primary-500 mr-1.5" />
                 <h2 className="text-sm font-medium text-gray-900">My Work Queue</h2>
               </div>
-              <span className="text-xs text-gray-500">{labResults.filter(r => r.assigned_to === user?.id).length} tests</span>
+              <span className="text-xs text-gray-500">{assignedToMeCount} tests</span>
             </div>
             <div className="p-3">
-              {labResults.filter(r => r.assigned_to === user?.id).length === 0 ? (
+              {assignedToMeCount === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-sm text-gray-500">No tests currently assigned to you</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {labResults
-                    .filter(r => r.assigned_to === user?.id)
+                  {Array.isArray(labResults) && labResults
+                    .filter(r => r.assigned_to === 'current_user')
                     .sort((a, b) => {
                       // Sort by emergency first, then by workflow stage
                       if (a.is_emergency && !b.is_emergency) return -1;
@@ -911,14 +759,6 @@ const Laboratory: React.FC = () => {
                         </button>
                       </div>
                     ))}
-                  
-                  {labResults.filter(r => r.assigned_to === user?.id).length > 5 && (
-                    <div className="text-center pt-1">
-                      <button className="text-xs text-primary-600 hover:text-primary-800">
-                        View all ({labResults.filter(r => r.assigned_to === user?.id).length})
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </div>

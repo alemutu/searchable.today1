@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Users, Calendar, FileText, Activity, Pill, AlertTriangle, TrendingUp, BedDouble, Microscope, Stethoscope, FlaskRound as Flask, BarChart, ArrowRight } from 'lucide-react';
-import { useAuthStore } from '../lib/store';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
+import { useHybridStorage } from '../lib/hooks/useHybridStorage';
 
 interface StatCardProps {
   title: string;
@@ -98,7 +97,6 @@ const PatientTableRow: React.FC<PatientTableRowProps> = ({
 };
 
 const Dashboard: React.FC = () => {
-  const { isDoctor, isNurse, isAdmin } = useAuthStore();
   const [stats, setStats] = useState({
     totalPatients: 0,
     appointmentsToday: 0,
@@ -108,53 +106,45 @@ const Dashboard: React.FC = () => {
     emergencyCases: 0
   });
   
-  const [analyticsData, setAnalyticsData] = useState({
-    patientsByDepartment: [
-      { department: 'Cardiology', count: 42 },
-      { department: 'Pediatrics', count: 38 },
-      { department: 'Orthopedics', count: 27 },
-      { department: 'Neurology', count: 21 },
-      { department: 'Gynecology', count: 35 }
-    ],
-    appointmentsTrend: [
-      { date: '2025-05-01', count: 18 },
-      { date: '2025-05-02', count: 22 },
-      { date: '2025-05-03', count: 15 },
-      { date: '2025-05-04', count: 12 },
-      { date: '2025-05-05', count: 24 },
-      { date: '2025-05-06', count: 28 },
-      { date: '2025-05-07', count: 30 }
-    ],
-    revenueByService: [
-      { service: 'Consultations', amount: 12500 },
-      { service: 'Laboratory', amount: 8750 },
-      { service: 'Radiology', amount: 9200 },
-      { service: 'Pharmacy', amount: 7300 },
-      { service: 'Procedures', amount: 15400 }
-    ]
-  });
+  const { data: patients } = useHybridStorage<any>('patients');
   
   useEffect(() => {
-    // In a real app, this would fetch actual data from the database
-    // For now, we'll use mock data
-    setStats({
-      totalPatients: 128,
-      appointmentsToday: 24,
-      activeConsultations: 8,
-      pendingLabResults: 12,
-      pharmacyOrders: 15,
-      emergencyCases: 2
-    });
-  }, []);
+    // Calculate stats based on actual data
+    if (Array.isArray(patients)) {
+      setStats({
+        totalPatients: patients.length,
+        appointmentsToday: 0, // Would need appointments data
+        activeConsultations: patients.filter(p => p.current_flow_step === 'consultation').length,
+        pendingLabResults: 0, // Would need lab results data
+        pharmacyOrders: 0, // Would need pharmacy data
+        emergencyCases: patients.filter(p => p.current_flow_step === 'emergency').length
+      });
+    }
+  }, [patients]);
   
-  // Mock data for active patients
-  const recentPatients = [
-    { name: 'John Doe', age: 45, status: 'Active', stage: 'Consultation', department: 'Cardiology', waitTime: '10 min' },
-    { name: 'Jane Smith', age: 32, status: 'Active', stage: 'Lab Testing', department: 'Internal Medicine', waitTime: '25 min' },
-    { name: 'Emily Clark', age: 8, status: 'Pending', stage: 'Waiting for Doctor', department: 'Pediatrics', waitTime: '35 min' },
-    { name: 'Robert Wilson', age: 67, status: 'Active', stage: 'Pharmacy', department: 'Neurology', waitTime: '5 min' },
-    { name: 'Sarah Johnson', age: 28, status: 'Emergency', stage: 'Triage', department: 'Emergency', waitTime: '0 min', isEmergency: true },
-  ];
+  // Generate sample data for active patients based on real patients
+  const getRecentPatients = () => {
+    if (!Array.isArray(patients) || patients.length === 0) {
+      return [];
+    }
+    
+    return patients.slice(0, 5).map(patient => {
+      const age = new Date().getFullYear() - new Date(patient.date_of_birth).getFullYear();
+      const isEmergency = patient.current_flow_step === 'emergency';
+      
+      return {
+        name: `${patient.first_name} ${patient.last_name}`,
+        age,
+        status: patient.status === 'active' ? 'Active' : 'Inactive',
+        stage: patient.current_flow_step?.replace('_', ' ').charAt(0).toUpperCase() + patient.current_flow_step?.slice(1).replace('_', ' ') || 'Registration',
+        department: 'General Medicine',
+        waitTime: '10 min',
+        isEmergency
+      };
+    });
+  };
+  
+  const recentPatients = getRecentPatients();
 
   // Simple bar chart renderer
   const renderBarChart = (data: any[], keyField: string, valueField: string, color: string) => {
@@ -178,6 +168,33 @@ const Dashboard: React.FC = () => {
         ))}
       </div>
     );
+  };
+
+  // Sample analytics data
+  const analyticsData = {
+    patientsByDepartment: [
+      { department: 'Cardiology', count: 42 },
+      { department: 'Pediatrics', count: 38 },
+      { department: 'Orthopedics', count: 27 },
+      { department: 'Neurology', count: 21 },
+      { department: 'Gynecology', count: 35 }
+    ],
+    appointmentsTrend: [
+      { date: '2025-05-01', count: 18 },
+      { date: '2025-05-02', count: 22 },
+      { date: '2025-05-03', count: 15 },
+      { date: '2025-05-04', count: 12 },
+      { date: '2025-05-05', count: 24 },
+      { date: '2025-05-06', count: 28 },
+      { date: '2025-05-07', count: 30 }
+    ],
+    revenueByService: [
+      { service: 'Consultations', amount: 12500 },
+      { service: 'Laboratory', amount: 8750 },
+      { service: 'Radiology', amount: 9200 },
+      { service: 'Pharmacy', amount: 7300 },
+      { service: 'Procedures', amount: 15400 }
+    ]
   };
 
   // Simple line chart renderer
@@ -341,25 +358,33 @@ const Dashboard: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {recentPatients.map((patient, index) => (
-                <PatientTableRow
-                  key={index}
-                  name={patient.name}
-                  age={patient.age}
-                  status={patient.status}
-                  stage={patient.stage}
-                  department={patient.department}
-                  waitTime={patient.waitTime}
-                  isEmergency={patient.isEmergency}
-                />
-              ))}
+              {recentPatients.length > 0 ? (
+                recentPatients.map((patient, index) => (
+                  <PatientTableRow
+                    key={index}
+                    name={patient.name}
+                    age={patient.age}
+                    status={patient.status}
+                    stage={patient.stage}
+                    department={patient.department}
+                    waitTime={patient.waitTime}
+                    isEmergency={patient.isEmergency}
+                  />
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                    No active patients found
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
         <div className="card-footer">
           <div className="flex justify-between items-center">
             <div className="text-sm text-gray-700">
-              Showing <span className="font-medium">5</span> of <span className="font-medium">25</span> patients
+              Showing <span className="font-medium">{recentPatients.length}</span> of <span className="font-medium">{stats.totalPatients}</span> patients
             </div>
             <div className="flex space-x-2">
               <button className="btn btn-outline py-1 px-3">Previous</button>

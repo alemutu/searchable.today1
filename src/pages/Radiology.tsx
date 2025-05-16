@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuthStore, useNotificationStore } from '../lib/store';
+import { useHybridStorage } from '../lib/hooks/useHybridStorage';
+import { useNotificationStore } from '../lib/store';
 import { Search, Filter, Microscope, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, FileImage, ChevronDown, ArrowRight, Loader2, MoreHorizontal, Layers, Scan } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
@@ -33,174 +33,22 @@ interface RadiologyResult {
 const Radiology: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [radiologyResults, setRadiologyResults] = useState<RadiologyResult[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { hospital, user } = useAuthStore();
-  const { addNotification, hasNotifiedAbout, markAsNotified } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'pending' | 'in_progress'>('pending');
   const navigate = useNavigate();
   const [assignedToMe, setAssignedToMe] = useState(false);
+  const { addNotification } = useNotificationStore();
+  
+  const { 
+    data: radiologyResults, 
+    loading: isLoading, 
+    error, 
+    saveItem, 
+    fetchItems 
+  } = useHybridStorage<RadiologyResult>('radiology_results');
 
   useEffect(() => {
-    fetchRadiologyResults();
-  }, [hospital]);
-
-  const fetchRadiologyResults = async () => {
-    try {
-      // In a real app, we would fetch from Supabase
-      // For now, we'll use mock data
-      const mockResults = [
-        {
-          id: '00000000-0000-0000-0000-000000000001',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000001',
-            first_name: 'John',
-            last_name: 'Doe'
-          },
-          scan_type: 'x_ray',
-          scan_date: '2025-05-15',
-          status: 'pending',
-          results: null,
-          reviewed_by: null,
-          is_emergency: false,
-          workflow_stage: 'pending',
-          last_updated: '2025-05-15T09:15:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000002',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000002',
-            first_name: 'Jane',
-            last_name: 'Smith'
-          },
-          scan_type: 'ct_scan',
-          scan_date: '2025-05-15',
-          status: 'in_progress',
-          results: null,
-          reviewed_by: null,
-          is_emergency: true,
-          workflow_stage: 'in_progress',
-          scan_info: {
-            scan_id: 'RAD-20250515-1234',
-            scan_time: '2025-05-15T10:30:00Z',
-            equipment_used: 'ct_scanner'
-          },
-          assigned_to: user?.id,
-          last_updated: '2025-05-15T10:35:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000003',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000003',
-            first_name: 'Robert',
-            last_name: 'Johnson'
-          },
-          scan_type: 'mri',
-          scan_date: '2025-05-14',
-          status: 'pending',
-          results: null,
-          reviewed_by: null,
-          is_emergency: false,
-          workflow_stage: 'pending',
-          assigned_to: '00000000-0000-0000-0000-000000000010', // Another technician
-          last_updated: '2025-05-14T15:00:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000004',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000004',
-            first_name: 'Emily',
-            last_name: 'Williams'
-          },
-          scan_type: 'ultrasound',
-          scan_date: '2025-05-14',
-          status: 'in_progress',
-          results: null,
-          reviewed_by: null,
-          is_emergency: false,
-          workflow_stage: 'in_progress',
-          scan_info: {
-            scan_id: 'RAD-20250514-5678',
-            scan_time: '2025-05-14T15:45:00Z',
-            equipment_used: 'ultrasound_machine'
-          },
-          assigned_to: user?.id,
-          last_updated: '2025-05-14T16:00:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000005',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000005',
-            first_name: 'Michael',
-            last_name: 'Brown'
-          },
-          scan_type: 'mammogram',
-          scan_date: '2025-05-15',
-          status: 'completed',
-          results: { findings: 'Normal study' },
-          reviewed_by: {
-            first_name: 'Doctor',
-            last_name: 'Smith'
-          },
-          is_emergency: false,
-          workflow_stage: 'completed',
-          scan_info: {
-            scan_id: 'RAD-20250515-9012',
-            scan_time: '2025-05-15T09:15:00Z',
-            equipment_used: 'mammography_unit'
-          },
-          assigned_to: user?.id,
-          last_updated: '2025-05-15T10:15:00Z'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000006',
-          patient: {
-            id: '00000000-0000-0000-0000-000000000006',
-            first_name: 'Sarah',
-            last_name: 'Davis'
-          },
-          scan_type: 'x_ray',
-          scan_date: '2025-05-15',
-          status: 'pending',
-          results: null,
-          reviewed_by: null,
-          is_emergency: true,
-          workflow_stage: 'pending',
-          last_updated: '2025-05-15T11:00:00Z'
-        }
-      ];
-      
-      setRadiologyResults(mockResults);
-      
-      // Show notification for emergency cases
-      const emergencyCases = mockResults.filter(result => result.is_emergency && (result.status === 'pending' || result.status === 'in_progress'));
-      
-      emergencyCases.forEach(emergency => {
-        // Create a unique key for this emergency
-        const emergencyKey = `rad-${emergency.id}-${emergency.patient.id}`;
-        
-        // Only show notification if we haven't already notified about this emergency
-        if (!hasNotifiedAbout(emergencyKey)) {
-          addNotification({
-            message: `EMERGENCY: ${getScanTypeLabel(emergency.scan_type)} needed for ${emergency.patient.first_name} ${emergency.patient.last_name}`,
-            type: 'error',
-            duration: 5000
-          });
-          
-          // Mark this emergency as notified
-          markAsNotified(emergencyKey);
-        }
-      });
-    } catch (error) {
-      console.error('Error fetching radiology results:', error);
-      addNotification({
-        message: 'Failed to load radiology data',
-        type: 'error'
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    fetchItems();
+  }, [fetchItems]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -263,121 +111,163 @@ const Radiology: React.FC = () => {
     return `${diffDays}d ago`;
   };
 
-  const filteredResults = radiologyResults.filter(result => {
+  const filteredResults = Array.isArray(radiologyResults) ? radiologyResults.filter(result => {
     const patientName = `${result.patient.first_name} ${result.patient.last_name}`.toLowerCase();
     const matchesSearch = patientName.includes(searchTerm.toLowerCase()) ||
                          result.scan_type.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || result.status === filterStatus;
-    const matchesAssigned = !assignedToMe || result.assigned_to === user?.id;
+    const matchesAssigned = !assignedToMe || result.assigned_to === 'current_user'; // Replace with actual user ID
     
     if (activeTab === 'pending') {
       return result.workflow_stage === 'pending' && matchesSearch && matchesFilter && matchesAssigned;
     } else {
       return result.workflow_stage === 'in_progress' && matchesSearch && matchesFilter && matchesAssigned;
     }
-  });
+  }) : [];
 
   // Count scans in each category
-  const pendingCount = radiologyResults.filter(r => r.workflow_stage === 'pending').length;
-  const inProgressCount = radiologyResults.filter(r => r.workflow_stage === 'in_progress').length;
-  const completedCount = radiologyResults.filter(r => r.workflow_stage === 'completed').length;
-  const urgentCount = radiologyResults.filter(r => r.is_emergency).length;
-  const assignedToMeCount = radiologyResults.filter(r => r.assigned_to === user?.id).length;
+  const pendingCount = Array.isArray(radiologyResults) ? radiologyResults.filter(r => r.workflow_stage === 'pending').length : 0;
+  const inProgressCount = Array.isArray(radiologyResults) ? radiologyResults.filter(r => r.workflow_stage === 'in_progress').length : 0;
+  const completedCount = Array.isArray(radiologyResults) ? radiologyResults.filter(r => r.workflow_stage === 'completed').length : 0;
+  const urgentCount = Array.isArray(radiologyResults) ? radiologyResults.filter(r => r.is_emergency).length : 0;
+  const assignedToMeCount = Array.isArray(radiologyResults) ? radiologyResults.filter(r => r.assigned_to === 'current_user').length : 0; // Replace with actual user ID
 
   const handleStartScan = async (scanId: string) => {
-    // Update the scan status to in_progress
-    const updatedResults = radiologyResults.map(result => {
-      if (result.id === scanId) {
-        return {
-          ...result,
-          status: 'in_progress',
-          workflow_stage: 'in_progress',
-          assigned_to: user?.id,
-          scan_info: {
-            scan_id: `RAD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`,
-            scan_time: new Date().toISOString(),
-            equipment_used: result.scan_type === 'x_ray' ? 'x_ray_machine' : 
-                           result.scan_type === 'ct_scan' ? 'ct_scanner' :
-                           result.scan_type === 'mri' ? 'mri_scanner' :
-                           result.scan_type === 'ultrasound' ? 'ultrasound_machine' :
-                           result.scan_type === 'mammogram' ? 'mammography_unit' :
-                           result.scan_type === 'pet_scan' ? 'pet_scanner' :
-                           result.scan_type === 'dexa_scan' ? 'dexa_scanner' :
-                           'fluoroscopy_unit'
-          },
-          last_updated: new Date().toISOString()
-        };
-      }
-      return result;
-    });
+    if (!Array.isArray(radiologyResults)) return;
     
-    setRadiologyResults(updatedResults);
+    const scan = radiologyResults.find(r => r.id === scanId);
+    if (!scan) return;
     
-    // Show notification
-    addNotification({
-      message: `Scan started for ${updatedResults.find(r => r.id === scanId)?.patient.first_name} ${updatedResults.find(r => r.id === scanId)?.patient.last_name}`,
-      type: 'success',
-      duration: 3000
-    });
-    
-    // Navigate to the scan processing form
-    navigate(`/radiology/process/${scanId}`);
+    try {
+      // Create a scan ID
+      const date = new Date();
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const random = Math.floor(1000 + Math.random() * 9000);
+      const scanId = `RAD-${year}${month}${day}-${random}`;
+      
+      // Update the scan
+      const updatedScan: RadiologyResult = {
+        ...scan,
+        status: 'in_progress',
+        workflow_stage: 'in_progress',
+        assigned_to: 'current_user', // Replace with actual user ID
+        scan_info: {
+          scan_id: scanId,
+          scan_time: new Date().toISOString(),
+          equipment_used: scan.scan_type === 'x_ray' ? 'x_ray_machine' : 
+                         scan.scan_type === 'ct_scan' ? 'ct_scanner' :
+                         scan.scan_type === 'mri' ? 'mri_scanner' :
+                         scan.scan_type === 'ultrasound' ? 'ultrasound_machine' :
+                         scan.scan_type === 'mammogram' ? 'mammography_unit' :
+                         scan.scan_type === 'pet_scan' ? 'pet_scanner' :
+                         scan.scan_type === 'dexa_scan' ? 'dexa_scanner' :
+                         'fluoroscopy_unit'
+        },
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedScan, scanId);
+      
+      // Show notification
+      addNotification({
+        message: `Scan started for ${scan.patient.first_name} ${scan.patient.last_name}`,
+        type: 'success',
+        duration: 3000
+      });
+      
+      // Navigate to the scan processing form
+      navigate(`/radiology/process/${scanId}`);
+    } catch (error: any) {
+      console.error('Error starting scan:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    }
   };
 
   const handleProcessScan = (scanId: string) => {
     navigate(`/radiology/process/${scanId}`);
   };
 
-  const handleAssignToMe = (scanId: string) => {
-    // Update the scan to assign it to the current user
-    const updatedResults = radiologyResults.map(result => {
-      if (result.id === scanId) {
-        return {
-          ...result,
-          assigned_to: user?.id,
-          last_updated: new Date().toISOString()
-        };
-      }
-      return result;
-    });
+  const handleAssignToMe = async (scanId: string) => {
+    if (!Array.isArray(radiologyResults)) return;
     
-    setRadiologyResults(updatedResults);
+    const scan = radiologyResults.find(r => r.id === scanId);
+    if (!scan) return;
     
-    // Show notification
-    addNotification({
-      message: `Scan assigned to you`,
-      type: 'success',
-      duration: 3000
-    });
+    try {
+      // Update the scan
+      const updatedScan: RadiologyResult = {
+        ...scan,
+        assigned_to: 'current_user', // Replace with actual user ID
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedScan, scanId);
+      
+      // Show notification
+      addNotification({
+        message: `Scan assigned to you`,
+        type: 'success',
+        duration: 3000
+      });
+    } catch (error: any) {
+      console.error('Error assigning scan:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    }
   };
 
-  const handleReleaseAssignment = (scanId: string) => {
-    // Update the scan to unassign it
-    const updatedResults = radiologyResults.map(result => {
-      if (result.id === scanId) {
-        return {
-          ...result,
-          assigned_to: null,
-          last_updated: new Date().toISOString()
-        };
-      }
-      return result;
-    });
+  const handleReleaseAssignment = async (scanId: string) => {
+    if (!Array.isArray(radiologyResults)) return;
     
-    setRadiologyResults(updatedResults);
+    const scan = radiologyResults.find(r => r.id === scanId);
+    if (!scan) return;
     
-    // Show notification
-    addNotification({
-      message: `Scan released from your queue`,
-      type: 'info',
-      duration: 3000
-    });
+    try {
+      // Update the scan
+      const updatedScan: RadiologyResult = {
+        ...scan,
+        assigned_to: undefined,
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedScan, scanId);
+      
+      // Show notification
+      addNotification({
+        message: `Scan released from your queue`,
+        type: 'info',
+        duration: 3000
+      });
+    } catch (error: any) {
+      console.error('Error releasing scan assignment:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    }
   };
 
   if (isLoading) {
     return (
       <div className="flex justify-center p-6">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-secondary-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-center">
+        <AlertTriangle className="h-12 w-12 text-error-500 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900">Error loading radiology data</h3>
+        <p className="text-gray-500 mt-2">{error.message}</p>
       </div>
     );
   }
@@ -580,7 +470,7 @@ const Radiology: React.FC = () => {
                               </span>
                             )}
                             
-                            {result.assigned_to && result.assigned_to !== user?.id && (
+                            {result.assigned_to && result.assigned_to !== 'current_user' && (
                               <span className="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-gray-100 text-gray-800">
                                 Assigned
                               </span>
@@ -598,7 +488,7 @@ const Radiology: React.FC = () => {
                                   </button>
                                 )}
                                 
-                                {result.assigned_to === user?.id && (
+                                {result.assigned_to === 'current_user' && (
                                   <>
                                     <button 
                                       onClick={() => handleStartScan(result.id)}
@@ -618,7 +508,7 @@ const Radiology: React.FC = () => {
                               </div>
                             ) : (
                               <div className="flex space-x-1">
-                                {result.assigned_to === user?.id ? (
+                                {result.assigned_to === 'current_user' ? (
                                   <>
                                     <button 
                                       onClick={() => handleProcessScan(result.id)}
@@ -684,17 +574,17 @@ const Radiology: React.FC = () => {
                 <Layers className="h-4 w-4 text-secondary-500 mr-1.5" />
                 <h2 className="text-sm font-medium text-gray-900">My Work Queue</h2>
               </div>
-              <span className="text-xs text-gray-500">{radiologyResults.filter(r => r.assigned_to === user?.id).length} scans</span>
+              <span className="text-xs text-gray-500">{assignedToMeCount} scans</span>
             </div>
             <div className="p-3">
-              {radiologyResults.filter(r => r.assigned_to === user?.id).length === 0 ? (
+              {assignedToMeCount === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-sm text-gray-500">No scans currently assigned to you</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {radiologyResults
-                    .filter(r => r.assigned_to === user?.id)
+                  {Array.isArray(radiologyResults) && radiologyResults
+                    .filter(r => r.assigned_to === 'current_user')
                     .sort((a, b) => {
                       // Sort by emergency first, then by workflow stage
                       if (a.is_emergency && !b.is_emergency) return -1;
@@ -739,14 +629,6 @@ const Radiology: React.FC = () => {
                         </button>
                       </div>
                     ))}
-                  
-                  {radiologyResults.filter(r => r.assigned_to === user?.id).length > 5 && (
-                    <div className="text-center pt-1">
-                      <button className="text-xs text-secondary-600 hover:text-secondary-800">
-                        View all ({radiologyResults.filter(r => r.assigned_to === user?.id).length})
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </div>

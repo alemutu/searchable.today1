@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuthStore } from '../lib/store';
+import { useHybridStorage } from '../lib/hooks/useHybridStorage';
+import { useNotificationStore } from '../lib/store';
 import { Search, User, AlertTriangle, Activity, FileText, Eye, Pill, Stethoscope, Hash, X, Loader2, Filter } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
@@ -20,31 +20,45 @@ interface Patient {
 const PatientSearch: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [searchFilter, setSearchFilter] = useState<'all' | 'name' | 'id' | 'phone'>('all');
-  const { hospital } = useAuthStore();
+  const { addNotification } = useNotificationStore();
+  const { data: patients, loading: isLoading, fetchItems } = useHybridStorage<Patient>('patients');
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!searchTerm || !hospital) return;
+    if (!searchTerm) return;
     
-    setIsLoading(true);
     setHasSearched(true);
     
     try {
-      // Use the search_patients RPC function
-      const { data, error } = await supabase.rpc('search_patients', {
-        search_term: searchTerm
-      });
+      await fetchItems({ search: searchTerm });
       
-      if (error) throw error;
-      setSearchResults(data || []);
-    } catch (error) {
+      // Filter results based on search term and filter type
+      const results = Array.isArray(patients) ? patients.filter(patient => {
+        const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
+        
+        if (searchFilter === 'name') {
+          return fullName.includes(searchTerm.toLowerCase());
+        } else if (searchFilter === 'id') {
+          return patient.id.toLowerCase().includes(searchTerm.toLowerCase());
+        } else if (searchFilter === 'phone') {
+          return patient.contact_number.includes(searchTerm);
+        }
+        
+        // 'all' filter - check all fields
+        return fullName.includes(searchTerm.toLowerCase()) || 
+               patient.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+               patient.contact_number.includes(searchTerm);
+      }) : [];
+      
+      setSearchResults(results);
+    } catch (error: any) {
       console.error('Error searching patients:', error);
-      setSearchResults([]);
-    } finally {
-      setIsLoading(false);
+      addNotification({
+        message: `Error searching patients: ${error.message}`,
+        type: 'error'
+      });
     }
   };
 
@@ -88,51 +102,18 @@ const PatientSearch: React.FC = () => {
 
   // Generate a formatted patient ID based on hospital settings
   const generatePatientId = (patient: Patient) => {
-    if (!hospital) return patient.id.slice(0, 8);
-    
     // Use the UUID first 8 characters as a fallback
     const shortId = patient.id.slice(0, 8);
     
-    // If we have hospital settings, try to format the ID
-    if (hospital.patient_id_format) {
-      // For demo purposes, we'll use a simple algorithm to generate a number
-      // In a real system, this would be stored in the database
-      const patientNumber = parseInt(patient.id.substring(0, 8), 16) % 1000;
-      
-      if (patientNumber <= 0) return shortId;
-      
-      const paddedNumber = String(patientNumber).padStart(hospital.patient_id_digits || 6, '0');
-      
-      switch (hospital.patient_id_format) {
-        case 'prefix_year_number':
-          return `${hospital.patient_id_prefix || 'PT'}${new Date().getFullYear()}-${paddedNumber}`;
-        case 'hospital_prefix_number':
-          return `${hospital.subdomain.substring(0, 2).toUpperCase()}-${hospital.patient_id_prefix || 'PT'}-${paddedNumber}`;
-        case 'custom':
-          return `${hospital.patient_id_prefix || 'PT'}${paddedNumber}`;
-        case 'prefix_number':
-        default:
-          return `${hospital.patient_id_prefix || 'PT'}${paddedNumber}`;
-      }
-    }
+    // For demo purposes, we'll use a simple algorithm to generate a number
+    // In a real system, this would be stored in the database
+    const patientNumber = parseInt(patient.id.substring(0, 8), 16) % 1000;
     
-    return shortId;
+    if (patientNumber <= 0) return shortId;
+    
+    const paddedNumber = String(patientNumber).padStart(6, '0');
+    return `PT${paddedNumber}`;
   };
-
-  const filteredResults = searchResults.filter(patient => {
-    if (searchFilter === 'all') return true;
-    if (searchFilter === 'name') {
-      const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
-      return fullName.includes(searchTerm.toLowerCase());
-    }
-    if (searchFilter === 'id') {
-      return patient.id.toLowerCase().includes(searchTerm.toLowerCase());
-    }
-    if (searchFilter === 'phone') {
-      return patient.contact_number.includes(searchTerm);
-    }
-    return true;
-  });
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
@@ -206,9 +187,9 @@ const PatientSearch: React.FC = () => {
         <div className="bg-white rounded-lg shadow-sm overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
             <h2 className="text-lg font-medium text-gray-900">Search Results</h2>
-            {filteredResults.length > 0 && (
+            {searchResults.length > 0 && (
               <span className="text-sm text-gray-500">
-                Found {filteredResults.length} {filteredResults.length === 1 ? 'patient' : 'patients'}
+                Found {searchResults.length} {searchResults.length === 1 ? 'patient' : 'patients'}
               </span>
             )}
           </div>
@@ -256,7 +237,7 @@ const PatientSearch: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredResults.map((patient) => (
+                  {searchResults.map((patient) => (
                     <tr key={patient.id} className="hover:bg-gray-50 transition-colors duration-150">
                       <td className="px-6 py-4">
                         <div className="flex items-center">

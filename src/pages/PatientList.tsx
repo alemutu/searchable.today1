@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Plus, FileText, Eye, Activity, Stethoscope, Hash } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { useAuthStore } from '../lib/store';
+import { useHybridStorage } from '../lib/hooks/useHybridStorage';
 
 interface Patient {
   id: string;
@@ -19,66 +18,31 @@ interface Patient {
 const PatientList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { isDoctor } = useAuthStore();
+  const { data: patients, loading: isLoading, fetchItems } = useHybridStorage<Patient>('patients');
   
   useEffect(() => {
-    fetchPatients();
-  }, []);
+    fetchItems();
+  }, [fetchItems]);
   
-  const fetchPatients = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('patients')
-        .select('*')
-        .order('created_at', { ascending: false });
-          
-      if (error) throw error;
-      setPatients(data || []);
-    } catch (error) {
-      console.error('Error fetching patients:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const searchPatients = async () => {
-    if (!searchTerm) return;
+    if (!searchTerm) {
+      fetchItems();
+      return;
+    }
     
     try {
-      setIsLoading(true);
-      
-      // Use the search_patients function if the search term is complex
-      if (searchTerm.length > 2) {
-        const { data, error } = await supabase.rpc('search_patients', {
-          search_term: searchTerm
-        });
-        
-        if (error) throw error;
-        setPatients(data || []);
-      } else {
-        // For simple searches, use the regular query
-        const { data, error } = await supabase
-          .from('patients')
-          .select('*')
-          .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`)
-          .order('created_at', { ascending: false });
-            
-        if (error) throw error;
-        setPatients(data || []);
-      }
+      await fetchItems({
+        search: searchTerm
+      });
     } catch (error) {
       console.error('Error searching patients:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
   
-  const filteredPatients = patients.filter(patient => {
+  const filteredPatients = Array.isArray(patients) ? patients.filter(patient => {
     const matchesFilter = filterStatus === 'all' || patient.status === filterStatus;
     return matchesFilter;
-  });
+  }) : [];
 
   const getFlowStepColor = (step: string | null) => {
     switch (step) {
@@ -278,7 +242,7 @@ const PatientList: React.FC = () => {
                             <Activity className="h-5 w-5" />
                           </Link>
                         )}
-                        {(patient.current_flow_step === 'waiting_consultation' || patient.current_flow_step === 'emergency') && isDoctor && (
+                        {(patient.current_flow_step === 'waiting_consultation' || patient.current_flow_step === 'emergency') && (
                           <Link
                             to={`/patients/${patient.id}/consultation`}
                             className="text-secondary-600 hover:text-secondary-900"
@@ -301,7 +265,7 @@ const PatientList: React.FC = () => {
         <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
           <div className="text-sm text-gray-700">
             Showing <span className="font-medium">{filteredPatients.length}</span> of{' '}
-            <span className="font-medium">{patients.length}</span> patients
+            <span className="font-medium">{Array.isArray(patients) ? patients.length : 0}</span> patients
           </div>
           <div className="flex space-x-2">
             <button className="btn btn-outline py-1 px-3">Previous</button>

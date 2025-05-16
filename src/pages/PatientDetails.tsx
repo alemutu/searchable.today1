@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { useAuthStore } from '../lib/store';
+import { useHybridStorage } from '../lib/hooks/useHybridStorage';
+import { useNotificationStore } from '../lib/store';
 import { 
   User, 
   Phone, 
@@ -60,33 +60,21 @@ interface Patient {
 const PatientDetails: React.FC = () => {
   const { patientId } = useParams<{ patientId: string }>();
   const navigate = useNavigate();
-  const [patient, setPatient] = useState<Patient | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const { addNotification } = useNotificationStore();
   const [activeTab, setActiveTab] = useState('overview');
-  const { isAdmin } = useAuthStore();
+  
+  const { 
+    data: patient, 
+    loading: isLoading, 
+    error, 
+    fetchById 
+  } = useHybridStorage<Patient>('patients');
 
   useEffect(() => {
     if (patientId) {
-      fetchPatient();
+      fetchById(patientId);
     }
-  }, [patientId]);
-
-  const fetchPatient = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('patients')
-        .select('*')
-        .eq('id', patientId)
-        .single();
-
-      if (error) throw error;
-      setPatient(data);
-    } catch (error) {
-      console.error('Error fetching patient:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  }, [patientId, fetchById]);
 
   const calculateAge = (dateOfBirth: string) => {
     const birthDate = new Date(dateOfBirth);
@@ -122,6 +110,14 @@ const PatientDetails: React.FC = () => {
     return (
       <div className="flex justify-center p-8">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="text-center p-8">
+        <p className="text-error-500">Error loading patient: {error.message}</p>
       </div>
     );
   }

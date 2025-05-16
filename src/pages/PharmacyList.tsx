@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Pill, CheckCircle, XCircle, AlertTriangle, Plus, ArrowLeft, Clock, FileText, User, Calendar, ChevronDown, Layers, Loader2, CreditCard, Building2, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { useAuthStore, useNotificationStore } from '../lib/store';
+import { useHybridStorage } from '../lib/hooks/useHybridStorage';
+import { useNotificationStore } from '../lib/store';
 
 interface PharmacyOrder {
   id: string;
@@ -27,237 +27,38 @@ interface PharmacyOrder {
 const PharmacyList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [orders, setOrders] = useState<PharmacyOrder[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { hospital, user } = useAuthStore();
-  const { addNotification, hasNotifiedAbout, markAsNotified } = useNotificationStore();
   const [activeTab, setActiveTab] = useState<'pending' | 'processing'>('pending');
-  const [inventoryStatus, setInventoryStatus] = useState<{[key: string]: {inStock: boolean, quantity: number}}>({});
   const [assignedToMe, setAssignedToMe] = useState(false);
+  const { addNotification } = useNotificationStore();
+  
+  const { 
+    data: orders, 
+    loading: isLoading, 
+    error, 
+    saveItem, 
+    fetchItems 
+  } = useHybridStorage<PharmacyOrder>('pharmacy');
+  
+  const [inventoryStatus, setInventoryStatus] = useState<{[key: string]: {inStock: boolean, quantity: number}}>({});
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      if (!hospital) return;
+    fetchItems();
+    
+    // Initialize inventory status
+    setInventoryStatus({
+      'Amoxicillin': { inStock: true, quantity: 120 },
+      'Paracetamol': { inStock: true, quantity: 200 },
+      'Ibuprofen': { inStock: true, quantity: 150 },
+      'Metformin': { inStock: true, quantity: 80 },
+      'Atorvastatin': { inStock: true, quantity: 60 },
+      'Aspirin': { inStock: true, quantity: 100 },
+      'Salbutamol': { inStock: false, quantity: 0 },
+      'Prednisolone': { inStock: true, quantity: 45 },
+      'Omeprazole': { inStock: false, quantity: 0 },
+      'Ranitidine': { inStock: true, quantity: 25 }
+    });
+  }, [fetchItems]);
 
-      try {
-        // In a real app, we would fetch from Supabase
-        // For now, we'll use mock data
-        const mockOrders = [
-          {
-            id: '00000000-0000-0000-0000-000000000001',
-            created_at: '2025-05-15T09:15:00Z',
-            patient: {
-              id: '00000000-0000-0000-0000-000000000001',
-              first_name: 'John',
-              last_name: 'Doe'
-            },
-            medications: [
-              {
-                medication: 'Amoxicillin',
-                dosage: '500mg',
-                quantity: 30
-              },
-              {
-                medication: 'Paracetamol',
-                dosage: '500mg',
-                quantity: 20
-              }
-            ],
-            status: 'pending',
-            payment_status: 'pending',
-            is_emergency: false,
-            last_updated: '2025-05-15T09:15:00Z'
-          },
-          {
-            id: '00000000-0000-0000-0000-000000000002',
-            created_at: '2025-05-15T10:30:00Z',
-            patient: {
-              id: '00000000-0000-0000-0000-000000000002',
-              first_name: 'Jane',
-              last_name: 'Smith'
-            },
-            medications: [
-              {
-                medication: 'Ibuprofen',
-                dosage: '400mg',
-                quantity: 15
-              }
-            ],
-            status: 'processing',
-            payment_status: 'paid',
-            is_emergency: true,
-            assigned_to: user?.id,
-            last_updated: '2025-05-15T10:30:00Z'
-          },
-          {
-            id: '00000000-0000-0000-0000-000000000003',
-            created_at: '2025-05-15T11:45:00Z',
-            patient: {
-              id: '00000000-0000-0000-0000-000000000003',
-              first_name: 'Robert',
-              last_name: 'Johnson'
-            },
-            medications: [
-              {
-                medication: 'Metformin',
-                dosage: '850mg',
-                quantity: 60
-              },
-              {
-                medication: 'Atorvastatin',
-                dosage: '20mg',
-                quantity: 30
-              },
-              {
-                medication: 'Aspirin',
-                dosage: '75mg',
-                quantity: 28
-              }
-            ],
-            status: 'pending',
-            payment_status: 'insured',
-            is_emergency: false,
-            last_updated: '2025-05-15T11:45:00Z'
-          },
-          {
-            id: '00000000-0000-0000-0000-000000000004',
-            created_at: '2025-05-15T12:15:00Z',
-            patient: {
-              id: '00000000-0000-0000-0000-000000000004',
-              first_name: 'Emily',
-              last_name: 'Williams'
-            },
-            medications: [
-              {
-                medication: 'Salbutamol',
-                dosage: '100mcg',
-                quantity: 1
-              }
-            ],
-            status: 'processing',
-            payment_status: 'pending',
-            is_emergency: false,
-            assigned_to: '00000000-0000-0000-0000-000000000010', // Another pharmacist
-            last_updated: '2025-05-15T12:15:00Z'
-          },
-          {
-            id: '00000000-0000-0000-0000-000000000005',
-            created_at: '2025-05-15T13:00:00Z',
-            patient: {
-              id: '00000000-0000-0000-0000-000000000005',
-              first_name: 'Michael',
-              last_name: 'Brown'
-            },
-            medications: [
-              {
-                medication: 'Prednisolone',
-                dosage: '5mg',
-                quantity: 28
-              }
-            ],
-            status: 'ready',
-            payment_status: 'paid',
-            is_emergency: false,
-            assigned_to: user?.id,
-            last_updated: '2025-05-15T13:00:00Z'
-          },
-          {
-            id: '00000000-0000-0000-0000-000000000006',
-            created_at: '2025-05-15T13:30:00Z',
-            patient: {
-              id: '00000000-0000-0000-0000-000000000006',
-              first_name: 'Sarah',
-              last_name: 'Davis'
-            },
-            medications: [
-              {
-                medication: 'Omeprazole',
-                dosage: '20mg',
-                quantity: 28
-              },
-              {
-                medication: 'Ranitidine',
-                dosage: '150mg',
-                quantity: 30
-              }
-            ],
-            status: 'pending',
-            payment_status: 'pending',
-            is_emergency: true,
-            last_updated: '2025-05-15T13:30:00Z'
-          }
-        ];
-        
-        setOrders(mockOrders);
-        
-        // Show notification for emergency cases
-        const emergencyCases = mockOrders.filter(order => order.is_emergency && (order.status === 'pending' || order.status === 'processing'));
-        
-        emergencyCases.forEach(emergency => {
-          // Create a unique key for this emergency
-          const emergencyKey = `pharm-${emergency.id}-${emergency.patient.id}`;
-          
-          // Only show notification if we haven't already notified about this emergency
-          if (!hasNotifiedAbout(emergencyKey)) {
-            addNotification({
-              message: `EMERGENCY: Prescription for ${emergency.patient.first_name} ${emergency.patient.last_name} needs immediate attention`,
-              type: 'error',
-              duration: 5000
-            });
-            
-            // Mark this emergency as notified
-            markAsNotified(emergencyKey);
-          }
-        });
-        
-        // Check inventory status for all medications
-        const mockInventory: {[key: string]: {inStock: boolean, quantity: number}} = {
-          'Amoxicillin': { inStock: true, quantity: 120 },
-          'Paracetamol': { inStock: true, quantity: 200 },
-          'Ibuprofen': { inStock: true, quantity: 150 },
-          'Metformin': { inStock: true, quantity: 80 },
-          'Atorvastatin': { inStock: true, quantity: 60 },
-          'Aspirin': { inStock: true, quantity: 100 },
-          'Salbutamol': { inStock: false, quantity: 0 },
-          'Prednisolone': { inStock: true, quantity: 45 },
-          'Omeprazole': { inStock: false, quantity: 0 },
-          'Ranitidine': { inStock: true, quantity: 25 }
-        };
-        
-        setInventoryStatus(mockInventory);
-        
-        // Check for out of stock medications
-        mockOrders.forEach(order => {
-          order.medications.forEach(med => {
-            if (mockInventory[med.medication] && !mockInventory[med.medication].inStock) {
-              addNotification({
-                message: `Warning: ${med.medication} is out of stock`,
-                type: 'warning',
-                duration: 4000
-              });
-            } else if (mockInventory[med.medication] && mockInventory[med.medication].quantity < med.quantity) {
-              addNotification({
-                message: `Low stock: Only ${mockInventory[med.medication].quantity} of ${med.medication} available`,
-                type: 'warning',
-                duration: 4000
-              });
-            }
-          });
-        });
-      } catch (error) {
-        console.error('Error fetching pharmacy orders:', error);
-        addNotification({
-          message: 'Failed to load pharmacy orders',
-          type: 'error'
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchOrders();
-  }, [hospital, addNotification, user?.id]);
-  
   const getTimeAgo = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
@@ -274,96 +75,112 @@ const PharmacyList: React.FC = () => {
     return `${diffDays}d ago`;
   };
   
-  const handleAssignToMe = (orderId: string) => {
-    // Update the order to assign it to the current user
-    const updatedOrders = orders.map(order => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          assigned_to: user?.id,
-          last_updated: new Date().toISOString()
-        };
-      }
-      return order;
-    });
+  const handleAssignToMe = async (orderId: string) => {
+    if (!Array.isArray(orders)) return;
     
-    setOrders(updatedOrders);
-    
-    // Show notification
     const order = orders.find(o => o.id === orderId);
-    if (order) {
+    if (!order) return;
+    
+    try {
+      // Update the order
+      const updatedOrder: PharmacyOrder = {
+        ...order,
+        assigned_to: 'current_user', // Replace with actual user ID
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedOrder, orderId);
+      
+      // Show notification
       addNotification({
         message: `Order for ${order.patient.first_name} ${order.patient.last_name} assigned to you`,
         type: 'success',
         duration: 3000
       });
+    } catch (error: any) {
+      console.error('Error assigning order:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
     }
   };
 
-  const handleReleaseAssignment = (orderId: string) => {
-    // Update the order to unassign it
-    const updatedOrders = orders.map(order => {
-      if (order.id === orderId) {
-        return {
-          ...order,
-          assigned_to: null,
-          last_updated: new Date().toISOString()
-        };
-      }
-      return order;
-    });
+  const handleReleaseAssignment = async (orderId: string) => {
+    if (!Array.isArray(orders)) return;
     
-    setOrders(updatedOrders);
-    
-    // Show notification
     const order = orders.find(o => o.id === orderId);
-    if (order) {
+    if (!order) return;
+    
+    try {
+      // Update the order
+      const updatedOrder: PharmacyOrder = {
+        ...order,
+        assigned_to: undefined,
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedOrder, orderId);
+      
+      // Show notification
       addNotification({
         message: `Order for ${order.patient.first_name} ${order.patient.last_name} released from your queue`,
         type: 'info',
         duration: 3000
       });
+    } catch (error: any) {
+      console.error('Error releasing order assignment:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
     }
   };
   
   const handleProcessOrder = async (orderId: string) => {
-    // Update order status in state
-    const updatedOrders = orders.map(order => 
-      order.id === orderId 
-        ? { 
-            ...order, 
-            status: 'processing',
-            assigned_to: user?.id,
-            last_updated: new Date().toISOString()
-          } 
-        : order
-    );
+    if (!Array.isArray(orders)) return;
     
-    setOrders(updatedOrders);
-    
-    // Show notification
     const order = orders.find(o => o.id === orderId);
-    if (order) {
+    if (!order) return;
+    
+    try {
+      // Update order status
+      const updatedOrder: PharmacyOrder = {
+        ...order,
+        status: 'processing',
+        assigned_to: 'current_user', // Replace with actual user ID
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedOrder, orderId);
+      
+      // Show notification
       addNotification({
         message: `Started processing order for ${order.patient.first_name} ${order.patient.last_name}`,
         type: 'success',
         duration: 3000
       });
+    } catch (error: any) {
+      console.error('Error processing order:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
     }
   };
 
-  const filteredOrders = orders.filter(order => {
+  const filteredOrders = Array.isArray(orders) ? orders.filter(order => {
     const patientName = `${order.patient.first_name} ${order.patient.last_name}`.toLowerCase();
     const matchesSearch = patientName.includes(searchTerm.toLowerCase());
     const matchesFilter = filterStatus === 'all' || order.payment_status === filterStatus;
-    const matchesAssigned = !assignedToMe || order.assigned_to === user?.id;
+    const matchesAssigned = !assignedToMe || order.assigned_to === 'current_user'; // Replace with actual user ID
     
     if (activeTab === 'pending') {
       return order.status === 'pending' && matchesSearch && matchesFilter && matchesAssigned;
     } else {
       return order.status === 'processing' && matchesSearch && matchesFilter && matchesAssigned;
     }
-  });
+  }) : [];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -398,16 +215,26 @@ const PharmacyList: React.FC = () => {
   };
   
   // Count orders in each category
-  const pendingCount = orders.filter(o => o.status === 'pending').length;
-  const processingCount = orders.filter(o => o.status === 'processing').length;
-  const readyCount = orders.filter(o => o.status === 'ready').length;
-  const urgentCount = orders.filter(o => o.is_emergency).length;
-  const assignedToMeCount = orders.filter(o => o.assigned_to === user?.id).length;
+  const pendingCount = Array.isArray(orders) ? orders.filter(o => o.status === 'pending').length : 0;
+  const processingCount = Array.isArray(orders) ? orders.filter(o => o.status === 'processing').length : 0;
+  const readyCount = Array.isArray(orders) ? orders.filter(o => o.status === 'ready').length : 0;
+  const urgentCount = Array.isArray(orders) ? orders.filter(o => o.is_emergency).length : 0;
+  const assignedToMeCount = Array.isArray(orders) ? orders.filter(o => o.assigned_to === 'current_user').length : 0; // Replace with actual user ID
 
   if (isLoading) {
     return (
       <div className="flex justify-center p-6">
         <div className="animate-spin rounded-full h-10 w-10 border-t-2 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 text-center">
+        <AlertTriangle className="h-12 w-12 text-error-500 mx-auto mb-4" />
+        <h3 className="text-lg font-medium text-gray-900">Error loading pharmacy data</h3>
+        <p className="text-gray-500 mt-2">{error.message}</p>
       </div>
     );
   }
@@ -523,9 +350,7 @@ const PharmacyList: React.FC = () => {
                       <div className="ml-3 flex-1">
                         <div className="flex items-center justify-between">
                           <div>
-                            <h3 className="text-base font-medium text-gray-900">
-                              {order.patient.first_name} {order.patient.last_name}
-                            </h3>
+                            <h3 className="text-base font-medium text-gray-900">{order.patient.first_name} {order.patient.last_name}</h3>
                             <div className="flex items-center text-xs text-gray-500 mt-0.5">
                               <Clock className="h-3 w-3 mr-1" />
                               <span>{getTimeAgo(order.last_updated || order.created_at)}</span>
@@ -543,7 +368,7 @@ const PharmacyList: React.FC = () => {
                               </span>
                             )}
                             
-                            {order.assigned_to && order.assigned_to !== user?.id && (
+                            {order.assigned_to && order.assigned_to !== 'current_user' && (
                               <span className="px-2 py-1 inline-flex text-xs leading-5 font-medium rounded-full bg-gray-100 text-gray-800">
                                 Assigned
                               </span>
@@ -561,7 +386,7 @@ const PharmacyList: React.FC = () => {
                                   </button>
                                 )}
                                 
-                                {order.assigned_to === user?.id && (
+                                {order.assigned_to === 'current_user' && (
                                   <>
                                     <button 
                                       onClick={() => handleProcessOrder(order.id)}
@@ -583,7 +408,7 @@ const PharmacyList: React.FC = () => {
                               </div>
                             ) : (
                               <div className="flex space-x-1">
-                                {order.assigned_to === user?.id ? (
+                                {order.assigned_to === 'current_user' ? (
                                   <>
                                     <Link 
                                       to={`/pharmacy/${order.id}/dispense`}
@@ -648,17 +473,17 @@ const PharmacyList: React.FC = () => {
                 <Layers className="h-4 w-4 text-primary-500 mr-1.5" />
                 <h2 className="text-sm font-medium text-gray-900">My Work Queue</h2>
               </div>
-              <span className="text-xs text-gray-500">{orders.filter(o => o.assigned_to === user?.id).length} orders</span>
+              <span className="text-xs text-gray-500">{assignedToMeCount} orders</span>
             </div>
             <div className="p-3">
-              {orders.filter(o => o.assigned_to === user?.id).length === 0 ? (
+              {assignedToMeCount === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-sm text-gray-500">No orders currently assigned to you</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {orders
-                    .filter(o => o.assigned_to === user?.id)
+                  {Array.isArray(orders) && orders
+                    .filter(o => o.assigned_to === 'current_user')
                     .sort((a, b) => {
                       // Sort by emergency first, then by status
                       if (a.is_emergency && !b.is_emergency) return -1;
@@ -704,14 +529,6 @@ const PharmacyList: React.FC = () => {
                         </Link>
                       </div>
                     ))}
-                  
-                  {orders.filter(o => o.assigned_to === user?.id).length > 5 && (
-                    <div className="text-center pt-1">
-                      <button className="text-xs text-primary-600 hover:text-primary-800">
-                        View all ({orders.filter(o => o.assigned_to === user?.id).length})
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
