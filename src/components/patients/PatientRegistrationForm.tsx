@@ -19,7 +19,8 @@ import {
   CreditCard,
   Smartphone,
   Building2,
-  FileText
+  FileText,
+  DollarSign
 } from 'lucide-react';
 
 interface PatientFormData {
