@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { useAuthStore } from '../../lib/store';
+import { useAuthStore, useNotificationStore } from '../../lib/store';
 import { User, Activity, FileText, Pill, AlertTriangle, Stethoscope, Building2, Save, ArrowLeft, Brain, Thermometer, Ruler, Droplets, Scale, Hash, Heart, Clock, Calculator, AlertCircle } from 'lucide-react';
 
 interface TriageFormData {
@@ -61,6 +61,7 @@ interface Department {
 
 const TriageForm: React.FC = () => {
   const { hospital, user } = useAuthStore();
+  const { addNotification } = useNotificationStore();
   const { patientId } = useParams();
   const navigate = useNavigate();
   const [patient, setPatient] = useState<Patient | null>(null);
@@ -325,6 +326,13 @@ const TriageForm: React.FC = () => {
         // Simulate successful submission in development
         console.log('Triage form submitted:', data);
         await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Show success notification
+        addNotification({
+          message: 'Triage completed successfully',
+          type: 'success'
+        });
+        
         navigate('/patients');
         return;
       }
@@ -378,10 +386,21 @@ const TriageForm: React.FC = () => {
 
       if (patientError) throw patientError;
       
+      // Show success notification
+      addNotification({
+        message: 'Triage completed successfully',
+        type: 'success'
+      });
+      
       navigate('/patients');
     } catch (error: any) {
       console.error('Error submitting triage form:', error.message);
-      alert(`Error: ${error.message}`);
+      
+      // Show error notification
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
     } finally {
       setIsSaving(false);
     }
@@ -773,7 +792,6 @@ const TriageForm: React.FC = () => {
               
               <div>
                 <div className="flex items-center mb-1">
-                  
                   <Pill className="h-3 w-3 text-gray-400 mr-1" />
                   <label className="form-label text-xs mb-0">Current Medications</label>
                 </div>
