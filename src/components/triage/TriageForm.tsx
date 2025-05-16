@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
-import { supabase } from '../../lib/supabase';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
 import { 
   User, 
@@ -93,21 +92,26 @@ const TriageForm: React.FC = () => {
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
-  const [departments, setDepartments] = useState<Department[]>([]);
   
+  // Use the useHybridStorage hook for patients
   const { 
     data: patient,
     loading: patientLoading,
     error: patientError,
-    fetchById: fetchPatient
+    fetchById: fetchPatient,
+    saveItem: savePatient
   } = useHybridStorage<Patient>('patients');
   
+  // Use the useHybridStorage hook for departments
   const { 
     data: departmentsData,
     loading: departmentsLoading,
     error: departmentsError,
     fetchItems: fetchDepartments
   } = useHybridStorage<Department>('departments');
+  
+  // State for departments
+  const [departments, setDepartments] = useState<Department[]>([]);
   
   const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<TriageFormData>({
     defaultValues: {
@@ -147,6 +151,7 @@ const TriageForm: React.FC = () => {
   const hasAllergies = watch('medicalHistory.allergies.hasAllergies');
   
   useEffect(() => {
+    // Fetch departments data
     fetchDepartments();
     
     if (patientId) {
@@ -157,8 +162,11 @@ const TriageForm: React.FC = () => {
   }, [patientId, fetchPatient, fetchDepartments]);
   
   useEffect(() => {
-    // Set default department when departments are loaded
-    if (departmentsData && Array.isArray(departmentsData) && departmentsData.length > 0) {
+    // Set departments from fetched data
+    if (departmentsData && Array.isArray(departmentsData)) {
+      setDepartments(departmentsData);
+      
+      // Set default department to General Medicine if available
       const generalMedicineDept = departmentsData.find(dept => dept.name === 'General Medicine');
       if (generalMedicineDept) {
         setValue('departmentId', generalMedicineDept.id);
@@ -167,7 +175,36 @@ const TriageForm: React.FC = () => {
         setValue('departmentId', departmentsData[0].id);
       }
     }
-  }, [departmentsData, setValue]);
+    
+    // If no departments are available, create mock departments
+    if ((!departmentsData || !Array.isArray(departmentsData) || departmentsData.length === 0) && !departmentsLoading) {
+      const mockDepartments: Department[] = [
+        { id: '1', name: 'Emergency' },
+        { id: '2', name: 'General Medicine' },
+        { id: '3', name: 'Cardiology' },
+        { id: '4', name: 'Pediatrics' },
+        { id: '5', name: 'Orthopedics' },
+        { id: '6', name: 'Gynecology' },
+        { id: '7', name: 'Surgical' },
+        { id: '8', name: 'Dental' },
+        { id: '9', name: 'Eye Clinic' },
+        { id: '10', name: 'Physiotherapy' }
+      ];
+      
+      setDepartments(mockDepartments);
+      
+      // Set default department to General Medicine
+      const generalMedicineDept = mockDepartments.find(dept => dept.name === 'General Medicine');
+      if (generalMedicineDept) {
+        setValue('departmentId', generalMedicineDept.id);
+      }
+    }
+    
+    // Set loading state based on both data fetches
+    if (!patientLoading && !departmentsLoading) {
+      setIsLoading(false);
+    }
+  }, [departmentsData, patientLoading, departmentsLoading, setValue]);
   
   useEffect(() => {
     // Calculate BMI if height and weight are available
@@ -177,18 +214,6 @@ const TriageForm: React.FC = () => {
       setValue('vitalSigns.bmi', parseFloat(bmi.toFixed(1)));
     }
   }, [vitalSigns.height, vitalSigns.weight, setValue]);
-
-  useEffect(() => {
-    // Set departments from fetched data
-    if (departmentsData && Array.isArray(departmentsData)) {
-      setDepartments(departmentsData);
-    }
-    
-    // Set loading state based on both data fetches
-    if (!patientLoading && !departmentsLoading) {
-      setIsLoading(false);
-    }
-  }, [departmentsData, patientLoading, departmentsLoading]);
 
   const calculateAge = (dateOfBirth: string) => {
     const birthDate = new Date(dateOfBirth);
@@ -367,12 +392,12 @@ const TriageForm: React.FC = () => {
       };
       
       // Save the updated patient
-      const { saveItem } = useHybridStorage<Patient>('patients');
-      await saveItem(updatedPatient, patient.id);
+      await savePatient(updatedPatient, patient.id);
       
       // Create triage record in local storage
       const { saveItem: saveTriageItem } = useHybridStorage('triage');
       await saveTriageItem({
+        id: Date.now().toString(), // Generate a unique ID
         patient_id: patient.id,
         vital_signs: data.vitalSigns,
         chief_complaint: data.chiefComplaint,
