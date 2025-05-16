@@ -36,7 +36,19 @@ interface PatientRegistrationFormData {
 }
 
 const PatientRegistrationForm: React.FC = () => {
-  const { register, handleSubmit, watch, formState: { errors }, trigger, setValue } = useForm<PatientRegistrationFormData>();
+  const { register, handleSubmit, watch, formState: { errors }, trigger, setValue } = useForm<PatientRegistrationFormData>({
+    defaultValues: {
+      medicalHistory: {
+        allergies: false,
+        allergyDetails: '',
+        chronicConditions: [],
+        otherConditions: '',
+        currentMedications: '',
+        pastSurgeries: '',
+        familyHistory: ''
+      }
+    }
+  });
   const navigate = useNavigate();
   const { addNotification } = useNotificationStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -109,7 +121,7 @@ const PatientRegistrationForm: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      // Create patient object
+      // Create patient object with safe access to medical history
       const patientId = uuidv4();
       const patient = {
         id: patientId,
@@ -126,20 +138,21 @@ const PatientRegistrationForm: React.FC = () => {
           phone: data.emergencyContactPhone || 'Unknown' // Default for emergency
         },
         medical_info: {
-          allergies: hasAllergies ? data.medicalHistory.allergyDetails.split(',').map(a => ({
-            allergen: a.trim(),
-            reaction: 'Unknown',
-            severity: 'unknown'
-          })) : [],
-          chronicConditions: chronicConditions,
-          currentMedications: data.medicalHistory.currentMedications ? 
+          allergies: data.medicalHistory?.allergies ? 
+            (data.medicalHistory.allergyDetails || '').split(',').map(a => ({
+              allergen: a.trim(),
+              reaction: 'Unknown',
+              severity: 'unknown'
+            })) : [],
+          chronicConditions: data.medicalHistory?.chronicConditions || [],
+          currentMedications: data.medicalHistory?.currentMedications ? 
             data.medicalHistory.currentMedications.split(',').map(m => ({
               name: m.trim(),
               dosage: 'Unknown',
               frequency: 'Unknown'
             })) : [],
-          pastSurgeries: data.medicalHistory.pastSurgeries,
-          familyHistory: data.medicalHistory.familyHistory
+          pastSurgeries: data.medicalHistory?.pastSurgeries || '',
+          familyHistory: data.medicalHistory?.familyHistory || ''
         },
         status: 'active',
         current_flow_step: patientType === 'emergency' ? 'emergency' : 'registration',
@@ -652,7 +665,8 @@ const PatientRegistrationForm: React.FC = () => {
               <div className="bg-white p-4 rounded-lg border border-gray-200">
                 <label htmlFor="familyHistory" className="form-label">Family History</label>
                 <textarea
-                  id="familyHistory"
+                  id="famil
+yHistory"
                   rows={2}
                   {...register('medicalHistory.familyHistory')}
                   className="form-input"
