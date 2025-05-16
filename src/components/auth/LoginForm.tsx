@@ -5,7 +5,6 @@ import { useAuthStore } from '../../lib/store';
 import { Activity, WifiOff, Eye, EyeOff } from 'lucide-react';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
 import { isValidEmail, isStrongPassword, generateCsrfToken, storeCsrfToken } from '../../lib/security';
-import { supabase } from '../../lib/supabase';
 
 interface LoginFormData {
   email: string;
@@ -13,7 +12,7 @@ interface LoginFormData {
 }
 
 const LoginForm: React.FC = () => {
-  const { login, isLoading, error } = useAuthStore();
+  const { login, isLoading, error, isAuthenticated } = useAuthStore();
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
   const { isOffline } = useOfflineStatus();
   const navigate = useNavigate();
@@ -21,13 +20,11 @@ const LoginForm: React.FC = () => {
   const [offlineError, setOfflineError] = useState<string | null>(null);
   const [loginAttempts, setLoginAttempts] = useState<number>(0);
   const [lockoutUntil, setLockoutUntil] = useState<Date | null>(null);
-  const [resetEmailSent, setResetEmailSent] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
   // Check if user is already logged in and redirect accordingly
   useEffect(() => {
-    const { user } = useAuthStore.getState();
-    if (user) {
+    if (isAuthenticated) {
       navigate('/dashboard');
     }
     
@@ -51,24 +48,7 @@ const LoginForm: React.FC = () => {
     // Generate and store CSRF token
     const csrfToken = generateCsrfToken();
     storeCsrfToken(csrfToken);
-  }, [navigate]);
-  
-  const handlePasswordReset = async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/change-password`,
-      });
-      
-      if (error) {
-        throw error;
-      }
-      
-      setResetEmailSent(true);
-    } catch (error: any) {
-      console.error('Password reset error:', error.message);
-      alert(`Error sending password reset: ${error.message}`);
-    }
-  };
+  }, [navigate, isAuthenticated]);
   
   const onSubmit = async (data: LoginFormData) => {
     if (isOffline) {
@@ -150,12 +130,6 @@ const LoginForm: React.FC = () => {
             </div>
           )}
           
-          {resetEmailSent && (
-            <div className="bg-success-50 border border-success-200 text-success-700 px-4 py-3 rounded-md">
-              Password reset instructions have been sent to your email address.
-            </div>
-          )}
-          
           <div className="space-y-4">
             <div>
               <label htmlFor="email" className="form-label">
@@ -225,20 +199,9 @@ const LoginForm: React.FC = () => {
             </div>
 
             <div className="text-sm">
-              <button
-                type="button"
-                onClick={() => {
-                  const email = (document.getElementById('email') as HTMLInputElement)?.value;
-                  if (email && isValidEmail(email)) {
-                    handlePasswordReset(email);
-                  } else {
-                    alert("Please enter a valid email address to reset your password.");
-                  }
-                }}
-                className="font-medium text-primary-600 hover:text-primary-500"
-              >
+              <Link to="/forgot-password" className="font-medium text-primary-600 hover:text-primary-500">
                 Forgot your password?
-              </button>
+              </Link>
             </div>
           </div>
 

@@ -50,13 +50,19 @@ const RegisterForm: React.FC = () => {
     
     const { email, password, firstName, lastName } = data;
     
-    await signup(email, password, {
-      first_name: firstName,
-      last_name: lastName,
-      role: 'visitor', // Default role, can be changed by admin later
-    });
-    
-    navigate('/login');
+    try {
+      await signup(email, password, {
+        first_name: firstName,
+        last_name: lastName,
+        role: 'visitor', // Default role, can be changed by admin later
+      });
+      
+      // Show success message and navigate to login
+      navigate('/login');
+    } catch (error) {
+      console.error('Registration error:', error);
+      // Error is already handled by the store
+    }
   };
   
   return (
