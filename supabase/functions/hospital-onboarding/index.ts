@@ -38,7 +38,7 @@ app.use(express.json());
 
 // Handle CORS preflight requests
 app.options('*', (req, res) => {
-  return res.set(corsHeaders).status(204).send();
+  res.set(corsHeaders).status(204).send();
 });
 
 // Add CORS middleware
@@ -232,14 +232,14 @@ app.post('/hospitals', async (req, res) => {
       console.log('Would send email to:', adminSetup.email || hospitalProfile.email);
     }
 
-    return res.status(201).json({
+    res.status(201).json({
       success: true,
       hospital: hospital,
       message: 'Hospital created successfully'
     });
   } catch (error) {
     console.error('Error in hospital onboarding:', error);
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -253,14 +253,12 @@ app.get('/check-subdomain/:subdomain', async (req, res) => {
       .eq('subdomain', subdomain)
       .maybeSingle();
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
+    if (error) throw error;
     
-    return res.json({ available: !data });
+    res.json({ available: !data });
   } catch (error) {
     console.error('Error checking subdomain:', error);
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -272,13 +270,11 @@ app.get('/hospitals', async (req, res) => {
       .select('*')
       .order('name');
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-    return res.json(data);
+    if (error) throw error;
+    res.json(data);
   } catch (error) {
     console.error('Error fetching hospitals:', error);
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -311,13 +307,11 @@ app.get('/hospitals/:id', async (req, res) => {
       .eq('id', id)
       .single();
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
-    return res.json(data);
+    if (error) throw error;
+    res.json(data);
   } catch (error) {
     console.error('Error fetching hospital:', error);
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 

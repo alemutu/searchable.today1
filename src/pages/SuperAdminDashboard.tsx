@@ -86,23 +86,19 @@ const SuperAdminDashboard: React.FC = () => {
 
       if (settingsError) {
         console.error('Error fetching system settings:', settingsError);
-        return null;
+      } else {
+        setSettings(settingsData || []);
+
+        const mainDomainSetting = settingsData?.find(s => s.key === 'system.main_domain');
+        if (mainDomainSetting?.value) {
+          const domain = typeof mainDomainSetting.value === 'string'
+            ? mainDomainSetting.value.replace(/"/g, '')
+            : mainDomainSetting.value;
+          setMainDomain(domain);
+        }
       }
-
-      setSettings(settingsData || []);
-
-      const mainDomainSetting = settingsData?.find(s => s.key === 'system.main_domain');
-      if (mainDomainSetting?.value) {
-        const domain = typeof mainDomainSetting.value === 'string'
-          ? mainDomainSetting.value.replace(/"/g, '')
-          : mainDomainSetting.value;
-        setMainDomain(domain);
-      }
-
-      return null;
     } catch (error) {
       console.error('Error fetching super admin data:', error);
-      return null;
     } finally {
       setIsLoading(false);
     }

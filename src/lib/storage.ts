@@ -4,7 +4,7 @@ import { sanitizeInput } from './security';
 
 // Type for storage operations
 type StorageOperation = {
-  id: string;
+  id: string; // Add unique ID for each operation
   table: string;
   type: 'insert' | 'update' | 'delete';
   data: any;
@@ -45,7 +45,7 @@ const isOnline = (): boolean => {
 const addToQueue = (operation: Omit<StorageOperation, 'id'>): void => {
   const operationWithId = {
     ...operation,
-    id: uuidv4()
+    id: uuidv4() // Add unique ID to each operation
   };
   operationsQueue.push(operationWithId);
   saveQueue();
@@ -57,15 +57,13 @@ export const processQueue = async (): Promise<void> => {
 
   const client = getClient();
   
+  // Process operations in order
   const operations = [...operationsQueue];
   operationsQueue = [];
   saveQueue();
   
   for (const op of operations) {
     try {
-      // Skip any operations targeting the cached table
-      if (op.table === 'cached') continue;
-
       if (op.type === 'insert') {
         await client.from(op.table).insert(op.data);
       } else if (op.type === 'update' && op.id) {
@@ -75,10 +73,12 @@ export const processQueue = async (): Promise<void> => {
       }
     } catch (error) {
       console.error(`Error processing operation:`, op, error);
+      // Add failed operation back to queue with its original ID
       operationsQueue.push(op);
     }
   }
   
+  // Save any operations that failed back to the queue
   if (operationsQueue.length > 0) {
     saveQueue();
   }
@@ -112,16 +112,11 @@ export const saveData = async <T extends object>(
   data: T,
   id?: string
 ): Promise<T> => {
-  // Skip operations on the cached table
-  if (table === 'cached') {
-    throw new Error('Direct operations on cached table are not allowed');
-  }
-
   // Sanitize data to prevent XSS
   const sanitizedData = sanitizeData(data);
   
-  // Save to local storage first with a prefix to avoid conflicts
-  const localStorageKey = `storage_${table}_${id || (sanitizedData as any).id || 'new'}`;
+  // Save to local storage first
+  const localStorageKey = `${table}_${id || (sanitizedData as any).id || 'new'}`;
   localStorage.setItem(localStorageKey, JSON.stringify(sanitizedData));
   
   // If online, save to Supabase
@@ -130,6 +125,7 @@ export const saveData = async <T extends object>(
       const client = getClient();
       
       if (id) {
+        // Update existing record
         const { error } = await client
           .from(table)
           .update(sanitizedData)
@@ -137,6 +133,7 @@ export const saveData = async <T extends object>(
           
         if (error) throw error;
       } else {
+        // Insert new record
         const { error } = await client
           .from(table)
           .insert(sanitizedData);
@@ -146,6 +143,7 @@ export const saveData = async <T extends object>(
     } catch (error) {
       console.error(`Error saving to Supabase:`, error);
       
+      // Add to queue for later sync
       addToQueue({
         table,
         type: id ? 'update' : 'insert',
@@ -157,6 +155,7 @@ export const saveData = async <T extends object>(
       throw error;
     }
   } else {
+    // Add to queue for later sync
     addToQueue({
       table,
       type: id ? 'update' : 'insert',
@@ -175,14 +174,9 @@ export const fetchData = async <T>(
   id?: string,
   query?: any
 ): Promise<T | T[] | null> => {
-  // Skip operations on the cached table
-  if (table === 'cached') {
-    throw new Error('Direct operations on cached table are not allowed');
-  }
-
   // Try to get from local storage first
   if (id) {
-    const localData = localStorage.getItem(`storage_${table}_${id}`);
+    const localData = localStorage.getItem(`${table}_${id}`);
     if (localData) {
       try {
         return JSON.parse(localData) as T;
@@ -198,6 +192,7 @@ export const fetchData = async <T>(
       const client = getClient();
       
       if (id) {
+        // Fetch single record
         const { data, error } = await client
           .from(table)
           .select('*')
@@ -206,14 +201,17 @@ export const fetchData = async <T>(
           
         if (error) throw error;
         
+        // Save to local storage
         if (data) {
-          localStorage.setItem(`storage_${table}_${id}`, JSON.stringify(data));
+          localStorage.setItem(`${table}_${id}`, JSON.stringify(data));
         }
         
         return data as T;
       } else if (query) {
+        // Fetch with query
         let queryBuilder = client.from(table).select('*');
         
+        // Apply query parameters
         Object.entries(query).forEach(([key, value]) => {
           queryBuilder = queryBuilder.eq(key, value);
         });
@@ -222,26 +220,29 @@ export const fetchData = async <T>(
         
         if (error) throw error;
         
+        // Save to local storage
         if (data) {
           data.forEach((item: any) => {
             if (item.id) {
-              localStorage.setItem(`storage_${table}_${item.id}`, JSON.stringify(item));
+              localStorage.setItem(`${table}_${item.id}`, JSON.stringify(item));
             }
           });
         }
         
         return data as T[];
       } else {
+        // Fetch all records
         const { data, error } = await client
           .from(table)
           .select('*');
           
         if (error) throw error;
         
+        // Save to local storage
         if (data) {
           data.forEach((item: any) => {
             if (item.id) {
-              localStorage.setItem(`storage_${table}_${item.id}`, JSON.stringify(item));
+              localStorage.setItem(`${table}_${item.id}`, JSON.stringify(item));
             }
           });
         }
@@ -251,16 +252,19 @@ export const fetchData = async <T>(
     } catch (error) {
       console.error(`Error fetching from Supabase:`, error);
       
+      // Fall back to local storage
       if (id) {
         return null;
       } else {
+        // Return all items for this table from local storage
         const results: T[] = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && key.startsWith(`storage_${table}_`)) {
+          if (key && key.startsWith(`${table}_`)) {
             try {
               const item = JSON.parse(localStorage.getItem(key) || '{}');
               
+              // Apply query filter if provided
               if (query) {
                 let matches = true;
                 Object.entries(query).forEach(([queryKey, queryValue]) => {
@@ -284,17 +288,20 @@ export const fetchData = async <T>(
       }
     }
   } else {
+    // Offline mode - use local storage only
     if (id) {
-      const localData = localStorage.getItem(`storage_${table}_${id}`);
+      const localData = localStorage.getItem(`${table}_${id}`);
       return localData ? JSON.parse(localData) as T : null;
     } else {
+      // Return all items for this table from local storage
       const results: T[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith(`storage_${table}_`)) {
+        if (key && key.startsWith(`${table}_`)) {
           try {
             const item = JSON.parse(localStorage.getItem(key) || '{}');
             
+            // Apply query filter if provided
             if (query) {
               let matches = true;
               Object.entries(query).forEach(([queryKey, queryValue]) => {
@@ -324,13 +331,8 @@ export const deleteData = async (
   table: string,
   id: string
 ): Promise<void> => {
-  // Skip operations on the cached table
-  if (table === 'cached') {
-    throw new Error('Direct operations on cached table are not allowed');
-  }
-
   // Remove from local storage
-  localStorage.removeItem(`storage_${table}_${id}`);
+  localStorage.removeItem(`${table}_${id}`);
   
   // If online, delete from Supabase
   if (isOnline()) {
@@ -345,6 +347,7 @@ export const deleteData = async (
     } catch (error) {
       console.error(`Error deleting from Supabase:`, error);
       
+      // Add to queue for later sync
       addToQueue({
         table,
         type: 'delete',
@@ -356,6 +359,7 @@ export const deleteData = async (
       throw error;
     }
   } else {
+    // Add to queue for later sync
     addToQueue({
       table,
       type: 'delete',
@@ -370,28 +374,31 @@ export const deleteData = async (
 export const syncAllData = async (): Promise<void> => {
   if (!isOnline()) return;
   
+  // Process the operations queue first
   await processQueue();
   
+  // Then sync any data that might have been missed
   const client = getClient();
   
+  // Get all keys from localStorage
   const tables = new Set<string>();
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('storage_')) {
-      const table = key.split('_')[1];
-      if (table !== 'cached') {
-        tables.add(table);
-      }
+    if (key && key.includes('_')) {
+      const table = key.split('_')[0];
+      tables.add(table);
     }
   }
   
+  // Sync each table
   for (const table of tables) {
     try {
+      // Get all items for this table from local storage
       const localItems: any[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && key.startsWith(`storage_${table}_`) && key !== 'pendingOperations') {
-          const id = key.split('_')[2];
+        if (key && key.startsWith(`${table}_`) && key !== 'pendingOperations') {
+          const id = key.split('_')[1];
           if (id && id !== 'new') {
             try {
               const item = JSON.parse(localStorage.getItem(key) || '{}');
@@ -403,6 +410,7 @@ export const syncAllData = async (): Promise<void> => {
         }
       }
       
+      // Sync each item
       for (const item of localItems) {
         if (item.id) {
           await client
@@ -418,17 +426,21 @@ export const syncAllData = async (): Promise<void> => {
 
 // Initialize storage
 export const initializeStorage = (): void => {
+  // Load the operations queue
   loadQueue();
   
+  // Set up online/offline event listeners
   window.addEventListener('online', () => {
     console.log('Back online, processing queue...');
     processQueue();
   });
   
+  // Check if local storage is available
   if (typeof localStorage === 'undefined') {
     console.error('Local storage is not available');
   }
   
+  // Periodically clean up old data
   setInterval(() => {
     cleanupOldData();
   }, 24 * 60 * 60 * 1000); // Once a day
@@ -441,7 +453,7 @@ const cleanupOldData = (): void => {
   
   for (let i = 0; i < localStorage.length; i++) {
     const key = localStorage.key(i);
-    if (key && key.startsWith('storage_')) {
+    if (key && key.includes('_')) {
       try {
         const item = JSON.parse(localStorage.getItem(key) || '{}');
         if (item.timestamp && (now - item.timestamp > MAX_AGE)) {

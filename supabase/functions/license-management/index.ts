@@ -28,7 +28,7 @@ app.use(express.json());
 
 // Handle CORS preflight requests
 app.options('*', (req, res) => {
-  return res.set(corsHeaders).status(204).send();
+  res.set(corsHeaders).status(204).send();
 });
 
 // Add CORS middleware
@@ -49,14 +49,12 @@ app.get('/licenses', async (req, res) => {
       `)
       .order('created_at', { ascending: false });
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
+    if (error) throw error;
 
-    return res.json(data);
+    res.json(data);
   } catch (error) {
     console.error('Error fetching licenses:', error);
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -66,7 +64,7 @@ app.post('/licenses', async (req, res) => {
     const { hospital_id, plan_id } = req.body;
 
     if (!hospital_id || !plan_id) {
-      return res.status(400).json({ error: 'Hospital ID and Plan ID are required' });
+      throw new Error('Hospital ID and Plan ID are required');
     }
 
     // Get plan details
@@ -76,9 +74,7 @@ app.post('/licenses', async (req, res) => {
       .eq('id', plan_id)
       .single();
 
-    if (planError) {
-      return res.status(500).json({ error: planError.message });
-    }
+    if (planError) throw planError;
 
     const licenseData = {
       hospital_id,
@@ -100,14 +96,12 @@ app.post('/licenses', async (req, res) => {
       .select()
       .single();
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
+    if (error) throw error;
 
-    return res.status(201).json(data);
+    res.status(201).json(data);
   } catch (error) {
     console.error('Error creating license:', error);
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -118,7 +112,7 @@ app.put('/licenses/:id/status', async (req, res) => {
     const { status } = req.body;
 
     if (!['active', 'suspended', 'cancelled'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status' });
+      throw new Error('Invalid status');
     }
 
     const { data, error } = await supabaseClient
@@ -128,14 +122,12 @@ app.put('/licenses/:id/status', async (req, res) => {
       .select()
       .single();
 
-    if (error) {
-      return res.status(500).json({ error: error.message });
-    }
+    if (error) throw error;
 
-    return res.json(data);
+    res.json(data);
   } catch (error) {
     console.error('Error updating license status:', error);
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
@@ -146,9 +138,7 @@ app.get('/metrics', async (req, res) => {
       .from('licenses')
       .select('*');
 
-    if (licensesError) {
-      return res.status(500).json({ error: licensesError.message });
-    }
+    if (licensesError) throw licensesError;
 
     const metrics = {
       total_active: licenses.filter(l => l.status === 'active').length,
@@ -162,10 +152,10 @@ app.get('/metrics', async (req, res) => {
       }).length
     };
 
-    return res.json(metrics);
+    res.json(metrics);
   } catch (error) {
     console.error('Error fetching metrics:', error);
-    return res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message });
   }
 });
 
