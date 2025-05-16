@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Mail, Phone, Globe, MapPin, User, Lock, CheckCircle, AlertTriangle, ArrowRight, ArrowLeft, Box, CreditCard, Calendar, Save, Shield, Info, Check, X } from 'lucide-react';
+import { Building2, Mail, Phone, Globe, MapPin, User, Lock, CheckCircle, AlertTriangle, ArrowRight, ArrowLeft, Box, CreditCard, Calendar, Save, Shield, Info, Check, X, DollarSign, Pill, Flask, Microscope, BedDouble, Stethoscope, Syringe, BarChart, Users, Settings, Video, LineChart, UserRound } from 'lucide-react';
 import { useAuthStore, useNotificationStore } from '../lib/store';
 import { hospitalOnboardingApi } from '../lib/api';
 import { isValidEmail, isStrongPassword, generateSecurePassword } from '../lib/security';
