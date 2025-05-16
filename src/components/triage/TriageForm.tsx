@@ -304,7 +304,7 @@ const TriageForm: React.FC = () => {
   };
 
   const onSubmit = async (data: TriageFormData) => {
-    if (!hospital || !user || !patient) return;
+    if (!user || !patient) return;
     
     try {
       setIsSaving(true);
