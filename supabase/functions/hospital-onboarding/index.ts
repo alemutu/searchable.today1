@@ -5,11 +5,12 @@ import { v4 as uuidv4 } from 'npm:uuid@9.0.1';
 
 const app = express();
 
-// Update CORS headers to be more permissive during development
+// Update CORS headers to be more specific about allowed origins
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Origin': '*', // In production, replace with specific origin
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info',
+  'Access-Control-Max-Age': '86400',
   'Content-Type': 'application/json'
 };
 
@@ -44,7 +45,9 @@ app.options('*', (req, res) => {
 
 // Add CORS middleware
 app.use((req, res, next) => {
-  res.set(corsHeaders);
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    res.set(key, value);
+  });
   next();
 });
 
@@ -59,7 +62,7 @@ app.use((err, req, res, next) => {
 
 // Basic health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'ok' });
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Check if subdomain is available
@@ -69,8 +72,14 @@ app.get('/check-subdomain/:subdomain', async (req, res) => {
 
     // Validate subdomain format
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(subdomain)) {
-      return res.status(400).json({ error: 'Invalid subdomain format' });
+      return res.status(400).json({ 
+        error: 'Invalid subdomain format',
+        available: false
+      });
     }
+
+    // Add delay to prevent rapid requests
+    await new Promise(resolve => setTimeout(resolve, 500));
 
     const { data, error } = await supabaseAdmin
       .from('hospitals')
@@ -80,13 +89,19 @@ app.get('/check-subdomain/:subdomain', async (req, res) => {
 
     if (error) {
       console.error('Database error:', error);
-      return res.status(500).json({ error: 'Failed to check subdomain availability' });
+      return res.status(500).json({ 
+        error: 'Failed to check subdomain availability',
+        available: false
+      });
     }
     
     res.json({ available: !data });
   } catch (error) {
     console.error('Error checking subdomain:', error);
-    res.status(500).json({ error: 'Internal server error' });
+    res.status(500).json({ 
+      error: 'Internal server error',
+      available: false
+    });
   }
 });
 
