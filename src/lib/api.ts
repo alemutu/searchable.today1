@@ -108,46 +108,41 @@ export const hospitalOnboardingApi = {
       },
     };
 
-    // Use direct Supabase RPC call instead of edge function
-    try {
-      const { data, error } = await supabase.rpc('create_hospital', {
-        hospital_data: sanitizedData.hospitalProfile,
-        admin_data: sanitizedData.adminSetup,
-        modules_data: sanitizedData.moduleSelection,
-        plan_key: sanitizedData.pricingPlan.plan,
-        license_data: sanitizedData.licenseDetails
-      });
+    const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals`;
+    const headers = await getHeaders();
 
-      if (error) {
-        throw new Error(error.message || 'Failed to create hospital');
-      }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(sanitizedData)
+    });
 
-      return data;
-    } catch (error: any) {
-      console.error('Error creating hospital:', error);
-      throw new Error(error.message || 'Failed to create hospital');
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create hospital');
     }
+
+    return response.json();
   },
 
   /**
    * Get all hospitals
    */
   getHospitals: async () => {
-    try {
-      const { data, error } = await supabase
-        .from('hospitals')
-        .select('*')
-        .order('name');
+    const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals`;
+    const headers = await getHeaders();
 
-      if (error) {
-        throw new Error(error.message || 'Failed to fetch hospitals');
-      }
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
 
-      return data;
-    } catch (error: any) {
-      console.error('Error fetching hospitals:', error);
-      throw new Error(error.message || 'Failed to fetch hospitals');
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch hospitals');
     }
+
+    return response.json();
   },
 
   /**
@@ -159,41 +154,20 @@ export const hospitalOnboardingApi = {
       throw new Error('Invalid hospital ID format');
     }
     
-    try {
-      const { data, error } = await supabase
-        .from('hospitals')
-        .select(`
-          *,
-          licenses (
-            id,
-            plan_id,
-            start_date,
-            end_date,
-            status,
-            max_users,
-            current_users,
-            features,
-            billing_info
-          ),
-          hospital_modules (
-            id,
-            module_key,
-            category,
-            is_active
-          )
-        `)
-        .eq('id', id)
-        .single();
+    const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals/${id}`;
+    const headers = await getHeaders();
 
-      if (error) {
-        throw new Error(error.message || 'Failed to fetch hospital');
-      }
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
 
-      return data;
-    } catch (error: any) {
-      console.error('Error fetching hospital:', error);
-      throw new Error(error.message || 'Failed to fetch hospital');
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch hospital');
     }
+
+    return response.json();
   },
 
   /**
@@ -205,22 +179,20 @@ export const hospitalOnboardingApi = {
       throw new Error('Invalid subdomain format');
     }
     
-    try {
-      const { data, error } = await supabase
-        .from('hospitals')
-        .select('id')
-        .eq('subdomain', subdomain)
-        .maybeSingle();
+    const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/check-subdomain/${safeEncodeURIComponent(subdomain)}`;
+    const headers = await getHeaders();
 
-      if (error) {
-        throw new Error(error.message || 'Failed to check subdomain');
-      }
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
 
-      return { available: !data };
-    } catch (error: any) {
-      console.error('Error checking subdomain:', error);
-      throw new Error(error.message || 'Failed to check subdomain');
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to check subdomain');
     }
+
+    return response.json();
   }
 };
 
@@ -233,25 +205,20 @@ export const licenseApi = {
    * Get all licenses
    */
   getLicenses: async () => {
-    try {
-      const { data, error } = await supabase
-        .from('licenses')
-        .select(`
-          *,
-          hospital:hospitals(id, name),
-          plan:pricing_plans(id, name)
-        `)
-        .order('created_at', { ascending: false });
+    const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses`;
+    const headers = await getHeaders();
 
-      if (error) {
-        throw new Error(error.message || 'Failed to fetch licenses');
-      }
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
 
-      return data;
-    } catch (error: any) {
-      console.error('Error fetching licenses:', error);
-      throw new Error(error.message || 'Failed to fetch licenses');
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch licenses');
     }
+
+    return response.json();
   },
 
   /**
@@ -267,21 +234,21 @@ export const licenseApi = {
       throw new Error('Invalid ID format');
     }
     
-    try {
-      const { data: result, error } = await supabase.rpc('create_license', {
-        hospital_id: data.hospital_id,
-        plan_id: data.plan_id
-      });
+    const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses`;
+    const headers = await getHeaders();
 
-      if (error) {
-        throw new Error(error.message || 'Failed to create license');
-      }
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data)
+    });
 
-      return result;
-    } catch (error: any) {
-      console.error('Error creating license:', error);
-      throw new Error(error.message || 'Failed to create license');
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to create license');
     }
+
+    return response.json();
   },
 
   /**
@@ -298,41 +265,41 @@ export const licenseApi = {
       throw new Error('Invalid status value');
     }
     
-    try {
-      const { data, error } = await supabase
-        .from('licenses')
-        .update({ status })
-        .eq('id', id)
-        .select()
-        .single();
+    const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses/${id}/status`;
+    const headers = await getHeaders();
 
-      if (error) {
-        throw new Error(error.message || 'Failed to update license status');
-      }
+    const response = await fetch(url, {
+      method: 'PUT',
+      headers,
+      body: JSON.stringify({ status })
+    });
 
-      return data;
-    } catch (error: any) {
-      console.error('Error updating license status:', error);
-      throw new Error(error.message || 'Failed to update license status');
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to update license status');
     }
+
+    return response.json();
   },
 
   /**
    * Get license usage metrics
    */
   getLicenseMetrics: async () => {
-    try {
-      const { data, error } = await supabase.rpc('get_license_metrics');
+    const url = `${getEdgeFunctionBaseUrl()}/license-management/metrics`;
+    const headers = await getHeaders();
 
-      if (error) {
-        throw new Error(error.message || 'Failed to fetch license metrics');
-      }
+    const response = await fetch(url, {
+      method: 'GET',
+      headers
+    });
 
-      return data;
-    } catch (error: any) {
-      console.error('Error fetching license metrics:', error);
-      throw new Error(error.message || 'Failed to fetch license metrics');
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to fetch license metrics');
     }
+
+    return response.json();
   }
 };
 
