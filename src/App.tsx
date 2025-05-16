@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from './lib/store';
+import { supabase } from './lib/supabase';
 import LoginForm from './components/auth/LoginForm';
 import AdminLoginForm from './components/auth/AdminLoginForm';
 import RegisterForm from './components/auth/RegisterForm';

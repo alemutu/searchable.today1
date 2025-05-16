@@ -260,6 +260,19 @@ const HospitalOnboarding: React.FC = () => {
   const checkSubdomainAvailability = async (subdomain: string) => {
     try {
       setIsCheckingSubdomain(true);
+      
+      // In development mode, simulate the API call
+      if (import.meta.env.DEV) {
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Simulate some taken subdomains
+        const takenSubdomains = ['general', 'admin', 'test', 'demo'];
+        setSubdomainAvailable(!takenSubdomains.includes(subdomain));
+        setIsCheckingSubdomain(false);
+        return;
+      }
+      
       const response = await hospitalOnboardingApi.checkSubdomain(subdomain);
       setSubdomainAvailable(response.available);
     } catch (error) {
@@ -275,6 +288,20 @@ const HospitalOnboarding: React.FC = () => {
     
     try {
       setIsLoading(true);
+      
+      // In development mode, simulate the API call
+      if (import.meta.env.DEV) {
+        // Simulate network delay
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        
+        addNotification({
+          message: 'Hospital created successfully (simulated in dev mode)',
+          type: 'success'
+        });
+        
+        navigate('/super-admin');
+        return;
+      }
       
       const response = await hospitalOnboardingApi.createHospital(formData);
       
