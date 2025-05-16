@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Plus, FileText, Eye, Activity, Stethoscope, Hash } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { useHybridStorage } from '../lib/hooks/useHybridStorage';
-import { useNotificationStore } from '../lib/store';
+import { supabase } from '../lib/supabase';
+import { useAuthStore } from '../lib/store';
 
 interface Patient {
   id: string;
@@ -19,29 +19,67 @@ interface Patient {
 const PatientList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const { data: patients, loading: isLoading, error } = useHybridStorage<Patient>('patients');
-  const { addNotification } = useNotificationStore();
+  const [patients, setPatients] = useState<Patient[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { isDoctor } = useAuthStore();
   
   useEffect(() => {
-    if (error) {
-      addNotification({
-        message: 'Error loading patients: ' + error.message,
-        type: 'error'
-      });
-    }
-  }, [error, addNotification]);
+    fetchPatients();
+  }, []);
   
-  const searchPatients = () => {
-    if (!searchTerm || !Array.isArray(patients)) return patients;
+  const fetchPatients = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('patients')
+        .select('*')
+        .order('created_at', { ascending: false });
+          
+      if (error) throw error;
+      setPatients(data || []);
+    } catch (error) {
+      console.error('Error fetching patients:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const searchPatients = async () => {
+    if (!searchTerm) return;
     
-    return patients.filter(patient => {
-      const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
-      return fullName.includes(searchTerm.toLowerCase());
-    });
+    try {
+      setIsLoading(true);
+      
+      // Use the search_patients function if the search term is complex
+      if (searchTerm.length > 2) {
+        const { data, error } = await supabase.rpc('search_patients', {
+          search_term: searchTerm
+        });
+        
+        if (error) throw error;
+        setPatients(data || []);
+      } else {
+        // For simple searches, use the regular query
+        const { data, error } = await supabase
+          .from('patients')
+          .select('*')
+          .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`)
+          .order('created_at', { ascending: false });
+            
+        if (error) throw error;
+        setPatients(data || []);
+      }
+    } catch (error) {
+      console.error('Error searching patients:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
   
-  const filteredPatients = searchPatients();
-  
+  const filteredPatients = patients.filter(patient => {
+    const matchesFilter = filterStatus === 'all' || patient.status === filterStatus;
+    return matchesFilter;
+  });
+
   const getFlowStepColor = (step: string | null) => {
     switch (step) {
       case 'registration':
@@ -75,12 +113,17 @@ const PatientList: React.FC = () => {
     const paddedNumber = String(patientNumber).padStart(6, '0');
     return `PT${paddedNumber}`;
   };
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    searchPatients();
+  };
   
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Patients</h1>
-        <Link to="/patient-registration" className="btn btn-primary inline-flex items-center">
+        <Link to="/patients/register" className="btn btn-primary inline-flex items-center">
           <Plus className="h-5 w-5 mr-2" />
           Add Patient
         </Link>
@@ -88,7 +131,7 @@ const PatientList: React.FC = () => {
       
       <div className="card">
         <div className="p-6 flex flex-col space-y-4 sm:flex-row sm:space-y-0 sm:space-x-4">
-          <form className="relative flex-grow flex">
+          <form onSubmit={handleSearch} className="relative flex-grow flex">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
               <Search className="h-5 w-5 text-gray-400" />
             </div>
@@ -97,8 +140,9 @@ const PatientList: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="form-input pl-10 flex-grow"
-              placeholder="Search patients by name..."
+              placeholder="Search patients by name, contact, or medical info..."
             />
+            <button type="submit" className="btn btn-primary ml-2">Search</button>
           </form>
           
           <div className="relative sm:w-1/4">
@@ -156,10 +200,10 @@ const PatientList: React.FC = () => {
                     </div>
                   </td>
                 </tr>
-              ) : !Array.isArray(patients) || patients.length === 0 ? (
+              ) : filteredPatients.length === 0 ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">
-                    No patients found. Add your first patient to get started.
+                    No patients found matching your search criteria.
                   </td>
                 </tr>
               ) : (
@@ -226,18 +270,25 @@ const PatientList: React.FC = () => {
                         >
                           <Eye className="h-5 w-5" />
                         </Link>
-                        <Link
-                          to={`/patient-workflow/${patient.id}`}
-                          className="text-secondary-600 hover:text-secondary-900"
-                        >
-                          <Activity className="h-5 w-5" />
-                        </Link>
-                        <Link
-                          to={`/patient-consultation/${patient.id}`}
-                          className="text-secondary-600 hover:text-secondary-900"
-                        >
-                          <Stethoscope className="h-5 w-5" />
-                        </Link>
+                        {patient.current_flow_step === 'registration' && (
+                          <Link
+                            to={`/patients/${patient.id}/triage`}
+                            className="text-warning-600 hover:text-warning-900"
+                          >
+                            <Activity className="h-5 w-5" />
+                          </Link>
+                        )}
+                        {(patient.current_flow_step === 'waiting_consultation' || patient.current_flow_step === 'emergency') && isDoctor && (
+                          <Link
+                            to={`/patients/${patient.id}/consultation`}
+                            className="text-secondary-600 hover:text-secondary-900"
+                          >
+                            <Stethoscope className="h-5 w-5" />
+                          </Link>
+                        )}
+                        <button className="text-secondary-600 hover:text-secondary-900">
+                          <FileText className="h-5 w-5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -249,8 +300,8 @@ const PatientList: React.FC = () => {
         
         <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
           <div className="text-sm text-gray-700">
-            Showing <span className="font-medium">{Array.isArray(filteredPatients) ? filteredPatients.length : 0}</span> of{' '}
-            <span className="font-medium">{Array.isArray(patients) ? patients.length : 0}</span> patients
+            Showing <span className="font-medium">{filteredPatients.length}</span> of{' '}
+            <span className="font-medium">{patients.length}</span> patients
           </div>
           <div className="flex space-x-2">
             <button className="btn btn-outline py-1 px-3">Previous</button>
