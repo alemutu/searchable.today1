@@ -191,6 +191,12 @@ const TriageForm: React.FC = () => {
           { id: '5', name: 'Orthopedics' }
         ];
         setDepartments(mockDepartments);
+        
+        // Auto-select General Medicine department
+        const generalMedicineDept = mockDepartments.find(dept => dept.name === 'General Medicine');
+        if (generalMedicineDept) {
+          setValue('departmentId', generalMedicineDept.id);
+        }
         return;
       }
 
@@ -201,6 +207,12 @@ const TriageForm: React.FC = () => {
 
       if (error) throw error;
       setDepartments(data || []);
+      
+      // Auto-select General Medicine department
+      const generalMedicineDept = data?.find(dept => dept.name === 'General Medicine');
+      if (generalMedicineDept) {
+        setValue('departmentId', generalMedicineDept.id);
+      }
     } catch (error) {
       console.error('Error loading departments:', error);
     }
