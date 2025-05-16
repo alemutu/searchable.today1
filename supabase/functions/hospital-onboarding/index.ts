@@ -40,7 +40,10 @@ app.use(express.json());
 
 // Handle CORS preflight requests
 app.options('*', (req, res) => {
-  res.set(corsHeaders).status(204).send();
+  Object.entries(corsHeaders).forEach(([key, value]) => {
+    res.set(key, value);
+  });
+  res.status(204).send();
 });
 
 // Add CORS middleware
@@ -108,6 +111,8 @@ app.get('/check-subdomain/:subdomain', async (req, res) => {
 // Create a new hospital with all related resources
 app.post('/hospitals', async (req, res) => {
   try {
+    console.log('Received hospital creation request:', JSON.stringify(req.body, null, 2));
+    
     const { 
       hospitalProfile, 
       adminSetup, 
@@ -135,8 +140,11 @@ app.post('/hospitals', async (req, res) => {
       .single();
 
     if (hospitalError) {
+      console.error('Error creating hospital:', hospitalError);
       return res.status(500).json({ error: hospitalError.message });
     }
+
+    console.log('Hospital created:', hospital);
 
     // Create admin user using the auth API with service role
     const { data: { user }, error: userError } = await supabaseAdmin.auth.admin.createUser({
@@ -154,8 +162,11 @@ app.post('/hospitals', async (req, res) => {
     if (userError) {
       // Rollback hospital creation
       await supabaseAdmin.from('hospitals').delete().eq('id', hospital.id);
+      console.error('Error creating admin user:', userError);
       return res.status(500).json({ error: userError.message });
     }
+
+    console.log('Admin user created:', user.id);
 
     // Create profile for admin using service role client
     const { error: profileError } = await supabaseAdmin
@@ -173,8 +184,11 @@ app.post('/hospitals', async (req, res) => {
       // Rollback user and hospital creation
       await supabaseAdmin.auth.admin.deleteUser(user.id);
       await supabaseAdmin.from('hospitals').delete().eq('id', hospital.id);
+      console.error('Error creating admin profile:', profileError);
       return res.status(500).json({ error: profileError.message });
     }
+
+    console.log('Admin profile created');
 
     // Store selected modules
     const allModules = [
@@ -197,8 +211,11 @@ app.post('/hospitals', async (req, res) => {
       // Rollback previous creations
       await supabaseAdmin.auth.admin.deleteUser(user.id);
       await supabaseAdmin.from('hospitals').delete().eq('id', hospital.id);
+      console.error('Error creating hospital modules:', modulesError);
       return res.status(500).json({ error: modulesError.message });
     }
+
+    console.log('Hospital modules created');
 
     // Get pricing plan
     const { data: plan, error: planError } = await supabaseAdmin
@@ -208,8 +225,11 @@ app.post('/hospitals', async (req, res) => {
       .single();
 
     if (planError) {
+      console.error('Error fetching pricing plan:', planError);
       return res.status(500).json({ error: planError.message });
     }
+
+    console.log('Pricing plan found:', plan.id);
 
     // Calculate end date
     let endDate = null;
@@ -244,8 +264,11 @@ app.post('/hospitals', async (req, res) => {
       }]);
 
     if (licenseError) {
+      console.error('Error creating license:', licenseError);
       return res.status(500).json({ error: licenseError.message });
     }
+
+    console.log('License created');
 
     // Create default departments
     const defaultDepartments = [
@@ -267,6 +290,8 @@ app.post('/hospitals', async (req, res) => {
     if (departmentsError) {
       console.error('Error creating default departments:', departmentsError);
       // Non-critical error, continue
+    } else {
+      console.log('Default departments created');
     }
 
     // Create hospital user mapping
@@ -282,6 +307,8 @@ app.post('/hospitals', async (req, res) => {
     if (hospitalUserError) {
       console.error('Error creating hospital user mapping:', hospitalUserError);
       // Non-critical error, continue
+    } else {
+      console.log('Hospital user mapping created');
     }
 
     // 8. Send email if enabled
@@ -297,7 +324,7 @@ app.post('/hospitals', async (req, res) => {
     });
   } catch (error) {
     console.error('Error in hospital onboarding:', error);
-    res.status(500).json({ error: error.message });
+    res.status(500).json({ error: error.message || 'An unexpected error occurred' });
   }
 });
 
