@@ -6,7 +6,8 @@ import { sanitizeInput, safeEncodeURIComponent, apiRateLimiter } from './securit
  * This will be used to construct the full URL for each function
  */
 const getEdgeFunctionBaseUrl = () => {
-  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+  return url;
 };
 
 /**
@@ -18,6 +19,7 @@ const getHeaders = async () => {
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'x-client-info': 'hospital-onboarding-client'
   };
   
   // Add Authorization header if session exists
@@ -108,21 +110,20 @@ export const hospitalOnboardingApi = {
       },
     };
 
-    // For development environment, use the actual Supabase API instead of simulating
     try {
-      // Use the Edge Function URL
       const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals`;
       const headers = await getHeaders();
 
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(sanitizedData)
+        body: JSON.stringify(sanitizedData),
+        credentials: 'include'
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create hospital');
+        throw new Error(errorData.error || `Failed to create hospital: ${response.statusText}`);
       }
 
       return response.json();
@@ -142,12 +143,13 @@ export const hospitalOnboardingApi = {
 
       const response = await fetch(url, {
         method: 'GET',
-        headers
+        headers,
+        credentials: 'include'
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch hospitals');
+        throw new Error(errorData.error || `Failed to fetch hospitals: ${response.statusText}`);
       }
 
       return response.json();
@@ -172,12 +174,13 @@ export const hospitalOnboardingApi = {
 
       const response = await fetch(url, {
         method: 'GET',
-        headers
+        headers,
+        credentials: 'include'
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch hospital');
+        throw new Error(errorData.error || `Failed to fetch hospital: ${response.statusText}`);
       }
 
       return response.json();
@@ -202,12 +205,13 @@ export const hospitalOnboardingApi = {
 
       const response = await fetch(url, {
         method: 'GET',
-        headers
+        headers,
+        credentials: 'include'
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to check subdomain');
+        throw new Error(errorData.error || `Failed to check subdomain: ${response.statusText}`);
       }
 
       return response.json();
@@ -233,12 +237,13 @@ export const licenseApi = {
 
       const response = await fetch(url, {
         method: 'GET',
-        headers
+        headers,
+        credentials: 'include'
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch licenses');
+        throw new Error(errorData.error || `Failed to fetch licenses: ${response.statusText}`);
       }
 
       return response.json();
@@ -268,12 +273,13 @@ export const licenseApi = {
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(data)
+        body: JSON.stringify(data),
+        credentials: 'include'
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to create license');
+        throw new Error(errorData.error || `Failed to create license: ${response.statusText}`);
       }
 
       return response.json();
@@ -304,12 +310,13 @@ export const licenseApi = {
       const response = await fetch(url, {
         method: 'PUT',
         headers,
-        body: JSON.stringify({ status })
+        body: JSON.stringify({ status }),
+        credentials: 'include'
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update license status');
+        throw new Error(errorData.error || `Failed to update license status: ${response.statusText}`);
       }
 
       return response.json();
@@ -329,12 +336,13 @@ export const licenseApi = {
 
       const response = await fetch(url, {
         method: 'GET',
-        headers
+        headers,
+        credentials: 'include'
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch license metrics');
+        throw new Error(errorData.error || `Failed to fetch license metrics: ${response.statusText}`);
       }
 
       return response.json();
@@ -377,7 +385,7 @@ export const secureGet = async (url: string, params?: Record<string, string>): P
   const response = await fetch(url, {
     method: 'GET',
     headers,
-    credentials: 'include' // Include cookies
+    credentials: 'include'
   });
   
   if (!response.ok) {
@@ -409,7 +417,7 @@ export const securePost = async (url: string, data: any): Promise<any> => {
   const response = await fetch(url, {
     method: 'POST',
     headers,
-    credentials: 'include', // Include cookies
+    credentials: 'include',
     body: JSON.stringify(data)
   });
   

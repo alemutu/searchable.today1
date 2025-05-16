@@ -5,10 +5,11 @@ import { v4 as uuidv4 } from 'npm:uuid@9.0.1';
 
 const app = express();
 
+// Update CORS headers to be more permissive during development
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-client-info',
   'Content-Type': 'application/json'
 };
 
@@ -45,6 +46,20 @@ app.options('*', (req, res) => {
 app.use((req, res, next) => {
   res.set(corsHeaders);
   next();
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Error:', err);
+  res.status(500).json({
+    error: err.message || 'An unexpected error occurred',
+    details: process.env.NODE_ENV === 'development' ? err.stack : undefined
+  });
+});
+
+// Basic health check endpoint
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok' });
 });
 
 // Create a new hospital with all related resources
