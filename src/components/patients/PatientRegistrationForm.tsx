@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useNotificationStore } from '../../lib/store';
 import { v4 as uuidv4 } from 'uuid';
 import { saveData } from '../../lib/storage';
-import { ClipboardList, User, Phone, Mail, MapPin, Users, FileText, AlertTriangle, ChevronRight } from 'lucide-react';
+import { ClipboardList, User, Phone, Mail, MapPin, Users, FileText, AlertTriangle, ChevronRight, AlertCircle } from 'lucide-react';
 
 interface PatientRegistrationFormData {
   firstName: string;
@@ -26,10 +26,17 @@ interface PatientRegistrationFormData {
     pastSurgeries: string;
     familyHistory: string;
   };
+  paymentMethod: 'cash' | 'insurance' | 'credit' | 'mpesa' | 'pay_later';
+  mpesaDetails?: {
+    transactionCode: string;
+    phoneNumber: string;
+    amount: string;
+    paymentDate: string;
+  };
 }
 
 const PatientRegistrationForm: React.FC = () => {
-  const { register, handleSubmit, watch, formState: { errors }, trigger } = useForm<PatientRegistrationFormData>();
+  const { register, handleSubmit, watch, formState: { errors }, trigger, setValue } = useForm<PatientRegistrationFormData>();
   const navigate = useNavigate();
   const { addNotification } = useNotificationStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -38,6 +45,7 @@ const PatientRegistrationForm: React.FC = () => {
   
   const hasAllergies = watch('medicalHistory.allergies');
   const chronicConditions = watch('medicalHistory.chronicConditions') || [];
+  const paymentMethod = watch('paymentMethod');
 
   const steps = [
     { number: 1, title: 'Patient Type' },
@@ -49,6 +57,14 @@ const PatientRegistrationForm: React.FC = () => {
   ];
 
   const nextStep = async () => {
+    // For emergency cases, skip to the final step after collecting minimal info
+    if (patientType === 'emergency' && currentStep === 2) {
+      // Set payment method to "pay later" for emergency cases
+      setValue('paymentMethod', 'pay_later');
+      setCurrentStep(6);
+      return;
+    }
+    
     // Validate current step before proceeding
     let fieldsToValidate: string[] = [];
     
@@ -58,7 +74,12 @@ const PatientRegistrationForm: React.FC = () => {
         setCurrentStep(2);
         return;
       case 2:
-        fieldsToValidate = ['firstName', 'lastName', 'dateOfBirth', 'gender'];
+        // For emergency cases, only require names
+        if (patientType === 'emergency') {
+          fieldsToValidate = ['firstName', 'lastName'];
+        } else {
+          fieldsToValidate = ['firstName', 'lastName', 'dateOfBirth', 'gender'];
+        }
         break;
       case 3:
         fieldsToValidate = ['contactNumber', 'address', 'emergencyContactName', 'emergencyContactRelationship', 'emergencyContactPhone'];
@@ -74,6 +95,12 @@ const PatientRegistrationForm: React.FC = () => {
   };
 
   const prevStep = () => {
+    // For emergency cases, go back to step 1 from review
+    if (patientType === 'emergency' && currentStep === 6) {
+      setCurrentStep(1);
+      return;
+    }
+    
     setCurrentStep(currentStep - 1);
     window.scrollTo(0, 0);
   };
@@ -88,15 +115,15 @@ const PatientRegistrationForm: React.FC = () => {
         id: patientId,
         first_name: data.firstName,
         last_name: data.lastName,
-        date_of_birth: data.dateOfBirth,
-        gender: data.gender,
-        contact_number: data.contactNumber,
+        date_of_birth: data.dateOfBirth || new Date().toISOString().split('T')[0], // Default to today for emergency
+        gender: data.gender || 'Unknown', // Default for emergency
+        contact_number: data.contactNumber || 'Unknown', // Default for emergency
         email: data.email || null,
-        address: data.address,
+        address: data.address || 'Unknown', // Default for emergency
         emergency_contact: {
-          name: data.emergencyContactName,
-          relationship: data.emergencyContactRelationship,
-          phone: data.emergencyContactPhone
+          name: data.emergencyContactName || 'Unknown', // Default for emergency
+          relationship: data.emergencyContactRelationship || 'Unknown', // Default for emergency
+          phone: data.emergencyContactPhone || 'Unknown' // Default for emergency
         },
         medical_info: {
           allergies: hasAllergies ? data.medicalHistory.allergyDetails.split(',').map(a => ({
@@ -116,7 +143,14 @@ const PatientRegistrationForm: React.FC = () => {
         },
         status: 'active',
         current_flow_step: patientType === 'emergency' ? 'emergency' : 'registration',
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        payment_info: {
+          method: data.paymentMethod,
+          ...(data.paymentMethod === 'mpesa' && data.mpesaDetails ? {
+            mpesa: data.mpesaDetails
+          } : {})
+        },
+        patient_type: patientType
       };
       
       // Save to local storage
@@ -124,7 +158,7 @@ const PatientRegistrationForm: React.FC = () => {
       
       // Show success notification
       addNotification({
-        message: `Patient ${data.firstName} ${data.lastName} registered successfully`,
+        message: `Patient ${data.firstName} ${data.lastName} registered successfully${patientType === 'emergency' ? ' as EMERGENCY case' : ''}`,
         type: 'success'
       });
       
@@ -147,8 +181,8 @@ const PatientRegistrationForm: React.FC = () => {
         <div className="flex items-center">
           <ClipboardList className="h-6 w-6 mr-2" />
           <div>
-            <h1 className="text-xl font-bold">Patient Registration</h1>
-            <p className="text-sm text-primary-100">Register a new, existing, or emergency patient using this form.</p>
+            <h1 className="text-xl font-bold text-white">Patient Registration</h1>
+            <p className="text-sm text-white">Register a new, existing, or emergency patient using this form.</p>
           </div>
         </div>
       </div>
@@ -231,6 +265,56 @@ const PatientRegistrationForm: React.FC = () => {
                 <p className="text-sm text-gray-600">Urgent care needed. Minimal information required.</p>
               </div>
             </div>
+            
+            {patientType === 'emergency' && (
+              <div className="bg-error-50 p-4 rounded-lg border border-error-200 mt-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <AlertCircle className="h-5 w-5 text-error-400" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-error-800">Emergency Registration</h3>
+                    <div className="mt-2 text-sm text-error-700">
+                      <p>
+                        For emergency cases, only the patient's name is required. All other information can be collected later.
+                        Payment will be automatically set to "Pay Later".
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            {patientType === 'returning' && (
+              <div className="bg-primary-50 p-4 rounded-lg border border-primary-200 mt-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <User className="h-5 w-5 text-primary-400" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-primary-800">Returning Patient</h3>
+                    <div className="mt-2 text-sm text-primary-700">
+                      <p>
+                        Please search for the patient using their name, phone number, or ID before proceeding.
+                      </p>
+                      <div className="mt-2 flex">
+                        <input
+                          type="text"
+                          className="form-input text-sm rounded-l-md"
+                          placeholder="Search by name, ID, or phone"
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-primary rounded-l-none py-1 px-3"
+                        >
+                          Search
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
         
@@ -238,6 +322,24 @@ const PatientRegistrationForm: React.FC = () => {
         {currentStep === 2 && (
           <div className="space-y-6">
             <h2 className="text-xl font-semibold text-gray-900">Personal Information</h2>
+            
+            {patientType === 'emergency' && (
+              <div className="bg-error-50 p-4 rounded-lg border border-error-200 mb-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <AlertCircle className="h-5 w-5 text-error-400" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-error-800">Emergency Case</h3>
+                    <div className="mt-2 text-sm text-error-700">
+                      <p>
+                        Only the patient's name is required. Other details can be completed later.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
               <div>
@@ -274,32 +376,36 @@ const PatientRegistrationForm: React.FC = () => {
                 {errors.lastName && <p className="form-error">{errors.lastName.message}</p>}
               </div>
               
-              <div>
-                <label htmlFor="dateOfBirth" className="form-label required">Date of Birth</label>
-                <input
-                  id="dateOfBirth"
-                  type="date"
-                  {...register('dateOfBirth', { required: 'Date of birth is required' })}
-                  className={`form-input ${errors.dateOfBirth ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                />
-                {errors.dateOfBirth && <p className="form-error">{errors.dateOfBirth.message}</p>}
-              </div>
-              
-              <div>
-                <label htmlFor="gender" className="form-label required">Gender</label>
-                <select
-                  id="gender"
-                  {...register('gender', { required: 'Gender is required' })}
-                  className={`form-input ${errors.gender ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                >
-                  <option value="">Select gender</option>
-                  <option value="Male">Male</option>
-                  <option value="Female">Female</option>
-                  <option value="Other">Other</option>
-                  <option value="Prefer not to say">Prefer not to say</option>
-                </select>
-                {errors.gender && <p className="form-error">{errors.gender.message}</p>}
-              </div>
+              {patientType !== 'emergency' && (
+                <>
+                  <div>
+                    <label htmlFor="dateOfBirth" className="form-label required">Date of Birth</label>
+                    <input
+                      id="dateOfBirth"
+                      type="date"
+                      {...register('dateOfBirth', { required: 'Date of birth is required' })}
+                      className={`form-input ${errors.dateOfBirth ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    />
+                    {errors.dateOfBirth && <p className="form-error">{errors.dateOfBirth.message}</p>}
+                  </div>
+                  
+                  <div>
+                    <label htmlFor="gender" className="form-label required">Gender</label>
+                    <select
+                      id="gender"
+                      {...register('gender', { required: 'Gender is required' })}
+                      className={`form-input ${errors.gender ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    >
+                      <option value="">Select gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                      <option value="Prefer not to say">Prefer not to say</option>
+                    </select>
+                    {errors.gender && <p className="form-error">{errors.gender.message}</p>}
+                  </div>
+                </>
+              )}
             </div>
           </div>
         )}
@@ -570,8 +676,9 @@ const PatientRegistrationForm: React.FC = () => {
                     <div className="flex items-center">
                       <input
                         id="payment-cash"
-                        name="paymentMethod"
                         type="radio"
+                        value="cash"
+                        {...register('paymentMethod')}
                         defaultChecked
                         className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
                       />
@@ -582,8 +689,9 @@ const PatientRegistrationForm: React.FC = () => {
                     <div className="flex items-center">
                       <input
                         id="payment-insurance"
-                        name="paymentMethod"
                         type="radio"
+                        value="insurance"
+                        {...register('paymentMethod')}
                         className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
                       />
                       <label htmlFor="payment-insurance" className="ml-2 block text-sm text-gray-900">
@@ -593,16 +701,88 @@ const PatientRegistrationForm: React.FC = () => {
                     <div className="flex items-center">
                       <input
                         id="payment-credit"
-                        name="paymentMethod"
                         type="radio"
+                        value="credit"
+                        {...register('paymentMethod')}
                         className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
                       />
                       <label htmlFor="payment-credit" className="ml-2 block text-sm text-gray-900">
                         Credit Card
                       </label>
                     </div>
+                    <div className="flex items-center">
+                      <input
+                        id="payment-mpesa"
+                        type="radio"
+                        value="mpesa"
+                        {...register('paymentMethod')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                      />
+                      <label htmlFor="payment-mpesa" className="ml-2 block text-sm text-gray-900">
+                        M-PESA
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        id="payment-later"
+                        type="radio"
+                        value="pay_later"
+                        {...register('paymentMethod')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300"
+                      />
+                      <label htmlFor="payment-later" className="ml-2 block text-sm text-gray-900">
+                        Pay Later
+                      </label>
+                    </div>
                   </div>
                 </div>
+                
+                {paymentMethod === 'mpesa' && (
+                  <div className="mt-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">M-PESA Details</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <label htmlFor="transactionCode" className="form-label required">Transaction Code</label>
+                        <input
+                          id="transactionCode"
+                          type="text"
+                          {...register('mpesaDetails.transactionCode', { required: paymentMethod === 'mpesa' })}
+                          className="form-input"
+                          placeholder="e.g., QWE123456"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="phoneNumber" className="form-label required">Phone Number</label>
+                        <input
+                          id="phoneNumber"
+                          type="tel"
+                          {...register('mpesaDetails.phoneNumber', { required: paymentMethod === 'mpesa' })}
+                          className="form-input"
+                          placeholder="e.g., +254712345678"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="amount" className="form-label required">Amount</label>
+                        <input
+                          id="amount"
+                          type="text"
+                          {...register('mpesaDetails.amount', { required: paymentMethod === 'mpesa' })}
+                          className="form-input"
+                          placeholder="e.g., 1000"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="paymentDate" className="form-label required">Payment Date</label>
+                        <input
+                          id="paymentDate"
+                          type="date"
+                          {...register('mpesaDetails.paymentDate', { required: paymentMethod === 'mpesa' })}
+                          className="form-input"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
                 
                 <div className="pt-4 border-t border-gray-200">
                   <div className="flex items-center">
@@ -627,6 +807,25 @@ const PatientRegistrationForm: React.FC = () => {
           <div className="space-y-6">
             <h2 className="text-xl font-semibold text-gray-900">Review Information</h2>
             
+            {patientType === 'emergency' && (
+              <div className="bg-error-50 p-4 rounded-lg border border-error-200 mb-4">
+                <div className="flex">
+                  <div className="flex-shrink-0">
+                    <AlertTriangle className="h-5 w-5 text-error-400" />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-error-800">EMERGENCY CASE</h3>
+                    <div className="mt-2 text-sm text-error-700">
+                      <p>
+                        This patient is being registered as an emergency case with minimal information.
+                        Additional details can be collected after treatment has begun.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            
             <div className="bg-white p-6 rounded-lg border border-gray-200">
               <div className="space-y-6">
                 <div>
@@ -636,74 +835,119 @@ const PatientRegistrationForm: React.FC = () => {
                       <p className="text-sm font-medium text-gray-500">Full Name</p>
                       <p className="text-sm text-gray-900">{watch('firstName')} {watch('lastName')}</p>
                     </div>
+                    {patientType !== 'emergency' && (
+                      <>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Date of Birth</p>
+                          <p className="text-sm text-gray-900">{watch('dateOfBirth') || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Gender</p>
+                          <p className="text-sm text-gray-900">{watch('gender') || 'Not provided'}</p>
+                        </div>
+                      </>
+                    )}
                     <div>
-                      <p className="text-sm font-medium text-gray-500">Date of Birth</p>
-                      <p className="text-sm text-gray-900">{watch('dateOfBirth')}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Gender</p>
-                      <p className="text-sm text-gray-900">{watch('gender')}</p>
+                      <p className="text-sm font-medium text-gray-500">Patient Type</p>
+                      <p className="text-sm text-gray-900">
+                        {patientType === 'new' ? 'New Patient' : 
+                         patientType === 'returning' ? 'Returning Patient' : 
+                         'Emergency Case'}
+                      </p>
                     </div>
                   </div>
                 </div>
                 
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Contact Information</h3>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Phone Number</p>
-                      <p className="text-sm text-gray-900">{watch('contactNumber')}</p>
+                {patientType !== 'emergency' && (
+                  <>
+                    <div className="pt-4 border-t border-gray-200">
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Contact Information</h3>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Phone Number</p>
+                          <p className="text-sm text-gray-900">{watch('contactNumber') || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Email</p>
+                          <p className="text-sm text-gray-900">{watch('email') || 'Not provided'}</p>
+                        </div>
+                        <div className="sm:col-span-2">
+                          <p className="text-sm font-medium text-gray-500">Address</p>
+                          <p className="text-sm text-gray-900">{watch('address') || 'Not provided'}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Email</p>
-                      <p className="text-sm text-gray-900">{watch('email') || 'Not provided'}</p>
+                    
+                    <div className="pt-4 border-t border-gray-200">
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Emergency Contact</h3>
+                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Name</p>
+                          <p className="text-sm text-gray-900">{watch('emergencyContactName') || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Relationship</p>
+                          <p className="text-sm text-gray-900">{watch('emergencyContactRelationship') || 'Not provided'}</p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Phone</p>
+                          <p className="text-sm text-gray-900">{watch('emergencyContactPhone') || 'Not provided'}</p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="sm:col-span-2">
-                      <p className="text-sm font-medium text-gray-500">Address</p>
-                      <p className="text-sm text-gray-900">{watch('address')}</p>
+                    
+                    <div className="pt-4 border-t border-gray-200">
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Medical Information</h3>
+                      <div className="space-y-3">
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Allergies</p>
+                          <p className="text-sm text-gray-900">
+                            {hasAllergies ? watch('medicalHistory.allergyDetails') || 'None specified' : 'No known allergies'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Chronic Conditions</p>
+                          <p className="text-sm text-gray-900">
+                            {chronicConditions.length > 0 ? chronicConditions.join(', ') : 'None'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Current Medications</p>
+                          <p className="text-sm text-gray-900">
+                            {watch('medicalHistory.currentMedications') || 'None'}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
+                  </>
+                )}
                 
                 <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Emergency Contact</h3>
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Name</p>
-                      <p className="text-sm text-gray-900">{watch('emergencyContactName')}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Relationship</p>
-                      <p className="text-sm text-gray-900">{watch('emergencyContactRelationship')}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Phone</p>
-                      <p className="text-sm text-gray-900">{watch('emergencyContactPhone')}</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="pt-4 border-t border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">Medical Information</h3>
+                  <h3 className="text-lg font-medium text-gray-900 mb-2">Payment Information</h3>
                   <div className="space-y-3">
                     <div>
-                      <p className="text-sm font-medium text-gray-500">Allergies</p>
+                      <p className="text-sm font-medium text-gray-500">Payment Method</p>
                       <p className="text-sm text-gray-900">
-                        {hasAllergies ? watch('medicalHistory.allergyDetails') || 'None specified' : 'No known allergies'}
+                        {patientType === 'emergency' ? 'Pay Later (Emergency Case)' : 
+                         paymentMethod === 'cash' ? 'Cash' :
+                         paymentMethod === 'insurance' ? 'Insurance' :
+                         paymentMethod === 'credit' ? 'Credit Card' :
+                         paymentMethod === 'mpesa' ? 'M-PESA' :
+                         paymentMethod === 'pay_later' ? 'Pay Later' : 'Not specified'}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Chronic Conditions</p>
-                      <p className="text-sm text-gray-900">
-                        {chronicConditions.length > 0 ? chronicConditions.join(', ') : 'None'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-sm font-medium text-gray-500">Current Medications</p>
-                      <p className="text-sm text-gray-900">
-                        {watch('medicalHistory.currentMedications') || 'None'}
-                      </p>
-                    </div>
+                    
+                    {paymentMethod === 'mpesa' && (
+                      <div>
+                        <p className="text-sm font-medium text-gray-500">M-PESA Details</p>
+                        <p className="text-sm text-gray-900">
+                          Transaction Code: {watch('mpesaDetails.transactionCode')}<br />
+                          Phone: {watch('mpesaDetails.phoneNumber')}<br />
+                          Amount: {watch('mpesaDetails.amount')}<br />
+                          Date: {watch('mpesaDetails.paymentDate')}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
