@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Building2, Mail, Phone, Globe, MapPin, User, Lock, CheckCircle, AlertTriangle, ArrowRight, ArrowLeft, Box, CreditCard, Calendar, Save, Shield, Info, Check, X, DollarSign, Pill, FlaskRound as Flask, Microscope, BedDouble, Stethoscope, Syringe, BarChart, Users, Settings, Video, LineChart, UserRound } from 'lucide-react';
+import { Building2, Mail, Phone, Globe, MapPin, User, Lock, CheckCircle, AlertTriangle, ArrowRight, ArrowLeft, Box, CreditCard, Calendar, Save, Shield, Info, Check, X, DollarSign, Pill, FlaskRound as Flask, Microscope, BedDouble, Stethoscope, Syringe, BarChart, Users, Settings, Video, LineChart, UserRound, Key } from 'lucide-react';
 import { useAuthStore, useNotificationStore } from '../lib/store';
 import { hospitalOnboardingApi } from '../lib/api';
 import { isValidEmail, isStrongPassword, generateSecurePassword } from '../lib/security';
@@ -715,7 +715,7 @@ const HospitalOnboarding: React.FC = () => {
               {[
                 { id: 'ward_management', name: 'Ward Management', description: 'Bed tracking, patient care', icon: <BedDouble className="h-5 w-5 text-primary-500" /> },
                 { id: 'nursing_station', name: 'Nursing Station', description: 'Care plans, medication', icon: <Stethoscope className="h-5 w-5 text-primary-500" /> },
-                { id: 'surgery', name: 'Surgery', description: 'OR scheduling, procedures', icon: <Syringe className="h-5 w-5 text-primary-500" /> }
+                { id: 'surgery',  name: 'Surgery', description: 'OR scheduling, procedures', icon: <Syringe className="h-5 w-5 text-primary-500" /> }
               ].map((module) => (
                 <div 
                   key={module.id} 
