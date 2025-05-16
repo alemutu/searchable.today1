@@ -6,11 +6,11 @@ import { sanitizeInput, safeEncodeURIComponent, apiRateLimiter } from './securit
  * This will be used to construct the full URL for each function
  */
 const getEdgeFunctionBaseUrl = () => {
-  const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
-  if (!url) {
-    throw new Error('VITE_SUPABASE_URL environment variable is not set');
+  // Use local proxy in development to avoid CORS issues
+  if (import.meta.env.DEV) {
+    return '/api/functions';
   }
-  return url;
+  return `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
 };
 
 /**
@@ -28,6 +28,9 @@ const getHeaders = async () => {
   // Add Authorization header if session exists
   if (data.session?.access_token) {
     headers['Authorization'] = `Bearer ${data.session.access_token}`;
+  } else {
+    // For development/testing, use the anon key when no session is available
+    headers['Authorization'] = `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`;
   }
   
   return headers;
@@ -113,6 +116,24 @@ export const hospitalOnboardingApi = {
       },
     };
 
+    // For development environment, simulate a successful response
+    if (import.meta.env.DEV) {
+      console.log('DEV MODE: Simulating hospital creation', sanitizedData);
+      // Wait a bit to simulate network latency
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      return {
+        success: true,
+        hospital: {
+          id: 'simulated-id',
+          name: sanitizedData.hospitalProfile.name,
+          subdomain: sanitizedData.hospitalProfile.subdomain,
+          created_at: new Date().toISOString()
+        },
+        message: 'Hospital created successfully (simulated in dev mode)'
+      };
+    }
+
     try {
       const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals`;
       const headers = await getHeaders();
@@ -122,6 +143,9 @@ export const hospitalOnboardingApi = {
         headers,
         body: JSON.stringify(sanitizedData),
         credentials: 'include'
+      }).catch(error => {
+        console.error('Network error:', error);
+        throw new Error('Failed to connect to the server. Please check your internet connection.');
       });
 
       if (!response.ok) {
@@ -140,6 +164,28 @@ export const hospitalOnboardingApi = {
    * Get all hospitals
    */
   getHospitals: async () => {
+    // For development environment, simulate a successful response
+    if (import.meta.env.DEV) {
+      console.log('DEV MODE: Simulating fetching hospitals');
+      // Wait a bit to simulate network latency
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      return [
+        {
+          id: 'simulated-id-1',
+          name: 'Simulated Hospital 1',
+          subdomain: 'simulated-1',
+          created_at: new Date().toISOString()
+        },
+        {
+          id: 'simulated-id-2',
+          name: 'Simulated Hospital 2',
+          subdomain: 'simulated-2',
+          created_at: new Date().toISOString()
+        }
+      ];
+    }
+
     try {
       const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals`;
       const headers = await getHeaders();
@@ -148,6 +194,9 @@ export const hospitalOnboardingApi = {
         method: 'GET',
         headers,
         credentials: 'include'
+      }).catch(error => {
+        console.error('Network error:', error);
+        throw new Error('Failed to connect to the server. Please check your internet connection.');
       });
 
       if (!response.ok) {
@@ -171,6 +220,23 @@ export const hospitalOnboardingApi = {
       throw new Error('Invalid hospital ID format');
     }
     
+    // For development environment, simulate a successful response
+    if (import.meta.env.DEV) {
+      console.log('DEV MODE: Simulating fetching hospital', id);
+      // Wait a bit to simulate network latency
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      return {
+        id: id,
+        name: 'Simulated Hospital Detail',
+        subdomain: 'simulated-detail',
+        created_at: new Date().toISOString(),
+        address: '123 Hospital St, Medical City',
+        phone: '+1 (555) 123-4567',
+        email: 'contact@simulated-hospital.com'
+      };
+    }
+    
     try {
       const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals/${id}`;
       const headers = await getHeaders();
@@ -179,6 +245,9 @@ export const hospitalOnboardingApi = {
         method: 'GET',
         headers,
         credentials: 'include'
+      }).catch(error => {
+        console.error('Network error:', error);
+        throw new Error('Failed to connect to the server. Please check your internet connection.');
       });
 
       if (!response.ok) {
@@ -200,6 +269,17 @@ export const hospitalOnboardingApi = {
     // Validate subdomain format
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(subdomain)) {
       throw new Error('Invalid subdomain format');
+    }
+    
+    // For development environment, simulate a successful response
+    if (import.meta.env.DEV) {
+      console.log('DEV MODE: Simulating subdomain check', subdomain);
+      // Wait a bit to simulate network latency
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Simulate some subdomains as taken
+      const takenSubdomains = ['general', 'admin', 'test', 'demo'];
+      return { available: !takenSubdomains.includes(subdomain) };
     }
     
     try {
@@ -237,6 +317,36 @@ export const licenseApi = {
    * Get all licenses
    */
   getLicenses: async () => {
+    // For development environment, simulate a successful response
+    if (import.meta.env.DEV) {
+      console.log('DEV MODE: Simulating fetching licenses');
+      // Wait a bit to simulate network latency
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      return [
+        {
+          id: 'simulated-license-1',
+          hospital: { id: 'hospital-1', name: 'Simulated Hospital 1' },
+          plan: { id: 'plan-1', name: 'Standard Plan' },
+          start_date: '2025-01-01',
+          end_date: '2026-01-01',
+          status: 'active',
+          max_users: 10,
+          current_users: 5
+        },
+        {
+          id: 'simulated-license-2',
+          hospital: { id: 'hospital-2', name: 'Simulated Hospital 2' },
+          plan: { id: 'plan-2', name: 'Premium Plan' },
+          start_date: '2025-02-01',
+          end_date: '2026-02-01',
+          status: 'active',
+          max_users: 20,
+          current_users: 8
+        }
+      ];
+    }
+
     try {
       const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses`;
       const headers = await getHeaders();
@@ -245,6 +355,9 @@ export const licenseApi = {
         method: 'GET',
         headers,
         credentials: 'include'
+      }).catch(error => {
+        console.error('Network error:', error);
+        throw new Error('Failed to connect to the server. Please check your internet connection.');
       });
 
       if (!response.ok) {
@@ -272,6 +385,24 @@ export const licenseApi = {
       throw new Error('Invalid ID format');
     }
     
+    // For development environment, simulate a successful response
+    if (import.meta.env.DEV) {
+      console.log('DEV MODE: Simulating license creation', data);
+      // Wait a bit to simulate network latency
+      await new Promise(resolve => setTimeout(resolve, 800));
+      
+      return {
+        id: 'simulated-new-license',
+        hospital_id: data.hospital_id,
+        plan_id: data.plan_id,
+        start_date: new Date().toISOString().split('T')[0],
+        end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
+        status: 'active',
+        max_users: 10,
+        current_users: 0
+      };
+    }
+    
     try {
       const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses`;
       const headers = await getHeaders();
@@ -281,6 +412,9 @@ export const licenseApi = {
         headers,
         body: JSON.stringify(data),
         credentials: 'include'
+      }).catch(error => {
+        console.error('Network error:', error);
+        throw new Error('Failed to connect to the server. Please check your internet connection.');
       });
 
       if (!response.ok) {
@@ -309,6 +443,19 @@ export const licenseApi = {
       throw new Error('Invalid status value');
     }
     
+    // For development environment, simulate a successful response
+    if (import.meta.env.DEV) {
+      console.log('DEV MODE: Simulating license status update', { id, status });
+      // Wait a bit to simulate network latency
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      return {
+        id: id,
+        status: status,
+        updated_at: new Date().toISOString()
+      };
+    }
+    
     try {
       const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses/${id}/status`;
       const headers = await getHeaders();
@@ -318,6 +465,9 @@ export const licenseApi = {
         headers,
         body: JSON.stringify({ status }),
         credentials: 'include'
+      }).catch(error => {
+        console.error('Network error:', error);
+        throw new Error('Failed to connect to the server. Please check your internet connection.');
       });
 
       if (!response.ok) {
@@ -336,6 +486,19 @@ export const licenseApi = {
    * Get license usage metrics
    */
   getLicenseMetrics: async () => {
+    // For development environment, simulate a successful response
+    if (import.meta.env.DEV) {
+      console.log('DEV MODE: Simulating license metrics');
+      // Wait a bit to simulate network latency
+      await new Promise(resolve => setTimeout(resolve, 400));
+      
+      return {
+        total_active: 5,
+        total_users: 42,
+        expiring_soon: 2
+      };
+    }
+
     try {
       const url = `${getEdgeFunctionBaseUrl()}/license-management/metrics`;
       const headers = await getHeaders();
@@ -344,6 +507,9 @@ export const licenseApi = {
         method: 'GET',
         headers,
         credentials: 'include'
+      }).catch(error => {
+        console.error('Network error:', error);
+        throw new Error('Failed to connect to the server. Please check your internet connection.');
       });
 
       if (!response.ok) {
@@ -388,21 +554,26 @@ export const secureGet = async (url: string, params?: Record<string, string>): P
     headers['X-CSRF-Token'] = csrfToken;
   }
   
-  const response = await fetch(url, {
-    method: 'GET',
-    headers,
-    credentials: 'include'
-  }).catch(error => {
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+      credentials: 'include'
+    }).catch(error => {
+      console.error('Network error:', error);
+      throw new Error('Failed to connect to the server. Please check your internet connection.');
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
+      throw new Error(errorData.error || `HTTP error ${response.status}`);
+    }
+    
+    return response.json();
+  } catch (error) {
     console.error('Network error:', error);
-    throw new Error('Failed to connect to the server. Please check your internet connection.');
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-    throw new Error(errorData.error || `HTTP error ${response.status}`);
+    throw error;
   }
-  
-  return response.json();
 };
 
 /**
@@ -423,20 +594,25 @@ export const securePost = async (url: string, data: any): Promise<any> => {
     headers['X-CSRF-Token'] = csrfToken;
   }
   
-  const response = await fetch(url, {
-    method: 'POST',
-    headers,
-    credentials: 'include',
-    body: JSON.stringify(data)
-  }).catch(error => {
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify(data)
+    }).catch(error => {
+      console.error('Network error:', error);
+      throw new Error('Failed to connect to the server. Please check your internet connection.');
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
+      throw new Error(errorData.error || `HTTP error ${response.status}`);
+    }
+    
+    return response.json();
+  } catch (error) {
     console.error('Network error:', error);
-    throw new Error('Failed to connect to the server. Please check your internet connection.');
-  });
-  
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: 'Unknown error occurred' }));
-    throw new Error(errorData.error || `HTTP error ${response.status}`);
+    throw error;
   }
-  
-  return response.json();
 };

@@ -20,7 +20,8 @@ import {
   UserPlus,
   Lock,
   Calendar,
-  DollarSign
+  DollarSign,
+  AlertTriangle
 } from 'lucide-react';
 
 // Step 1: Hospital Profile
@@ -145,6 +146,7 @@ const HospitalOnboarding: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [subdomainAvailable, setSubdomainAvailable] = useState<boolean | null>(null);
   const [isCheckingSubdomain, setIsCheckingSubdomain] = useState(false);
+  const [networkError, setNetworkError] = useState<string | null>(null);
   
   // Form state
   const [hospitalProfile, setHospitalProfile] = useState<HospitalProfileForm>({
@@ -194,11 +196,13 @@ const HospitalOnboarding: React.FC = () => {
     }
     
     setIsCheckingSubdomain(true);
+    setNetworkError(null);
     try {
       const { available } = await hospitalOnboardingApi.checkSubdomain(subdomain);
       setSubdomainAvailable(available);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error checking subdomain:', error);
+      setNetworkError(error.message);
       setSubdomainAvailable(null);
     } finally {
       setIsCheckingSubdomain(false);
@@ -309,6 +313,7 @@ const HospitalOnboarding: React.FC = () => {
     if (!validateStep()) return;
     
     setIsLoading(true);
+    setNetworkError(null);
     try {
       const result = await hospitalOnboardingApi.createHospital({
         hospitalProfile,
@@ -327,6 +332,7 @@ const HospitalOnboarding: React.FC = () => {
       navigate('/super-admin');
     } catch (error: any) {
       console.error('Error creating hospital:', error);
+      setNetworkError(error.message);
       addNotification({
         message: `Failed to create hospital: ${error.message}`,
         type: 'error'
@@ -347,6 +353,21 @@ const HospitalOnboarding: React.FC = () => {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">Hospital Onboarding</h1>
       </div>
+      
+      {/* Network Error Alert */}
+      {networkError && (
+        <div className="bg-error-50 border border-error-200 text-error-700 px-4 py-3 rounded-md flex items-start">
+          <AlertTriangle className="h-5 w-5 text-error-400 mt-0.5 mr-3 flex-shrink-0" />
+          <div>
+            <p className="font-medium">Connection Error</p>
+            <p className="text-sm">{networkError}</p>
+            <p className="text-sm mt-1">
+              This could be due to network connectivity issues or the Supabase Edge Function not being available.
+              In development mode, simulated responses will be used.
+            </p>
+          </div>
+        </div>
+      )}
       
       {/* Progress Steps */}
       <div className="bg-white rounded-lg shadow-sm p-4">
