@@ -1,85 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, Plus, FileText, Eye, Activity, Stethoscope, Hash } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { useAuthStore } from '../lib/store';
-
-interface Patient {
-  id: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth: string;
-  gender: string;
-  contact_number: string;
-  current_flow_step: string | null;
-  status: string;
-  medical_info: any;
-}
+import { usePatients, type Patient } from '../lib/hooks/usePatients';
 
 const PatientList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
-  const [patients, setPatients] = useState<Patient[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const { isDoctor } = useAuthStore();
+  const { patients, loading, error, fetchPatients } = usePatients();
   
   useEffect(() => {
     fetchPatients();
-  }, []);
+  }, [fetchPatients]);
   
-  const fetchPatients = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('patients')
-        .select('*')
-        .order('created_at', { ascending: false });
-          
-      if (error) throw error;
-      setPatients(data || []);
-    } catch (error) {
-      console.error('Error fetching patients:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const searchPatients = async () => {
-    if (!searchTerm) return;
-    
-    try {
-      setIsLoading(true);
-      
-      // Use the search_patients function if the search term is complex
-      if (searchTerm.length > 2) {
-        const { data, error } = await supabase.rpc('search_patients', {
-          search_term: searchTerm
-        });
-        
-        if (error) throw error;
-        setPatients(data || []);
-      } else {
-        // For simple searches, use the regular query
-        const { data, error } = await supabase
-          .from('patients')
-          .select('*')
-          .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`)
-          .order('created_at', { ascending: false });
-            
-        if (error) throw error;
-        setPatients(data || []);
-      }
-    } catch (error) {
-      console.error('Error searching patients:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const filteredPatients = patients.filter(patient => {
-    const matchesFilter = filterStatus === 'all' || patient.status === filterStatus;
-    return matchesFilter;
-  });
-
   const getFlowStepColor = (step: string | null) => {
     switch (step) {
       case 'registration':
@@ -114,9 +46,23 @@ const PatientList: React.FC = () => {
     return `PT${paddedNumber}`;
   };
 
+  const searchPatients = () => {
+    if (!searchTerm) return patients;
+    
+    return patients.filter(patient => {
+      const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
+      return fullName.includes(searchTerm.toLowerCase());
+    });
+  };
+  
+  const filteredPatients = searchPatients().filter(patient => {
+    const matchesFilter = filterStatus === 'all' || patient.status === filterStatus;
+    return matchesFilter;
+  });
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    searchPatients();
+    // The filtering is already handled by the searchPatients function
   };
   
   return (
@@ -192,7 +138,7 @@ const PatientList: React.FC = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {isLoading ? (
+              {loading ? (
                 <tr>
                   <td colSpan={8} className="px-6 py-4 text-center">
                     <div className="flex justify-center">
@@ -278,7 +224,7 @@ const PatientList: React.FC = () => {
                             <Activity className="h-5 w-5" />
                           </Link>
                         )}
-                        {(patient.current_flow_step === 'waiting_consultation' || patient.current_flow_step === 'emergency') && isDoctor && (
+                        {(patient.current_flow_step === 'waiting_consultation' || patient.current_flow_step === 'emergency') && (
                           <Link
                             to={`/patients/${patient.id}/consultation`}
                             className="text-secondary-600 hover:text-secondary-900"
