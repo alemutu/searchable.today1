@@ -62,6 +62,34 @@ app.get('/health', (req, res) => {
   res.status(200).json({ status: 'ok' });
 });
 
+// Check if subdomain is available
+app.get('/check-subdomain/:subdomain', async (req, res) => {
+  try {
+    const { subdomain } = req.params;
+
+    // Validate subdomain format
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(subdomain)) {
+      return res.status(400).json({ error: 'Invalid subdomain format' });
+    }
+
+    const { data, error } = await supabaseAdmin
+      .from('hospitals')
+      .select('id')
+      .eq('subdomain', subdomain)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Database error:', error);
+      return res.status(500).json({ error: 'Failed to check subdomain availability' });
+    }
+    
+    res.json({ available: !data });
+  } catch (error) {
+    console.error('Error checking subdomain:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // Create a new hospital with all related resources
 app.post('/hospitals', async (req, res) => {
   try {
@@ -254,25 +282,6 @@ app.post('/hospitals', async (req, res) => {
     });
   } catch (error) {
     console.error('Error in hospital onboarding:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Check if subdomain is available
-app.get('/check-subdomain/:subdomain', async (req, res) => {
-  try {
-    const { subdomain } = req.params;
-    const { data, error } = await supabaseAdmin
-      .from('hospitals')
-      .select('id')
-      .eq('subdomain', subdomain)
-      .maybeSingle();
-
-    if (error) throw error;
-    
-    res.json({ available: !data });
-  } catch (error) {
-    console.error('Error checking subdomain:', error);
     res.status(500).json({ error: error.message });
   }
 });
