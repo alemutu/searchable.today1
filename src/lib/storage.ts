@@ -158,28 +158,8 @@ export const fetchData = async <T>(
         // Apply query filter if provided
         if (query) {
           let matches = true;
-          
-          // Handle search query
-          if (query.search && typeof query.search === 'string') {
-            const searchTerm = query.search.toLowerCase();
-            const searchableFields = ['first_name', 'last_name', 'email', 'contact_number', 'address'];
-            
-            // Check if any searchable field contains the search term
-            const containsSearchTerm = searchableFields.some(field => {
-              if (item[field] && typeof item[field] === 'string') {
-                return item[field].toLowerCase().includes(searchTerm);
-              }
-              return false;
-            });
-            
-            if (!containsSearchTerm) {
-              matches = false;
-            }
-          }
-          
-          // Handle exact match queries
           Object.entries(query).forEach(([queryKey, queryValue]) => {
-            if (queryKey !== 'search' && item[queryKey] !== queryValue) {
+            if (item[queryKey] !== queryValue) {
               matches = false;
             }
           });
