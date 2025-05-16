@@ -713,7 +713,7 @@ const HospitalOnboarding: React.FC = () => {
             <h3 className="text-lg font-medium text-gray-900 mb-4">Inpatient Modules</h3>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {[
-                { id: 'ward_management', name: 'Ward Management', description: 'Bed tracking, patient care', icon: <BedDouble className="h-5 w-5 text-primary-500" /> },
+                { id: 'ward_management', name: 'Ward Management', description: 'Bed tracking, patient care', icon: <BedDouble className="h-5 w-5  text-primary-500" /> },
                 { id: 'nursing_station', name: 'Nursing Station', description: 'Care plans, medication', icon: <Stethoscope className="h-5 w-5 text-primary-500" /> },
                 { id: 'surgery',  name: 'Surgery', description: 'OR scheduling, procedures', icon: <Syringe className="h-5 w-5 text-primary-500" /> }
               ].map((module) => (
@@ -1300,5 +1300,3 @@ const HospitalOnboarding: React.FC = () => {
 };
 
 export default HospitalOnboarding;
-
-export default HospitalOnboarding
