@@ -240,7 +240,7 @@ const SuperAdminDashboard: React.FC = () => {
         'departments' // Delete departments last before the hospital
       ];
 
-      // Delete data from each table
+      // Delete data from each table in sequence
       for (const table of tables) {
         const { error } = await supabase
           .from(table)
@@ -249,17 +249,17 @@ const SuperAdminDashboard: React.FC = () => {
         
         if (error) {
           console.error(`Error deleting from ${table}:`, error);
-          throw error;
+          throw new Error(`Failed to delete ${table} records: ${error.message}`);
         }
       }
 
       // Finally delete the hospital
-      const { error } = await supabase
+      const { error: hospitalError } = await supabase
         .from('hospitals')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (hospitalError) throw hospitalError;
 
       setHospitals(hospitals.filter(h => h.id !== id));
       await fetchData();
