@@ -7,7 +7,6 @@ import { clearSensitiveData } from './security';
 
 interface AuthState {
   user: User | null;
-  hospital: Hospital | null;
   isLoading: boolean;
   isAdmin: boolean;
   isDoctor: boolean;
@@ -20,23 +19,6 @@ interface AuthState {
   signup: (email: string, password: string, metadata: any) => Promise<void>;
   logout: () => Promise<void>;
   fetchUserProfile: () => Promise<void>;
-  fetchCurrentHospital: () => Promise<void>;
-}
-
-interface Hospital {
-  id: string;
-  name: string;
-  subdomain: string;
-  address: string;
-  phone: string;
-  email?: string;
-  logo_url?: string;
-  patient_id_format?: string;
-  patient_id_prefix?: string;
-  patient_id_digits?: number;
-  patient_id_auto_increment?: boolean;
-  patient_id_last_number?: number;
-  domain_enabled?: boolean;
 }
 
 interface NotificationState {
@@ -88,7 +70,6 @@ async function retryOperation<T>(
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
-  hospital: null,
   isLoading: false,
   isAdmin: false,
   isDoctor: false,
@@ -197,7 +178,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       
       set({ 
         user: null,
-        hospital: null,
         isAdmin: false,
         isDoctor: false,
         isNurse: false,
@@ -243,58 +223,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           isReceptionist: role === 'receptionist'
         });
       }
-      
-      // Fetch hospital information if available
-      if (currentUser?.user_metadata?.hospital_id) {
-        await get().fetchCurrentHospital();
-      }
     } catch (error: any) {
       console.error('Error fetching user profile:', error.message);
       throw new Error(`Error fetching user profile: ${error.message}`);
-    }
-  },
-  
-  fetchCurrentHospital: async () => {
-    try {
-      const { user } = get();
-      if (!user) return;
-      
-      // Get hospital_id from user metadata
-      const { data: { user: currentUser }, error: userError } = await retryOperation(async () => {
-        const response = await supabase.auth.getUser();
-        if (response.error) throw response.error;
-        return response;
-      });
-      
-      if (userError) throw userError;
-      
-      const hospitalId = currentUser?.user_metadata?.hospital_id;
-      
-      if (hospitalId) {
-        const { data: hospital, error: hospitalError } = await retryOperation(async () => {
-          const response = await supabase
-            .from('hospitals')
-            .select('*')
-            .eq('id', hospitalId)
-            .single();
-          if (response.error) throw response.error;
-          return response;
-        });
-        
-        if (hospitalError) {
-          console.error('Error fetching hospital:', hospitalError);
-          return;
-        }
-        
-        if (hospital) {
-          set({ hospital });
-          // Save hospital to local storage for offline use
-          localStorage.setItem(`hospitals_${hospital.id}`, JSON.stringify(hospital));
-        }
-      }
-    } catch (error: any) {
-      console.error('Error fetching hospital:', error.message);
-      throw new Error(`Error fetching hospital: ${error.message}`);
     }
   }
 }));

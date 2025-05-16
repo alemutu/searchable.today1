@@ -7,18 +7,15 @@ import AdminLoginForm from './components/auth/AdminLoginForm';
 import RegisterForm from './components/auth/RegisterForm';
 import DashboardLayout from './components/Layout/DashboardLayout';
 import Dashboard from './pages/Dashboard';
-import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import SystemModules from './pages/SystemModules';
 import PricingPlans from './pages/PricingPlans';
 import Licenses from './pages/Licenses';
 import SupportTickets from './pages/SupportTickets';
-import HospitalSettings from './pages/HospitalSettings';
 import DepartmentSettings from './pages/settings/DepartmentSettings';
 import UserSettings from './pages/settings/UserSettings';
 import ClinicalSettings from './pages/settings/ClinicalSettings';
 import SystemSettings from './pages/settings/SystemSettings';
 import BillingSettings from './pages/settings/BillingSettings';
-import LicenseSettings from './pages/settings/LicenseSettings';
 import SupportSettings from './pages/settings/SupportSettings';
 import PatientList from './pages/PatientList';
 import PatientRegistrationForm from './components/patients/PatientRegistrationForm';
@@ -52,7 +49,6 @@ import PatientDetails from './pages/PatientDetails';
 import ReceptionDashboard from './pages/ReceptionDashboard';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
 import NotificationToast from './components/common/NotificationToast';
-import HospitalOnboarding from './pages/HospitalOnboarding';
 import Reports from './pages/Reports';
 import PasswordChange from './pages/PasswordChange';
 
@@ -69,7 +65,7 @@ import Physiotherapy from './pages/departments/Physiotherapy';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'super_admin' | 'non_super_admin';
+  requiredRole?: 'admin' | 'non_admin';
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
@@ -82,12 +78,12 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
       if (!user) {
         // Not logged in, redirect to login
         navigate('/login', { state: { from: location } });
-      } else if (requiredRole === 'super_admin' && !isAdmin) {
-        // Not a super admin but trying to access super admin pages
+      } else if (requiredRole === 'admin' && !isAdmin) {
+        // Not an admin but trying to access admin pages
         navigate('/dashboard', { state: { from: location } });
-      } else if (requiredRole === 'non_super_admin' && isAdmin) {
-        // Super admin trying to access non-super admin pages
-        navigate('/super-admin', { state: { from: location } });
+      } else if (requiredRole === 'non_admin' && isAdmin) {
+        // Admin trying to access non-admin pages
+        navigate('/admin', { state: { from: location } });
       }
     }
   }, [user, isLoading, navigate, location, isAdmin, requiredRole]);
@@ -102,8 +98,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole 
   
   if (!user) return null;
   
-  if (requiredRole === 'super_admin' && !isAdmin) return null;
-  if (requiredRole === 'non_super_admin' && isAdmin) return null;
+  if (requiredRole === 'admin' && !isAdmin) return null;
+  if (requiredRole === 'non_admin' && isAdmin) return null;
   
   return <>{children}</>;
 };
@@ -186,25 +182,24 @@ const App: React.FC = () => {
         <Route path="/register" element={<RegisterForm />} />
         <Route path="/change-password" element={<PasswordChange />} />
         
-        {/* Super Admin Routes */}
-        <Route path="/super-admin" element={
-          <ProtectedRoute requiredRole="super_admin">
+        {/* Admin Routes */}
+        <Route path="/admin" element={
+          <ProtectedRoute requiredRole="admin">
             <DashboardLayout />
           </ProtectedRoute>
         }>
-          <Route index element={<SuperAdminDashboard />} />
+          <Route index element={<Dashboard />} />
           <Route path="system-modules" element={<SystemModules />} />
           <Route path="pricing-plans" element={<PricingPlans />} />
           <Route path="licenses" element={<Licenses />} />
           <Route path="support-tickets" element={<SupportTickets />} />
           <Route path="support-settings" element={<SupportSettings />} />
           <Route path="settings/system" element={<SystemSettings />} />
-          <Route path="hospital-onboarding" element={<HospitalOnboarding />} />
         </Route>
         
         {/* Regular User Routes */}
         <Route path="/" element={
-          <ProtectedRoute requiredRole="non_super_admin">
+          <ProtectedRoute requiredRole="non_admin">
             <FirstLoginCheck>
               <DashboardLayout />
             </FirstLoginCheck>
@@ -217,12 +212,10 @@ const App: React.FC = () => {
           
           {/* Settings Routes */}
           <Route path="settings">
-            <Route path="hospital" element={<HospitalSettings />} />
             <Route path="departments" element={<DepartmentSettings />} />
             <Route path="users" element={<UserSettings />} />
             <Route path="clinical" element={<ClinicalSettings />} />
             <Route path="billing" element={<BillingSettings />} />
-            <Route path="license" element={<LicenseSettings />} />
           </Route>
           
           {/* Clinical Routes */}

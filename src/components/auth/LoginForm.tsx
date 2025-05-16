@@ -4,8 +4,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
 import { Activity, WifiOff, Eye, EyeOff } from 'lucide-react';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
-import { isValidEmail, isStrongPassword } from '../../lib/security';
-import { generateCsrfToken, storeCsrfToken } from '../../lib/security';
+import { isValidEmail, isStrongPassword, generateCsrfToken, storeCsrfToken } from '../../lib/security';
 import { supabase } from '../../lib/supabase';
 
 interface LoginFormData {
@@ -14,13 +13,12 @@ interface LoginFormData {
 }
 
 const LoginForm: React.FC = () => {
-  const { login, isLoading, error, isAdmin } = useAuthStore();
+  const { login, isLoading, error } = useAuthStore();
   const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>();
   const { isOffline } = useOfflineStatus();
   const navigate = useNavigate();
   const location = useLocation();
   const [offlineError, setOfflineError] = useState<string | null>(null);
-  const [roleError, setRoleError] = useState<string | null>(null);
   const [loginAttempts, setLoginAttempts] = useState<number>(0);
   const [lockoutUntil, setLockoutUntil] = useState<Date | null>(null);
   const [resetEmailSent, setResetEmailSent] = useState(false);
@@ -28,13 +26,9 @@ const LoginForm: React.FC = () => {
   
   // Check if user is already logged in and redirect accordingly
   useEffect(() => {
-    const { user, isAdmin } = useAuthStore.getState();
+    const { user } = useAuthStore.getState();
     if (user) {
-      if (isAdmin) {
-        navigate('/super-admin');
-      } else {
-        navigate('/dashboard');
-      }
+      navigate('/dashboard');
     }
     
     // Check for lockout in localStorage
@@ -72,7 +66,7 @@ const LoginForm: React.FC = () => {
       setResetEmailSent(true);
     } catch (error: any) {
       console.error('Password reset error:', error.message);
-      setRoleError(`Error sending password reset: ${error.message}`);
+      alert(`Error sending password reset: ${error.message}`);
     }
   };
   
@@ -85,30 +79,18 @@ const LoginForm: React.FC = () => {
     // Check if account is locked out
     if (lockoutUntil && lockoutUntil > new Date()) {
       const timeLeft = Math.ceil((lockoutUntil.getTime() - new Date().getTime()) / 60000);
-      setRoleError(`Too many failed attempts. Please try again in ${timeLeft} minutes.`);
+      alert(`Too many failed attempts. Please try again in ${timeLeft} minutes.`);
       return;
     }
     
     // Validate email format
     if (!isValidEmail(data.email)) {
-      setRoleError("Please enter a valid email address.");
+      alert("Please enter a valid email address.");
       return;
     }
     
-    setRoleError(null);
-    
     try {
       await login(data.email, data.password);
-      
-      // Check if the user is a super_admin
-      const { isAdmin } = useAuthStore.getState();
-      
-      if (isAdmin) {
-        setRoleError("This login is for regular users only. Super admins should use the admin login portal.");
-        // Logout the user since they should use the admin login
-        await useAuthStore.getState().logout();
-        return;
-      }
       
       // Reset login attempts on successful login
       setLoginAttempts(0);
@@ -132,7 +114,7 @@ const LoginForm: React.FC = () => {
         lockoutTime.setMinutes(lockoutTime.getMinutes() + 15); // 15 minute lockout
         setLockoutUntil(lockoutTime);
         localStorage.setItem('loginLockout', lockoutTime.toISOString());
-        setRoleError(`Too many failed attempts. Account locked for 15 minutes.`);
+        alert(`Too many failed attempts. Account locked for 15 minutes.`);
       }
     }
   };
@@ -144,19 +126,13 @@ const LoginForm: React.FC = () => {
           <div className="flex justify-center">
             <Activity className="h-12 w-12 text-primary-500" />
           </div>
-          <h2 className="mt-6 text-2xl font-bold text-gray-900">Welcome back to Searchable</h2>
+          <h2 className="mt-6 text-2xl font-bold text-gray-900">Welcome to HMS</h2>
         </div>
         
         <form className="mt-8 space-y-6" onSubmit={handleSubmit(onSubmit)}>
           {error && (
             <div className="bg-error-50 border border-error-200 text-error-700 px-4 py-3 rounded-md">
               The email or password you entered is incorrect. Please try again or reset your password.
-            </div>
-          )}
-          
-          {roleError && (
-            <div className="bg-error-50 border border-error-200 text-error-700 px-4 py-3 rounded-md">
-              {roleError} <Link to="/admin-login" className="font-medium underline">Go to admin login</Link>
             </div>
           )}
           
@@ -256,7 +232,7 @@ const LoginForm: React.FC = () => {
                   if (email && isValidEmail(email)) {
                     handlePasswordReset(email);
                   } else {
-                    setRoleError("Please enter a valid email address to reset your password.");
+                    alert("Please enter a valid email address to reset your password.");
                   }
                 }}
                 className="font-medium text-primary-600 hover:text-primary-500"
@@ -282,6 +258,15 @@ const LoginForm: React.FC = () => {
             </button>
           </div>
         </form>
+        
+        <div className="mt-4 text-center">
+          <p className="text-sm text-gray-600">
+            Don't have an account?{' '}
+            <Link to="/register" className="font-medium text-primary-600 hover:text-primary-500">
+              Sign up
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );

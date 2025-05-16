@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../../lib/store';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
-import { Users, Calendar, FileText, Activity, Pill, DollarSign, LogOut, Menu, X, Bell, Building2, Settings, LayoutDashboard, BedDouble, FlaskRound as Flask, Microscope, Heart, Baby, UserRound, Syringe, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Stethoscope, ClipboardList, Cog, Building, Users2, Wrench, CreditCard, Key, LifeBuoy, ChevronDown, ChevronRight, TicketCheck, Box, Home, Search, LayoutList, WifiOff, Plus } from 'lucide-react';
+import { Users, Calendar, FileText, Activity, Pill, DollarSign, LogOut, Menu, X, Bell, Settings, LayoutDashboard, BedDouble, FlaskRound as Flask, Microscope, Heart, Baby, UserRound, Syringe, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Stethoscope, ClipboardList, Cog, Building2, Users2, Wrench, CreditCard, LifeBuoy, ChevronDown, ChevronRight, Box, Home, Search, LayoutList, WifiOff, Plus } from 'lucide-react';
 import { syncAllData } from '../../lib/storage';
 
 const DashboardLayout: React.FC = () => {
@@ -10,7 +10,7 @@ const DashboardLayout: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [departmentsOpen, setDepartmentsOpen] = useState(true);
   const [servicesOpen, setServicesOpen] = useState(true);
-  const { user, hospital, logout, isAdmin } = useAuthStore();
+  const { user, logout, isAdmin } = useAuthStore();
   const { isOffline } = useOfflineStatus();
   const navigate = useNavigate();
   const location = useLocation();
@@ -60,13 +60,6 @@ const DashboardLayout: React.FC = () => {
               <X size={20} className="text-gray-500" />
             </button>
           </div>
-          
-          {hospital && (
-            <div className="mt-4 py-2 px-3 bg-primary-50 rounded-md">
-              <p className="text-xs font-medium text-primary-700">HOSPITAL</p>
-              <p className="text-sm font-semibold text-primary-900 truncate">{hospital.name}</p>
-            </div>
-          )}
 
           {isOffline && (
             <div className="mt-2 py-2 px-3 bg-warning-50 rounded-md flex items-center">
@@ -77,17 +70,17 @@ const DashboardLayout: React.FC = () => {
         </div>
 
         <nav className="mt-4 px-4 space-y-1">
-          {/* Super Admin Section */}
+          {/* Admin Section */}
           {isAdmin && (
             <>
               <Link
-                to="/super-admin"
+                to="/admin"
                 className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                  location.pathname === '/super-admin' ? 'bg-primary-50 text-primary-700' : ''
+                  location.pathname === '/admin' ? 'bg-primary-50 text-primary-700' : ''
                 }`}
               >
                 <LayoutDashboard className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                Super Admin
+                Admin Dashboard
               </Link>
             </>
           )}
@@ -325,16 +318,6 @@ const DashboardLayout: React.FC = () => {
               {settingsOpen && (
                 <div className="space-y-1">
                   <Link
-                    to="/settings/hospital"
-                    className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                      location.pathname === '/settings/hospital' ? 'bg-primary-50 text-primary-700' : ''
-                    }`}
-                  >
-                    <Building className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Hospital Settings
-                  </Link>
-
-                  <Link
                     to="/settings/departments"
                     className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
                       location.pathname === '/settings/departments' ? 'bg-primary-50 text-primary-700' : ''
@@ -372,16 +355,6 @@ const DashboardLayout: React.FC = () => {
                   >
                     <CreditCard className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
                     Billing Settings
-                  </Link>
-
-                  <Link
-                    to="/settings/license"
-                    className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                      location.pathname === '/settings/license' ? 'bg-primary-50 text-primary-700' : ''
-                    }`}
-                  >
-                    <Key className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    License Settings
                   </Link>
                 </div>
               )}

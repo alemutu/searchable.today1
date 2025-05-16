@@ -63,13 +63,13 @@ const PatientDetails: React.FC = () => {
   const [patient, setPatient] = useState<Patient | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('overview');
-  const { hospital } = useAuthStore();
+  const { isAdmin } = useAuthStore();
 
   useEffect(() => {
     if (patientId) {
       fetchPatient();
     }
-  }, [patientId, hospital]);
+  }, [patientId]);
 
   const fetchPatient = async () => {
     try {
@@ -101,37 +101,21 @@ const PatientDetails: React.FC = () => {
     return age;
   };
 
-  // Generate a formatted patient ID based on hospital settings
+  // Generate a formatted patient ID
   const generatePatientId = () => {
-    if (!hospital || !patient) return patient?.id.slice(0, 8);
+    if (!patient) return '';
     
     // Use the UUID first 8 characters as a fallback
     const shortId = patient.id.slice(0, 8);
     
-    // If we have hospital settings, try to format the ID
-    if (hospital.patient_id_format) {
-      // For demo purposes, we'll use a simple algorithm to generate a number
-      // In a real system, this would be stored in the database
-      const patientNumber = parseInt(patient.id.substring(0, 8), 16) % 1000;
-      
-      if (patientNumber <= 0) return shortId;
-      
-      const paddedNumber = String(patientNumber).padStart(hospital.patient_id_digits || 6, '0');
-      
-      switch (hospital.patient_id_format) {
-        case 'prefix_year_number':
-          return `${hospital.patient_id_prefix || 'PT'}${new Date().getFullYear()}-${paddedNumber}`;
-        case 'hospital_prefix_number':
-          return `${hospital.subdomain.substring(0, 2).toUpperCase()}-${hospital.patient_id_prefix || 'PT'}-${paddedNumber}`;
-        case 'custom':
-          return `${hospital.patient_id_prefix || 'PT'}${paddedNumber}`;
-        case 'prefix_number':
-        default:
-          return `${hospital.patient_id_prefix || 'PT'}${paddedNumber}`;
-      }
-    }
+    // For demo purposes, we'll use a simple algorithm to generate a number
+    // In a real system, this would be stored in the database
+    const patientNumber = parseInt(patient.id.substring(0, 8), 16) % 1000;
     
-    return shortId;
+    if (patientNumber <= 0) return shortId;
+    
+    const paddedNumber = String(patientNumber).padStart(6, '0');
+    return `PT${paddedNumber}`;
   };
 
   if (isLoading) {

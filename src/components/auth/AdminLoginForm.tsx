@@ -29,7 +29,7 @@ const AdminLoginForm: React.FC = () => {
   useEffect(() => {
     const { user, isAdmin } = useAuthStore.getState();
     if (user && isAdmin) {
-      navigate('/super-admin');
+      navigate('/admin');
     }
     
     // Check for lockout in localStorage
@@ -95,12 +95,12 @@ const AdminLoginForm: React.FC = () => {
     try {
       await login(data.email, data.password);
       
-      // Check if the user is a super_admin
+      // Check if the user is an admin
       const { isAdmin } = useAuthStore.getState();
       
       if (!isAdmin) {
-        setRoleError("This login is for Super Admin only.");
-        // Logout the user since they're not a super_admin
+        setRoleError("This login is for Admin only.");
+        // Logout the user since they're not an admin
         await useAuthStore.getState().logout();
         return;
       }
@@ -110,8 +110,8 @@ const AdminLoginForm: React.FC = () => {
       localStorage.removeItem('adminLoginAttempts');
       localStorage.removeItem('adminLoginLockout');
       
-      // Redirect to the super admin dashboard
-      navigate('/super-admin');
+      // Redirect to the admin dashboard
+      navigate('/admin');
     } catch (error) {
       console.error('Login error:', error);
       
@@ -138,9 +138,9 @@ const AdminLoginForm: React.FC = () => {
           <div className="flex justify-center">
             <Shield className="h-12 w-12 text-primary-500" />
           </div>
-          <h2 className="mt-6 text-2xl font-bold text-gray-900">Super Admin Login</h2>
+          <h2 className="mt-6 text-2xl font-bold text-gray-900">Admin Login</h2>
           <p className="mt-2 text-sm text-gray-600">
-            This portal is for Super Admins only.
+            This portal is for Admins only.
           </p>
         </div>
         
@@ -275,7 +275,7 @@ const AdminLoginForm: React.FC = () => {
                   <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                 </svg>
               ) : null}
-              Sign in as Super Admin
+              Sign in as Admin
             </button>
           </div>
         </form>

@@ -98,7 +98,7 @@ const PatientTableRow: React.FC<PatientTableRowProps> = ({
 };
 
 const Dashboard: React.FC = () => {
-  const { hospital, isDoctor, isNurse, isAdmin } = useAuthStore();
+  const { isDoctor, isNurse, isAdmin } = useAuthStore();
   const [stats, setStats] = useState({
     totalPatients: 0,
     appointmentsToday: 0,
@@ -253,7 +253,7 @@ const Dashboard: React.FC = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-gray-900">
-          {hospital ? `${hospital.name} Dashboard` : 'Dashboard'}
+          Dashboard
         </h1>
         <div className="flex space-x-3">
           <Link to="/patients/search" className="btn btn-outline flex items-center">

@@ -21,20 +21,17 @@ const PatientList: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [patients, setPatients] = useState<Patient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const { hospital, isDoctor } = useAuthStore();
+  const { isDoctor } = useAuthStore();
   
   useEffect(() => {
     fetchPatients();
-  }, [hospital]);
+  }, []);
   
   const fetchPatients = async () => {
-    if (!hospital) return;
-    
     try {
       const { data, error } = await supabase
         .from('patients')
         .select('*')
-        .eq('hospital_id', hospital.id)
         .order('created_at', { ascending: false });
           
       if (error) throw error;
@@ -47,7 +44,7 @@ const PatientList: React.FC = () => {
   };
 
   const searchPatients = async () => {
-    if (!searchTerm || !hospital) return;
+    if (!searchTerm) return;
     
     try {
       setIsLoading(true);
@@ -65,7 +62,6 @@ const PatientList: React.FC = () => {
         const { data, error } = await supabase
           .from('patients')
           .select('*')
-          .eq('hospital_id', hospital.id)
           .or(`first_name.ilike.%${searchTerm}%,last_name.ilike.%${searchTerm}%`)
           .order('created_at', { ascending: false });
             
@@ -103,36 +99,19 @@ const PatientList: React.FC = () => {
     }
   };
 
-  // Generate a formatted patient ID based on hospital settings
+  // Generate a formatted patient ID
   const generatePatientId = (patient: Patient) => {
-    if (!hospital) return patient.id.slice(0, 8);
-    
     // Use the UUID first 8 characters as a fallback
     const shortId = patient.id.slice(0, 8);
     
-    // If we have hospital settings, try to format the ID
-    if (hospital.patient_id_format) {
-      const patientIndex = patients.findIndex(p => p.id === patient.id);
-      const patientNumber = hospital.patient_id_last_number - patientIndex;
-      
-      if (patientNumber <= 0) return shortId;
-      
-      const paddedNumber = String(patientNumber).padStart(hospital.patient_id_digits || 6, '0');
-      
-      switch (hospital.patient_id_format) {
-        case 'prefix_year_number':
-          return `${hospital.patient_id_prefix || 'PT'}${new Date().getFullYear()}-${paddedNumber}`;
-        case 'hospital_prefix_number':
-          return `${hospital.subdomain.substring(0, 2).toUpperCase()}-${hospital.patient_id_prefix || 'PT'}-${paddedNumber}`;
-        case 'custom':
-          return `${hospital.patient_id_prefix || 'PT'}${paddedNumber}`;
-        case 'prefix_number':
-        default:
-          return `${hospital.patient_id_prefix || 'PT'}${paddedNumber}`;
-      }
-    }
+    // For demo purposes, we'll use a simple algorithm to generate a number
+    // In a real system, this would be stored in the database
+    const patientNumber = parseInt(patient.id.substring(0, 8), 16) % 1000;
     
-    return shortId;
+    if (patientNumber <= 0) return shortId;
+    
+    const paddedNumber = String(patientNumber).padStart(6, '0');
+    return `PT${paddedNumber}`;
   };
 
   const handleSearch = (e: React.FormEvent) => {
