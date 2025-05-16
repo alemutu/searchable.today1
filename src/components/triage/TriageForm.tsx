@@ -133,9 +133,7 @@ const TriageForm: React.FC = () => {
   const hasAllergies = watch('medicalHistory.allergies.hasAllergies');
   
   useEffect(() => {
-    if (hospital) {
-      fetchDepartments();
-    }
+    fetchDepartments();
     
     if (patientId) {
       fetchPatient();
