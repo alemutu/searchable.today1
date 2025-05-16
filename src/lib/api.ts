@@ -108,81 +108,53 @@ export const hospitalOnboardingApi = {
       },
     };
 
-    // For development environment, simulate a successful response
-    if (import.meta.env.DEV) {
-      console.log('DEV MODE: Simulating hospital creation', sanitizedData);
-      // Wait a bit to simulate network latency
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      return {
-        success: true,
-        hospital: {
-          id: 'simulated-id',
-          name: sanitizedData.hospitalProfile.name,
-          subdomain: sanitizedData.hospitalProfile.subdomain,
-          created_at: new Date().toISOString()
-        },
-        message: 'Hospital created successfully (simulated in dev mode)'
-      };
+    // For development environment, use the actual Supabase API instead of simulating
+    try {
+      // Use the Edge Function URL
+      const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals`;
+      const headers = await getHeaders();
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(sanitizedData)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create hospital');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error creating hospital:', error);
+      throw error;
     }
-
-    const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals`;
-    const headers = await getHeaders();
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(sanitizedData)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create hospital');
-    }
-
-    return response.json();
   },
 
   /**
    * Get all hospitals
    */
   getHospitals: async () => {
-    // For development environment, simulate a successful response
-    if (import.meta.env.DEV) {
-      console.log('DEV MODE: Simulating fetching hospitals');
-      // Wait a bit to simulate network latency
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      return [
-        {
-          id: 'simulated-id-1',
-          name: 'Simulated Hospital 1',
-          subdomain: 'simulated-1',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: 'simulated-id-2',
-          name: 'Simulated Hospital 2',
-          subdomain: 'simulated-2',
-          created_at: new Date().toISOString()
-        }
-      ];
+    try {
+      const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals`;
+      const headers = await getHeaders();
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch hospitals');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching hospitals:', error);
+      throw error;
     }
-
-    const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals`;
-    const headers = await getHeaders();
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch hospitals');
-    }
-
-    return response.json();
   },
 
   /**
@@ -194,37 +166,25 @@ export const hospitalOnboardingApi = {
       throw new Error('Invalid hospital ID format');
     }
     
-    // For development environment, simulate a successful response
-    if (import.meta.env.DEV) {
-      console.log('DEV MODE: Simulating fetching hospital', id);
-      // Wait a bit to simulate network latency
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      return {
-        id: id,
-        name: 'Simulated Hospital Detail',
-        subdomain: 'simulated-detail',
-        created_at: new Date().toISOString(),
-        address: '123 Hospital St, Medical City',
-        phone: '+1 (555) 123-4567',
-        email: 'contact@simulated-hospital.com'
-      };
+    try {
+      const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals/${id}`;
+      const headers = await getHeaders();
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch hospital');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching hospital:', error);
+      throw error;
     }
-    
-    const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/hospitals/${id}`;
-    const headers = await getHeaders();
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch hospital');
-    }
-
-    return response.json();
   },
 
   /**
@@ -236,31 +196,25 @@ export const hospitalOnboardingApi = {
       throw new Error('Invalid subdomain format');
     }
     
-    // For development environment, simulate a successful response
-    if (import.meta.env.DEV) {
-      console.log('DEV MODE: Simulating subdomain check', subdomain);
-      // Wait a bit to simulate network latency
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Simulate some subdomains as taken
-      const takenSubdomains = ['general', 'admin', 'test', 'demo'];
-      return { available: !takenSubdomains.includes(subdomain) };
+    try {
+      const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/check-subdomain/${safeEncodeURIComponent(subdomain)}`;
+      const headers = await getHeaders();
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to check subdomain');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error checking subdomain:', error);
+      throw error;
     }
-    
-    const url = `${getEdgeFunctionBaseUrl()}/hospital-onboarding/check-subdomain/${safeEncodeURIComponent(subdomain)}`;
-    const headers = await getHeaders();
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to check subdomain');
-    }
-
-    return response.json();
   }
 };
 
@@ -273,50 +227,25 @@ export const licenseApi = {
    * Get all licenses
    */
   getLicenses: async () => {
-    // For development environment, simulate a successful response
-    if (import.meta.env.DEV) {
-      console.log('DEV MODE: Simulating fetching licenses');
-      // Wait a bit to simulate network latency
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      return [
-        {
-          id: 'simulated-license-1',
-          hospital: { id: 'hospital-1', name: 'Simulated Hospital 1' },
-          plan: { id: 'plan-1', name: 'Standard Plan' },
-          start_date: '2025-01-01',
-          end_date: '2026-01-01',
-          status: 'active',
-          max_users: 10,
-          current_users: 5
-        },
-        {
-          id: 'simulated-license-2',
-          hospital: { id: 'hospital-2', name: 'Simulated Hospital 2' },
-          plan: { id: 'plan-2', name: 'Premium Plan' },
-          start_date: '2025-02-01',
-          end_date: '2026-02-01',
-          status: 'active',
-          max_users: 20,
-          current_users: 8
-        }
-      ];
+    try {
+      const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses`;
+      const headers = await getHeaders();
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch licenses');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching licenses:', error);
+      throw error;
     }
-
-    const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses`;
-    const headers = await getHeaders();
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch licenses');
-    }
-
-    return response.json();
   },
 
   /**
@@ -332,39 +261,26 @@ export const licenseApi = {
       throw new Error('Invalid ID format');
     }
     
-    // For development environment, simulate a successful response
-    if (import.meta.env.DEV) {
-      console.log('DEV MODE: Simulating license creation', data);
-      // Wait a bit to simulate network latency
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      return {
-        id: 'simulated-new-license',
-        hospital_id: data.hospital_id,
-        plan_id: data.plan_id,
-        start_date: new Date().toISOString().split('T')[0],
-        end_date: new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split('T')[0],
-        status: 'active',
-        max_users: 10,
-        current_users: 0
-      };
+    try {
+      const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses`;
+      const headers = await getHeaders();
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(data)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create license');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error creating license:', error);
+      throw error;
     }
-    
-    const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses`;
-    const headers = await getHeaders();
-
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(data)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to create license');
-    }
-
-    return response.json();
   },
 
   /**
@@ -381,67 +297,51 @@ export const licenseApi = {
       throw new Error('Invalid status value');
     }
     
-    // For development environment, simulate a successful response
-    if (import.meta.env.DEV) {
-      console.log('DEV MODE: Simulating license status update', { id, status });
-      // Wait a bit to simulate network latency
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      return {
-        id: id,
-        status: status,
-        updated_at: new Date().toISOString()
-      };
+    try {
+      const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses/${id}/status`;
+      const headers = await getHeaders();
+
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ status })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update license status');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error updating license status:', error);
+      throw error;
     }
-    
-    const url = `${getEdgeFunctionBaseUrl()}/license-management/licenses/${id}/status`;
-    const headers = await getHeaders();
-
-    const response = await fetch(url, {
-      method: 'PUT',
-      headers,
-      body: JSON.stringify({ status })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to update license status');
-    }
-
-    return response.json();
   },
 
   /**
    * Get license usage metrics
    */
   getLicenseMetrics: async () => {
-    // For development environment, simulate a successful response
-    if (import.meta.env.DEV) {
-      console.log('DEV MODE: Simulating license metrics');
-      // Wait a bit to simulate network latency
-      await new Promise(resolve => setTimeout(resolve, 400));
-      
-      return {
-        total_active: 5,
-        total_users: 42,
-        expiring_soon: 2
-      };
+    try {
+      const url = `${getEdgeFunctionBaseUrl()}/license-management/metrics`;
+      const headers = await getHeaders();
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch license metrics');
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching license metrics:', error);
+      throw error;
     }
-
-    const url = `${getEdgeFunctionBaseUrl()}/license-management/metrics`;
-    const headers = await getHeaders();
-
-    const response = await fetch(url, {
-      method: 'GET',
-      headers
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || 'Failed to fetch license metrics');
-    }
-
-    return response.json();
   }
 };
 
