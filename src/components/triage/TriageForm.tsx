@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
-import { User, Activity, FileText, Pill, AlertTriangle, Syringe, Calculator, Clock, AlertCircle, Stethoscope, Building2, Save, ArrowLeft, Brain, Thermometer, Ruler, Droplets, Scale, Hash } from 'lucide-react';
+import { User, Activity, FileText, Pill, AlertTriangle, Syringe, Calculator, Clock, AlertCircle, Stethoscope, Building2, Save, ArrowLeft, Brain, Thermometer, Ruler, Droplets, Scale, Hash, Heart } from 'lucide-react';
 
 interface TriageFormData {
   vitalSigns: {
@@ -761,6 +761,7 @@ const TriageForm: React.FC = () => {
               
               <div>
                 <div className="flex items-center mb-1">
+                  
                   <Pill className="h-3 w-3 text-gray-400 mr-1" />
                   <label className="form-label text-xs mb-0">Current Medications</label>
                 </div>
