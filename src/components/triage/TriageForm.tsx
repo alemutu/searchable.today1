@@ -3,7 +3,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../lib/store';
-import { User, Activity, Heart, Thermometer, Settings as Lungs, Droplets, Scale, Ruler, Calculator, Clock, AlertTriangle, Stethoscope, Building2, Save, ArrowLeft, Brain, FileText, Pill, AlertCircle } from 'lucide-react';
+import { User, Activity, FileText, Pill, AlertTriangle, Syringe, Calculator, Clock, AlertCircle, Stethoscope, Building2, Save, ArrowLeft, Brain, Thermometer, Ruler, Droplets, Scale, Hash } from 'lucide-react';
 
 interface TriageFormData {
   vitalSigns: {
@@ -50,7 +50,6 @@ interface Patient {
     phone: string;
   };
   medical_history: any;
-  hospital_id: string;
   status: string;
   current_flow_step: string | null;
 }
@@ -157,7 +156,6 @@ const TriageForm: React.FC = () => {
               { name: 'Lisinopril', dosage: '10mg', frequency: 'Daily' }
             ]
           },
-          hospital_id: hospital?.id || '00000000-0000-0000-0000-000000000000',
           status: 'active',
           current_flow_step: 'registration'
         };
@@ -199,7 +197,6 @@ const TriageForm: React.FC = () => {
       const { data, error } = await supabase
         .from('departments')
         .select('id, name')
-        .eq('hospital_id', hospital?.id)
         .order('name');
 
       if (error) throw error;
@@ -325,7 +322,6 @@ const TriageForm: React.FC = () => {
         .from('triage')
         .insert({
           patient_id: patient.id,
-          hospital_id: hospital.id,
           vital_signs: data.vitalSigns,
           chief_complaint: data.chiefComplaint,
           acuity_level: data.acuityLevel,
@@ -351,7 +347,7 @@ const TriageForm: React.FC = () => {
         }
       }
       
-      // Update patient's current flow step
+      // Update patient's current flow step and medical history
       const { error: patientError } = await supabase
         .from('patients')
         .update({
@@ -381,7 +377,7 @@ const TriageForm: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center p-4">
+      <div className="flex justify-center p-3">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
       </div>
     );
@@ -389,7 +385,7 @@ const TriageForm: React.FC = () => {
 
   if (!patient) {
     return (
-      <div className="text-center p-4">
+      <div className="text-center p-3">
         <p className="text-gray-500">Patient not found</p>
       </div>
     );
@@ -399,13 +395,13 @@ const TriageForm: React.FC = () => {
     <div className="max-w-4xl mx-auto">
       <form onSubmit={handleSubmit(onSubmit)}>
         {/* Patient Header */}
-        <div className="bg-gradient-to-r from-primary-700 to-primary-600 rounded-lg shadow-sm p-3 mb-3">
+        <div className="bg-gradient-to-r from-primary-700 to-primary-600 rounded-lg shadow-sm p-2.5 mb-2.5">
           <div className="flex items-center">
-            <div className="h-10 w-10 rounded-full bg-white text-primary-600 flex items-center justify-center text-lg font-bold shadow-sm">
+            <div className="h-9 w-9 rounded-full bg-white text-primary-600 flex items-center justify-center text-base font-bold shadow-sm">
               {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
             </div>
-            <div className="ml-3">
-              <h2 className="text-lg font-bold text-white">
+            <div className="ml-2.5">
+              <h2 className="text-base font-bold text-white">
                 {patient.first_name} {patient.last_name}
               </h2>
               <div className="flex items-center text-primary-100 text-xs">
@@ -422,11 +418,11 @@ const TriageForm: React.FC = () => {
         </div>
 
         {/* Tabs */}
-        <div className="bg-white rounded-lg shadow-sm mb-3">
+        <div className="bg-white rounded-lg shadow-sm mb-2.5">
           <div className="flex border-b border-gray-200">
             <button
               type="button"
-              className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+              className={`flex-1 py-1.5 px-2.5 text-center text-xs font-medium ${
                 activeTab === 'vitals'
                   ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
@@ -438,7 +434,7 @@ const TriageForm: React.FC = () => {
             </button>
             <button
               type="button"
-              className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+              className={`flex-1 py-1.5 px-2.5 text-center text-xs font-medium ${
                 activeTab === 'medical-history'
                   ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
@@ -450,7 +446,7 @@ const TriageForm: React.FC = () => {
             </button>
             <button
               type="button"
-              className={`flex-1 py-2 px-3 text-center text-xs font-medium ${
+              className={`flex-1 py-1.5 px-2.5 text-center text-xs font-medium ${
                 activeTab === 'assessment'
                   ? 'text-primary-600 border-b-2 border-primary-500 bg-primary-50'
                   : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
@@ -465,9 +461,9 @@ const TriageForm: React.FC = () => {
 
         {/* Vital Signs Tab */}
         {activeTab === 'vitals' && (
-          <div className="bg-white rounded-lg shadow-sm p-3 mb-3">
+          <div className="bg-white rounded-lg shadow-sm p-3 mb-2.5">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="text-md font-medium text-gray-900">Vital Signs</h3>
+              <h3 className="text-sm font-medium text-gray-900">Vital Signs</h3>
               <button
                 type="button"
                 onClick={analyzeVitals}
@@ -519,7 +515,7 @@ const TriageForm: React.FC = () => {
               <div>
                 <label className="form-label text-xs">Respiratory Rate (breaths/min)</label>
                 <div className="flex items-center">
-                  <Lungs className="h-3 w-3 text-gray-400 mr-1" />
+                  <Activity className="h-3 w-3 text-gray-400 mr-1" />
                   <input
                     type="number"
                     {...register('vitalSigns.respiratoryRate')}
@@ -644,8 +640,8 @@ const TriageForm: React.FC = () => {
 
         {/* Medical History Tab */}
         {activeTab === 'medical-history' && (
-          <div className="bg-white rounded-lg shadow-sm p-3 mb-3">
-            <h3 className="text-md font-medium text-gray-900 mb-2">Medical History</h3>
+          <div className="bg-white rounded-lg shadow-sm p-3 mb-2.5">
+            <h3 className="text-sm font-medium text-gray-900 mb-2">Medical History</h3>
             
             <div className="space-y-2">
               <div>
@@ -791,7 +787,7 @@ const TriageForm: React.FC = () => {
 
         {/* Assessment Tab */}
         {activeTab === 'assessment' && (
-          <div className="bg-white rounded-lg shadow-sm p-3 mb-3">
+          <div className="bg-white rounded-lg shadow-sm p-3 mb-2.5">
             <div>
               <label className="form-label text-xs required">Chief Complaint</label>
               <textarea
