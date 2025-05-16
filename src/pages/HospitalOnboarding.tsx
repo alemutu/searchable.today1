@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore, useNotificationStore } from '../lib/store';
 import { hospitalOnboardingApi } from '../lib/api';
@@ -198,7 +198,9 @@ const HospitalOnboarding: React.FC = () => {
     setIsCheckingSubdomain(true);
     setNetworkError(null);
     try {
+      console.log('Checking subdomain availability for:', subdomain);
       const { available } = await hospitalOnboardingApi.checkSubdomain(subdomain);
+      console.log('Subdomain availability result:', available);
       setSubdomainAvailable(available);
     } catch (error: any) {
       console.error('Error checking subdomain:', error);
@@ -315,6 +317,14 @@ const HospitalOnboarding: React.FC = () => {
     setIsLoading(true);
     setNetworkError(null);
     try {
+      console.log('Submitting hospital onboarding form with data:', {
+        hospitalProfile,
+        adminSetup,
+        moduleSelection,
+        pricingPlan,
+        licenseDetails
+      });
+      
       const result = await hospitalOnboardingApi.createHospital({
         hospitalProfile,
         adminSetup,
@@ -322,6 +332,8 @@ const HospitalOnboarding: React.FC = () => {
         pricingPlan,
         licenseDetails
       });
+      
+      console.log('Hospital creation result:', result);
       
       addNotification({
         message: 'Hospital created successfully',
