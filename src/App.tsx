@@ -1,10 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import { useAuthStore } from './lib/store';
-import { supabase } from './lib/supabase';
-import LoginForm from './components/auth/LoginForm';
-import AdminLoginForm from './components/auth/AdminLoginForm';
-import RegisterForm from './components/auth/RegisterForm';
+import React from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import DashboardLayout from './components/Layout/DashboardLayout';
 import Dashboard from './pages/Dashboard';
 import SystemModules from './pages/SystemModules';
@@ -50,7 +45,6 @@ import ReceptionDashboard from './pages/ReceptionDashboard';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
 import NotificationToast from './components/common/NotificationToast';
 import Reports from './pages/Reports';
-import PasswordChange from './pages/PasswordChange';
 
 // Import department pages
 import GeneralMedicine from './pages/departments/GeneralMedicine';
@@ -63,131 +57,11 @@ import Dental from './pages/departments/Dental';
 import EyeClinic from './pages/departments/EyeClinic';
 import Physiotherapy from './pages/departments/Physiotherapy';
 
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-  requiredRole?: 'admin' | 'non_admin';
-}
-
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requiredRole }) => {
-  const { user, isLoading, isAdmin } = useAuthStore();
-  const navigate = useNavigate();
-  const location = useLocation();
-  
-  useEffect(() => {
-    if (!isLoading) {
-      if (!user) {
-        // Not logged in, redirect to login
-        navigate('/login', { state: { from: location } });
-      } else if (requiredRole === 'admin' && !isAdmin) {
-        // Not an admin but trying to access admin pages
-        navigate('/dashboard', { state: { from: location } });
-      } else if (requiredRole === 'non_admin' && isAdmin) {
-        // Admin trying to access non-admin pages
-        navigate('/admin', { state: { from: location } });
-      }
-    }
-  }, [user, isLoading, navigate, location, isAdmin, requiredRole]);
-  
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
-      </div>
-    );
-  }
-  
-  if (!user) return null;
-  
-  if (requiredRole === 'admin' && !isAdmin) return null;
-  if (requiredRole === 'non_admin' && isAdmin) return null;
-  
-  return <>{children}</>;
-};
-
-const FirstLoginCheck: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isLoading } = useAuthStore();
-  const navigate = useNavigate();
-  const location = useLocation();
-  const [isFirstLogin, setIsFirstLogin] = useState<boolean | null>(null);
-  const [isChecking, setIsChecking] = useState(true);
-  
-  useEffect(() => {
-    const checkFirstLogin = async () => {
-      if (!user) {
-        setIsChecking(false);
-        return;
-      }
-      
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('first_login')
-          .eq('id', user.id)
-          .single();
-          
-        if (error) throw error;
-        
-        // If first_login is true or null (not set yet), consider it a first login
-        const firstLogin = data?.first_login !== false;
-        setIsFirstLogin(firstLogin);
-        
-        // If it's first login and not already on the password change page, redirect
-        if (firstLogin && location.pathname !== '/change-password') {
-          navigate('/change-password', { state: { from: location } });
-        }
-      } catch (error) {
-        console.error('Error checking first login status:', error);
-        // Default to false if there's an error
-        setIsFirstLogin(false);
-      } finally {
-        setIsChecking(false);
-      }
-    };
-    
-    if (!isLoading) {
-      checkFirstLogin();
-    }
-  }, [user, isLoading, navigate, location]);
-  
-  // If still checking or loading, show loading spinner
-  if (isLoading || isChecking) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-500"></div>
-      </div>
-    );
-  }
-  
-  // If it's first login and not on password change page, don't render children
-  if (isFirstLogin && location.pathname !== '/change-password') {
-    return null;
-  }
-  
-  // Otherwise, render children
-  return <>{children}</>;
-};
-
 const App: React.FC = () => {
-  const { initialize } = useAuthStore();
-
-  useEffect(() => {
-    initialize();
-  }, [initialize]);
-
   return (
     <>
       <Routes>
-        <Route path="/login" element={<LoginForm />} />
-        <Route path="/admin-login" element={<AdminLoginForm />} />
-        <Route path="/register" element={<RegisterForm />} />
-        <Route path="/change-password" element={<PasswordChange />} />
-        
-        {/* Admin Routes */}
-        <Route path="/admin" element={
-          <ProtectedRoute requiredRole="admin">
-            <DashboardLayout />
-          </ProtectedRoute>
-        }>
+        <Route path="/" element={<DashboardLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="system-modules" element={<SystemModules />} />
           <Route path="pricing-plans" element={<PricingPlans />} />
@@ -195,17 +69,6 @@ const App: React.FC = () => {
           <Route path="support-tickets" element={<SupportTickets />} />
           <Route path="support-settings" element={<SupportSettings />} />
           <Route path="settings/system" element={<SystemSettings />} />
-        </Route>
-        
-        {/* Regular User Routes */}
-        <Route path="/" element={
-          <ProtectedRoute requiredRole="non_admin">
-            <FirstLoginCheck>
-              <DashboardLayout />
-            </FirstLoginCheck>
-          </ProtectedRoute>
-        }>
-          <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="reception" element={<ReceptionDashboard />} />
           <Route path="reports" element={<Reports />} />
@@ -269,7 +132,7 @@ const App: React.FC = () => {
         </Route>
         
         {/* Default redirect */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       
       {/* Offline indicator */}

@@ -1,93 +1,43 @@
-import { createClient } from '@supabase/supabase-js';
-import type { Database } from '../types/supabase';
+// This file is kept as a placeholder for future database integration
+// All authentication and session management has been removed
 
-// Get environment variables
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Create a dummy client for now
+export const supabase = {
+  from: (table: string) => ({
+    select: (query?: string) => ({
+      eq: (column: string, value: any) => ({
+        single: () => Promise.resolve({ data: null, error: null }),
+        maybeSingle: () => Promise.resolve({ data: null, error: null }),
+        order: (column: string, { ascending }: { ascending: boolean }) => 
+          Promise.resolve({ data: [], error: null }),
+        limit: (limit: number) => Promise.resolve({ data: [], error: null }),
+        in: (column: string, values: any[]) => Promise.resolve({ data: [], error: null }),
+        not: (column: string, value: any) => Promise.resolve({ data: [], error: null }),
+        or: (query: string) => Promise.resolve({ data: [], error: null }),
+      }),
+      order: (column: string, { ascending }: { ascending: boolean }) => 
+        Promise.resolve({ data: [], error: null }),
+    }),
+    insert: (data: any) => ({
+      select: () => ({
+        single: () => Promise.resolve({ data: null, error: null }),
+      }),
+    }),
+    update: (data: any) => ({
+      eq: (column: string, value: any) => Promise.resolve({ data: null, error: null }),
+    }),
+    delete: () => ({
+      eq: (column: string, value: any) => Promise.resolve({ data: null, error: null }),
+    }),
+    upsert: (data: any) => Promise.resolve({ data: null, error: null }),
+  }),
+  rpc: (func: string, params?: any) => Promise.resolve({ data: null, error: null }),
+};
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables. Please check your .env file.');
-}
-
-// Create Supabase client with secure configuration and timeout settings
-export const supabase = createClient<Database>(
-  supabaseUrl,
-  supabaseAnonKey,
-  {
-    auth: {
-      autoRefreshToken: true,
-      persistSession: true,
-      detectSessionInUrl: true,
-      storageKey: 'hms-auth-token',
-      flowType: 'pkce'
-    },
-    global: {
-      headers: {
-        'X-Client-Info': 'hms-web-client'
-      },
-      // Add request timeout to prevent hanging on recursive queries
-      fetch: (url, options) => {
-        const timeoutController = new AbortController();
-        const { signal } = timeoutController;
-        
-        // Set a 10-second timeout
-        const timeoutId = setTimeout(() => timeoutController.abort(), 10000);
-        
-        return fetch(url, {
-          ...options,
-          signal,
-        }).finally(() => clearTimeout(timeoutId));
-      }
-    },
-    // Add database schema
-    db: {
-      schema: 'public'
-    },
-    realtime: {
-      params: {
-        eventsPerSecond: 10
-      }
-    }
-  }
-);
-
-// Get a fresh client instance
+// Placeholder for future implementation
 export const getClient = () => supabase;
 
-// Session timeout handling
-const SESSION_TIMEOUT = parseInt(import.meta.env.VITE_SESSION_TIMEOUT || '3600', 10) * 1000;
-let sessionTimeoutId: number | null = null;
-
-// Reset session timeout
-export const resetSessionTimeout = () => {
-  if (sessionTimeoutId) {
-    window.clearTimeout(sessionTimeoutId);
-  }
-  
-  sessionTimeoutId = window.setTimeout(async () => {
-    console.log('Session timeout reached, logging out');
-    await supabase.auth.signOut();
-    window.location.href = '/login?timeout=true';
-  }, SESSION_TIMEOUT);
-};
-
-// Initialize session timeout
-export const initSessionTimeout = () => {
-  ['mousedown', 'keypress', 'scroll', 'touchstart'].forEach(event => {
-    document.addEventListener(event, resetSessionTimeout, { passive: true });
-  });
-  
-  resetSessionTimeout();
-};
-
-// Clear session timeout
-export const clearSessionTimeout = () => {
-  if (sessionTimeoutId) {
-    window.clearTimeout(sessionTimeoutId);
-    sessionTimeoutId = null;
-  }
-  
-  ['mousedown', 'keypress', 'scroll', 'touchstart'].forEach(event => {
-    document.removeEventListener(event, resetSessionTimeout);
-  });
-};
+// No-op functions for session management
+export const resetSessionTimeout = () => {};
+export const initSessionTimeout = () => {};
+export const clearSessionTimeout = () => {};

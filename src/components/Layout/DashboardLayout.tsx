@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation, Outlet } from 'react-router-dom';
-import { useAuthStore } from '../../lib/store';
+import React, { useState } from 'react';
+import { Link, useLocation, Outlet } from 'react-router-dom';
 import { useOfflineStatus } from '../../lib/hooks/useOfflineStatus';
-import { Users, Calendar, FileText, Activity, Pill, DollarSign, LogOut, Menu, X, Bell, Settings, LayoutDashboard, BedDouble, FlaskRound as Flask, Microscope, Heart, Baby, UserRound, Syringe, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Stethoscope, ClipboardList, Cog, Building2, Users2, Wrench, CreditCard, LifeBuoy, ChevronDown, ChevronRight, Box, Home, Search, LayoutList, WifiOff, Plus } from 'lucide-react';
+import { Users, Calendar, FileText, Activity, Pill, DollarSign, Menu, X, Bell, Settings, LayoutDashboard, BedDouble, FlaskRound as Flask, Microscope, Heart, Baby, UserRound, Syringe, Bone, Bluetooth as Tooth, Eye, ActivitySquare, Stethoscope, ClipboardList, Cog, Building2, Users2, Wrench, CreditCard, LifeBuoy, ChevronDown, ChevronRight, Box, Home, Search, LayoutList, WifiOff, Plus } from 'lucide-react';
 import { syncAllData } from '../../lib/storage';
 
 const DashboardLayout: React.FC = () => {
@@ -10,15 +9,8 @@ const DashboardLayout: React.FC = () => {
   const [settingsOpen, setSettingsOpen] = useState(true);
   const [departmentsOpen, setDepartmentsOpen] = useState(true);
   const [servicesOpen, setServicesOpen] = useState(true);
-  const { user, logout, isAdmin } = useAuthStore();
   const { isOffline } = useOfflineStatus();
-  const navigate = useNavigate();
   const location = useLocation();
-  
-  const handleLogout = async () => {
-    await logout();
-    navigate('/login');
-  };
   
   const toggleSidebar = () => {
     setSidebarOpen(!sidebarOpen);
@@ -70,295 +62,275 @@ const DashboardLayout: React.FC = () => {
         </div>
 
         <nav className="mt-4 px-4 space-y-1">
-          {/* Admin Section */}
-          {isAdmin && (
-            <>
+          <Link
+            to="/dashboard"
+            className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+              location.pathname === '/dashboard' ? 'bg-primary-50 text-primary-700' : ''
+            }`}
+          >
+            <Home className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+            Dashboard
+          </Link>
+
+          <Link
+            to="/reception"
+            className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+              location.pathname === '/reception' ? 'bg-primary-50 text-primary-700' : ''
+            }`}
+          >
+            <LayoutList className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+            Reception
+          </Link>
+
+          <Link
+            to="/patients"
+            className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+              location.pathname === '/patients' ? 'bg-primary-50 text-primary-700' : ''
+            }`}
+          >
+            <Users className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+            Patients
+          </Link>
+
+          <Link
+            to="/patients/search"
+            className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+              location.pathname === '/patients/search' ? 'bg-primary-50 text-primary-700' : ''
+            }`}
+          >
+            <Search className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+            Patient Search
+          </Link>
+
+          <Link
+            to="/triage"
+            className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+              location.pathname === '/triage' ? 'bg-primary-50 text-primary-700' : ''
+            }`}
+          >
+            <ClipboardList className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+            Triage
+          </Link>
+
+          <Link
+            to="/appointments"
+            className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+              location.pathname === '/appointments' ? 'bg-primary-50 text-primary-700' : ''
+            }`}
+          >
+            <Calendar className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+            Appointments
+          </Link>
+
+          <Link
+            to="/inpatients"
+            className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+              location.pathname === '/inpatients' ? 'bg-primary-50 text-primary-700' : ''
+            }`}
+          >
+            <BedDouble className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+            Inpatients
+          </Link>
+
+          {/* Services Section */}
+          <div className="pt-4 pb-2">
+            <button
+              onClick={() => setServicesOpen(!servicesOpen)}
+              className="w-full flex items-center justify-between px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-500"
+            >
+              Services
+              {servicesOpen ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+
+          {servicesOpen && (
+            <div className="space-y-1">
               <Link
-                to="/admin"
-                className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                  location.pathname === '/admin' ? 'bg-primary-50 text-primary-700' : ''
-                }`}
+                to="/laboratory"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
               >
-                <LayoutDashboard className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                Admin Dashboard
+                <Flask className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Laboratory
               </Link>
-            </>
+
+              <Link
+                to="/radiology"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+              >
+                <Microscope className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Radiology
+              </Link>
+
+              <Link
+                to="/pharmacy"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+              >
+                <Pill className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Pharmacy
+              </Link>
+
+              <Link
+                to="/billing"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+              >
+                <DollarSign className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Billing
+              </Link>
+            </div>
           )}
 
-          {/* Main Navigation - Only show for non-admin users */}
-          {!isAdmin && (
-            <>
-              <Link
-                to="/dashboard"
-                className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                  location.pathname === '/dashboard' ? 'bg-primary-50 text-primary-700' : ''
-                }`}
-              >
-                <Home className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                Dashboard
-              </Link>
-
-              <Link
-                to="/reception"
-                className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                  location.pathname === '/reception' ? 'bg-primary-50 text-primary-700' : ''
-                }`}
-              >
-                <LayoutList className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                Reception
-              </Link>
-
-              <Link
-                to="/patients"
-                className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                  location.pathname === '/patients' ? 'bg-primary-50 text-primary-700' : ''
-                }`}
-              >
-                <Users className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                Patients
-              </Link>
-
-              <Link
-                to="/patients/search"
-                className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                  location.pathname === '/patients/search' ? 'bg-primary-50 text-primary-700' : ''
-                }`}
-              >
-                <Search className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                Patient Search
-              </Link>
-
-              <Link
-                to="/triage"
-                className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                  location.pathname === '/triage' ? 'bg-primary-50 text-primary-700' : ''
-                }`}
-              >
-                <ClipboardList className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                Triage
-              </Link>
-
-              <Link
-                to="/appointments"
-                className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                  location.pathname === '/appointments' ? 'bg-primary-50 text-primary-700' : ''
-                }`}
-              >
-                <Calendar className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                Appointments
-              </Link>
-
-              <Link
-                to="/inpatients"
-                className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                  location.pathname === '/inpatients' ? 'bg-primary-50 text-primary-700' : ''
-                }`}
-              >
-                <BedDouble className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                Inpatients
-              </Link>
-
-              {/* Services Section */}
-              <div className="pt-4 pb-2">
-                <button
-                  onClick={() => setServicesOpen(!servicesOpen)}
-                  className="w-full flex items-center justify-between px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-500"
-                >
-                  Services
-                  {servicesOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
-
-              {servicesOpen && (
-                <div className="space-y-1">
-                  <Link
-                    to="/laboratory"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <Flask className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Laboratory
-                  </Link>
-
-                  <Link
-                    to="/radiology"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <Microscope className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Radiology
-                  </Link>
-
-                  <Link
-                    to="/pharmacy"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <Pill className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Pharmacy
-                  </Link>
-
-                  <Link
-                    to="/billing"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <DollarSign className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Billing
-                  </Link>
-                </div>
+          {/* Departments Section */}
+          <div className="pt-4 pb-2">
+            <button
+              onClick={() => setDepartmentsOpen(!departmentsOpen)}
+              className="w-full flex items-center justify-between px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-500"
+            >
+              Departments
+              {departmentsOpen ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
               )}
+            </button>
+          </div>
 
-              {/* Departments Section */}
-              <div className="pt-4 pb-2">
-                <button
-                  onClick={() => setDepartmentsOpen(!departmentsOpen)}
-                  className="w-full flex items-center justify-between px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-500"
-                >
-                  Departments
-                  {departmentsOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
+          {departmentsOpen && (
+            <div className="space-y-1">
+              <Link
+                to="/departments/general"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+              >
+                <Stethoscope className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                General Medicine
+              </Link>
 
-              {departmentsOpen && (
-                <div className="space-y-1">
-                  <Link
-                    to="/departments/general"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <Stethoscope className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    General Medicine
-                  </Link>
+              <Link
+                to="/departments/cardiology"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+              >
+                <Heart className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Cardiology
+              </Link>
 
-                  <Link
-                    to="/departments/cardiology"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <Heart className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Cardiology
-                  </Link>
+              <Link
+                to="/departments/pediatrics"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+              >
+                <Baby className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Pediatrics
+              </Link>
 
-                  <Link
-                    to="/departments/pediatrics"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <Baby className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Pediatrics
-                  </Link>
+              <Link
+                to="/departments/gynecology"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+              >
+                <UserRound className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Gynecology & Obstetrics
+              </Link>
 
-                  <Link
-                    to="/departments/gynecology"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <UserRound className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Gynecology & Obstetrics
-                  </Link>
+              <Link
+                to="/departments/surgical"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+              >
+                <Syringe className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Surgical
+              </Link>
 
-                  <Link
-                    to="/departments/surgical"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <Syringe className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Surgical
-                  </Link>
+              <Link
+                to="/departments/orthopedic"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+              >
+                <Bone className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Orthopedic
+              </Link>
 
-                  <Link
-                    to="/departments/orthopedic"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <Bone className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Orthopedic
-                  </Link>
+              <Link
+                to="/departments/dental"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+              >
+                <Tooth className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Dental
+              </Link>
 
-                  <Link
-                    to="/departments/dental"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <Tooth className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Dental
-                  </Link>
+              <Link
+                to="/departments/eye"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+              >
+                <Eye className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Eye Clinic
+              </Link>
 
-                  <Link
-                    to="/departments/eye"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <Eye className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Eye Clinic
-                  </Link>
+              <Link
+                to="/departments/physiotherapy"
+                className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
+              >
+                <ActivitySquare className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Physiotherapy
+              </Link>
+            </div>
+          )}
 
-                  <Link
-                    to="/departments/physiotherapy"
-                    className="flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group"
-                  >
-                    <ActivitySquare className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Physiotherapy
-                  </Link>
-                </div>
+          {/* Settings Section */}
+          <div className="pt-4 pb-2">
+            <button
+              onClick={() => setSettingsOpen(!settingsOpen)}
+              className="w-full flex items-center justify-between px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-500"
+            >
+              Settings
+              {settingsOpen ? (
+                <ChevronDown className="h-4 w-4" />
+              ) : (
+                <ChevronRight className="h-4 w-4" />
               )}
+            </button>
+          </div>
 
-              {/* Settings Section */}
-              <div className="pt-4 pb-2">
-                <button
-                  onClick={() => setSettingsOpen(!settingsOpen)}
-                  className="w-full flex items-center justify-between px-4 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-500"
-                >
-                  Settings
-                  {settingsOpen ? (
-                    <ChevronDown className="h-4 w-4" />
-                  ) : (
-                    <ChevronRight className="h-4 w-4" />
-                  )}
-                </button>
-              </div>
+          {settingsOpen && (
+            <div className="space-y-1">
+              <Link
+                to="/settings/departments"
+                className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                  location.pathname === '/settings/departments' ? 'bg-primary-50 text-primary-700' : ''
+                }`}
+              >
+                <Building2 className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Departments
+              </Link>
 
-              {settingsOpen && (
-                <div className="space-y-1">
-                  <Link
-                    to="/settings/departments"
-                    className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                      location.pathname === '/settings/departments' ? 'bg-primary-50 text-primary-700' : ''
-                    }`}
-                  >
-                    <Building2 className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Departments
-                  </Link>
+              <Link
+                to="/settings/users"
+                className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                  location.pathname === '/settings/users' ? 'bg-primary-50 text-primary-700' : ''
+                }`}
+              >
+                <Users2 className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                User Management
+              </Link>
 
-                  <Link
-                    to="/settings/users"
-                    className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                      location.pathname === '/settings/users' ? 'bg-primary-50 text-primary-700' : ''
-                    }`}
-                  >
-                    <Users2 className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    User Management
-                  </Link>
+              <Link
+                to="/settings/clinical"
+                className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                  location.pathname === '/settings/clinical' ? 'bg-primary-50 text-primary-700' : ''
+                }`}
+              >
+                <Stethoscope className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Clinical Settings
+              </Link>
 
-                  <Link
-                    to="/settings/clinical"
-                    className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                      location.pathname === '/settings/clinical' ? 'bg-primary-50 text-primary-700' : ''
-                    }`}
-                  >
-                    <Stethoscope className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Clinical Settings
-                  </Link>
-
-                  <Link
-                    to="/settings/billing"
-                    className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-                      location.pathname === '/settings/billing' ? 'bg-primary-50 text-primary-700' : ''
-                    }`}
-                  >
-                    <CreditCard className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-                    Billing Settings
-                  </Link>
-                </div>
-              )}
-            </>
+              <Link
+                to="/settings/billing"
+                className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
+                  location.pathname === '/settings/billing' ? 'bg-primary-50 text-primary-700' : ''
+                }`}
+              >
+                <CreditCard className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+                Billing Settings
+              </Link>
+            </div>
           )}
         </nav>
 
@@ -372,14 +344,6 @@ const DashboardLayout: React.FC = () => {
               Sync Data
             </button>
           )}
-          
-          <button
-            onClick={handleLogout}
-            className="flex items-center w-full px-4 py-2 text-gray-700 hover:bg-red-50 hover:text-red-700 rounded-md group"
-          >
-            <LogOut className="mr-3 h-5 w-5 text-gray-500 group-hover:text-red-500" />
-            Logout
-          </button>
         </div>
       </aside>
 
@@ -389,7 +353,7 @@ const DashboardLayout: React.FC = () => {
         <header className="bg-white border-b border-gray-200 shadow-sm">
           <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
             <h1 className="text-xl font-semibold text-gray-900">
-              {isAdmin ? 'Admin Dashboard' : 'HMS Dashboard'}
+              HMS Dashboard
             </h1>
             
             <div className="flex items-center space-x-4">
@@ -407,10 +371,10 @@ const DashboardLayout: React.FC = () => {
               
               <div className="flex items-center space-x-2">
                 <div className="h-8 w-8 rounded-full bg-primary-500 flex items-center justify-center text-white font-medium">
-                  {user?.email?.charAt(0).toUpperCase() || 'U'}
+                  U
                 </div>
                 <span className="text-sm font-medium text-gray-700 hidden md:block">
-                  {user?.email}
+                  User
                 </span>
               </div>
             </div>
