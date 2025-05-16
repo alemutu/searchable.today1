@@ -381,6 +381,7 @@ const TriageForm: React.FC = () => {
           type: 'error'
         });
         setActiveTab('assessment');
+        setIsSaving(false);
         return;
       }
       
@@ -390,6 +391,7 @@ const TriageForm: React.FC = () => {
           type: 'error'
         });
         setActiveTab('assessment');
+        setIsSaving(false);
         return;
       }
       
