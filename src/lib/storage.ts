@@ -159,7 +159,23 @@ export const fetchData = async <T>(
         if (query) {
           let matches = true;
           Object.entries(query).forEach(([queryKey, queryValue]) => {
-            if (item[queryKey] !== queryValue) {
+            if (queryKey === 'search' && typeof queryValue === 'string') {
+              // Special case for search - check multiple fields
+              const searchValue = queryValue.toLowerCase();
+              const searchableFields = ['first_name', 'last_name', 'email', 'contact_number'];
+              let foundMatch = false;
+              
+              for (const field of searchableFields) {
+                if (item[field] && item[field].toLowerCase().includes(searchValue)) {
+                  foundMatch = true;
+                  break;
+                }
+              }
+              
+              if (!foundMatch) {
+                matches = false;
+              }
+            } else if (item[queryKey] !== queryValue) {
               matches = false;
             }
           });
