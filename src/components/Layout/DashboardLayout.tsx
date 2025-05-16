@@ -73,16 +73,6 @@ const DashboardLayout: React.FC = () => {
           </Link>
 
           <Link
-            to="/reception"
-            className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-              location.pathname === '/reception' ? 'bg-primary-50 text-primary-700' : ''
-            }`}
-          >
-            <LayoutList className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-            Reception
-          </Link>
-
-          <Link
             to="/patients"
             className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
               location.pathname === '/patients' ? 'bg-primary-50 text-primary-700' : ''
@@ -93,43 +83,13 @@ const DashboardLayout: React.FC = () => {
           </Link>
 
           <Link
-            to="/patients/search"
+            to="/patient-registration"
             className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-              location.pathname === '/patients/search' ? 'bg-primary-50 text-primary-700' : ''
+              location.pathname === '/patient-registration' ? 'bg-primary-50 text-primary-700' : ''
             }`}
           >
-            <Search className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-            Patient Search
-          </Link>
-
-          <Link
-            to="/triage"
-            className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-              location.pathname === '/triage' ? 'bg-primary-50 text-primary-700' : ''
-            }`}
-          >
-            <ClipboardList className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-            Triage
-          </Link>
-
-          <Link
-            to="/appointments"
-            className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-              location.pathname === '/appointments' ? 'bg-primary-50 text-primary-700' : ''
-            }`}
-          >
-            <Calendar className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-            Appointments
-          </Link>
-
-          <Link
-            to="/inpatients"
-            className={`flex items-center px-4 py-2 text-gray-700 hover:bg-primary-50 hover:text-primary-700 rounded-md group ${
-              location.pathname === '/inpatients' ? 'bg-primary-50 text-primary-700' : ''
-            }`}
-          >
-            <BedDouble className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
-            Inpatients
+            <Plus className="mr-3 h-5 w-5 text-gray-500 group-hover:text-primary-500" />
+            Register Patient
           </Link>
 
           {/* Services Section */}
