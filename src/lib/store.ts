@@ -1,6 +1,28 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 
+// Auth store types
+interface AuthState {
+  isAuthenticated: boolean;
+  user: User | null;
+  setUser: (user: User | null) => void;
+  logout: () => void;
+}
+
+interface User {
+  id: string;
+  email: string;
+}
+
+// Auth store
+export const useAuthStore = create<AuthState>((set) => ({
+  isAuthenticated: false,
+  user: null,
+  setUser: (user) => set({ user, isAuthenticated: !!user }),
+  logout: () => set({ user: null, isAuthenticated: false })
+}));
+
+// Notification store types
 interface NotificationState {
   notifications: Notification[];
   notifiedEmergencies: Set<string>; // Track emergency IDs that have been notified
