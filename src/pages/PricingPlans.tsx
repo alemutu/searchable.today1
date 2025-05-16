@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { Plus, Edit, Trash2, Check, X, DollarSign } from 'lucide-react';
 
+interface Feature {
+  feature: string;
+  included: boolean;
+}
+
 interface PricingPlan {
   id: string;
   name: string;
@@ -9,7 +14,7 @@ interface PricingPlan {
   description: string;
   price: number;
   billing_cycle: string;
-  features: any[];
+  features: Feature[];
   is_active: boolean;
   max_users: number;
   max_storage_gb: number;
@@ -153,7 +158,7 @@ const PricingPlans: React.FC = () => {
                 {plan.features.map((feature, index) => (
                   <li key={index} className="flex items-start">
                     <Check className="h-5 w-5 text-success-500 mr-2" />
-                    <span className="text-sm text-gray-500">{feature}</span>
+                    <span className="text-sm text-gray-500">{feature.feature}</span>
                   </li>
                 ))}
               </ul>
