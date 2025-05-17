@@ -20,11 +20,7 @@ import {
   Activity,
   Siren,
   Search,
-  X,
-  CreditCard,
-  Building2,
-  DollarSign,
-  Smartphone
+  X
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -97,7 +93,6 @@ const PatientRegistrationForm: React.FC = () => {
   const [searchResults, setSearchResults] = useState<ExistingPatient[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<ExistingPatient | null>(null);
-  const [showInsuranceInfo, setShowInsuranceInfo] = useState(false);
   
   // Use the hybrid storage hook to access patient data
   const { 
@@ -124,15 +119,6 @@ const PatientRegistrationForm: React.FC = () => {
       fetchPatients();
     }
   }, [patientType, fetchPatients]);
-  
-  // Show insurance info when payment method is insurance
-  useEffect(() => {
-    if (paymentMethod === 'insurance') {
-      setShowInsuranceInfo(true);
-    } else {
-      setShowInsuranceInfo(false);
-    }
-  }, [paymentMethod]);
   
   const nextStep = () => {
     setCurrentStep(currentStep + 1);
@@ -542,110 +528,6 @@ const PatientRegistrationForm: React.FC = () => {
                   </div>
                 </div>
               )}
-              
-              <div className="mt-4">
-                <h3 className="text-sm font-medium text-gray-900 mb-3">Payment Method</h3>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                  <div 
-                    className={`border rounded-lg p-3 cursor-pointer transition-all ${
-                      paymentMethod === 'cash' 
-                        ? 'border-success-500 bg-success-50 ring-1 ring-success-200' 
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => setValue('paymentMethod', 'cash')}
-                  >
-                    <div className="flex flex-col items-center text-center">
-                      <div className="bg-success-100 p-2 rounded-full mb-2">
-                        <DollarSign className="h-5 w-5 text-success-600" />
-                      </div>
-                      <h3 className="text-sm font-medium text-gray-900">Cash</h3>
-                    </div>
-                  </div>
-                  
-                  <div 
-                    className={`border rounded-lg p-3 cursor-pointer transition-all ${
-                      paymentMethod === 'credit_card' 
-                        ? 'border-primary-500 bg-primary-50 ring-1 ring-primary-200' 
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => setValue('paymentMethod', 'credit_card')}
-                  >
-                    <div className="flex flex-col items-center text-center">
-                      <div className="bg-primary-100 p-2 rounded-full mb-2">
-                        <CreditCard className="h-5 w-5 text-primary-600" />
-                      </div>
-                      <h3 className="text-sm font-medium text-gray-900">Credit Card</h3>
-                    </div>
-                  </div>
-                  
-                  <div 
-                    className={`border rounded-lg p-3 cursor-pointer transition-all ${
-                      paymentMethod === 'insurance' 
-                        ? 'border-secondary-500 bg-secondary-50 ring-1 ring-secondary-200' 
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => setValue('paymentMethod', 'insurance')}
-                  >
-                    <div className="flex flex-col items-center text-center">
-                      <div className="bg-secondary-100 p-2 rounded-full mb-2">
-                        <Building2 className="h-5 w-5 text-secondary-600" />
-                      </div>
-                      <h3 className="text-sm font-medium text-gray-900">Insurance</h3>
-                    </div>
-                  </div>
-                  
-                  <div 
-                    className={`border rounded-lg p-3 cursor-pointer transition-all ${
-                      paymentMethod === 'mobile_payment' 
-                        ? 'border-accent-500 bg-accent-50 ring-1 ring-accent-200' 
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                    onClick={() => setValue('paymentMethod', 'mobile_payment')}
-                  >
-                    <div className="flex flex-col items-center text-center">
-                      <div className="bg-accent-100 p-2 rounded-full mb-2">
-                        <Smartphone className="h-5 w-5 text-accent-600" />
-                      </div>
-                      <h3 className="text-sm font-medium text-gray-900">Mobile Payment</h3>
-                    </div>
-                  </div>
-                </div>
-                
-                {showInsuranceInfo && (
-                  <div className="mt-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <h3 className="text-sm font-medium text-gray-900 mb-2">Insurance Information</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="form-label text-xs">Insurance Provider</label>
-                        <input
-                          type="text"
-                          {...register('insuranceInfo.provider')}
-                          className="form-input py-2 text-sm"
-                          placeholder="Enter insurance provider"
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label text-xs">Policy Number</label>
-                        <input
-                          type="text"
-                          {...register('insuranceInfo.policyNumber')}
-                          className="form-input py-2 text-sm"
-                          placeholder="Enter policy number"
-                        />
-                      </div>
-                      <div>
-                        <label className="form-label text-xs">Group Number</label>
-                        <input
-                          type="text"
-                          {...register('insuranceInfo.groupNumber')}
-                          className="form-input py-2 text-sm"
-                          placeholder="Enter group number (if applicable)"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
           )}
           
@@ -1067,35 +949,6 @@ const PatientRegistrationForm: React.FC = () => {
                     </p>
                     {watch('priorityNotes') && (
                       <p><span className="font-medium">Notes:</span> {watch('priorityNotes')}</p>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Payment Information</h3>
-                  <div className="space-y-1 text-sm">
-                    <p>
-                      <span className="font-medium">Payment Method:</span> 
-                      <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
-                        paymentMethod === 'cash' ? 'bg-success-100 text-success-800' :
-                        paymentMethod === 'credit_card' ? 'bg-primary-100 text-primary-800' :
-                        paymentMethod === 'insurance' ? 'bg-secondary-100 text-secondary-800' :
-                        'bg-accent-100 text-accent-800'
-                      }`}>
-                        {paymentMethod === 'credit_card' ? 'Credit Card' :
-                         paymentMethod === 'mobile_payment' ? 'Mobile Payment' :
-                         paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}
-                      </span>
-                    </p>
-                    
-                    {paymentMethod === 'insurance' && watch('insuranceInfo.provider') && (
-                      <>
-                        <p><span className="font-medium">Insurance Provider:</span> {watch('insuranceInfo.provider')}</p>
-                        <p><span className="font-medium">Policy Number:</span> {watch('insuranceInfo.policyNumber')}</p>
-                        {watch('insuranceInfo.groupNumber') && (
-                          <p><span className="font-medium">Group Number:</span> {watch('insuranceInfo.groupNumber')}</p>
-                        )}
-                      </>
                     )}
                   </div>
                 </div>
