@@ -192,6 +192,38 @@ const Triage: React.FC = () => {
     }
   };
 
+  // Get patient status label
+  const getPatientStatusLabel = (flowStep: string) => {
+    switch (flowStep) {
+      case 'registration':
+        return 'Waiting for Triage';
+      case 'triage':
+        return 'In Triage';
+      case 'waiting_consultation':
+        return 'Waiting for Doctor';
+      case 'consultation':
+        return 'With Doctor';
+      case 'emergency':
+        return 'Emergency';
+      default:
+        if (flowStep.startsWith('waiting_')) {
+          const dept = flowStep.replace('waiting_', '').replace(/_/g, ' ');
+          return `Waiting for ${dept.charAt(0).toUpperCase() + dept.slice(1)}`;
+        }
+        return flowStep.replace(/_/g, ' ').charAt(0).toUpperCase() + flowStep.replace(/_/g, ' ').slice(1);
+    }
+  };
+
+  // Get status color for patient status badge
+  const getStatusColor = (flowStep: string) => {
+    if (flowStep === 'registration') return 'bg-blue-100 text-blue-800';
+    if (flowStep === 'triage') return 'bg-primary-100 text-primary-800';
+    if (flowStep === 'emergency') return 'bg-error-100 text-error-800';
+    if (flowStep.startsWith('waiting_')) return 'bg-warning-100 text-warning-800';
+    if (flowStep === 'consultation') return 'bg-secondary-100 text-secondary-800';
+    return 'bg-gray-100 text-gray-800';
+  };
+
   // Filter patients based on their current flow step and the active tab
   const filteredPatients = Array.isArray(patients) ? patients.filter(patient => {
     const matchesSearch = patient.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -499,9 +531,11 @@ const Triage: React.FC = () => {
                             <p className="text-xs font-medium text-gray-900 line-clamp-1">
                               {patient.first_name} {patient.last_name}
                             </p>
-                            <p className="text-xs text-gray-500 line-clamp-1">
-                              {patient.chief_complaint || `${calculateAge(patient.date_of_birth)} years`}
-                            </p>
+                            <div className="flex items-center">
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full ${getStatusColor(patient.current_flow_step)}`}>
+                                {getPatientStatusLabel(patient.current_flow_step)}
+                              </span>
+                            </div>
                           </div>
                         </div>
                         <Link

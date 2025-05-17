@@ -154,6 +154,40 @@ const Cardiology: React.FC = () => {
     return `Expected in ${diffHours}h`;
   };
 
+  // Get patient status label
+  const getPatientStatusLabel = (flowStep: string) => {
+    switch (flowStep) {
+      case 'registration':
+        return 'Registration';
+      case 'triage':
+        return 'In Triage';
+      case 'waiting_consultation':
+        return 'Waiting for Doctor';
+      case 'waiting_cardiology':
+        return 'Waiting for Cardiology';
+      case 'consultation':
+        return 'In Consultation';
+      case 'emergency':
+        return 'Emergency';
+      default:
+        if (flowStep.startsWith('waiting_')) {
+          const dept = flowStep.replace('waiting_', '').replace(/_/g, ' ');
+          return `Waiting for ${dept.charAt(0).toUpperCase() + dept.slice(1)}`;
+        }
+        return flowStep.replace(/_/g, ' ').charAt(0).toUpperCase() + flowStep.replace(/_/g, ' ').slice(1);
+    }
+  };
+
+  // Get status color for patient status badge
+  const getStatusColor = (flowStep: string) => {
+    if (flowStep === 'registration') return 'bg-blue-100 text-blue-800';
+    if (flowStep === 'triage') return 'bg-primary-100 text-primary-800';
+    if (flowStep === 'emergency') return 'bg-error-100 text-error-800';
+    if (flowStep.startsWith('waiting_')) return 'bg-warning-100 text-warning-800';
+    if (flowStep === 'consultation') return 'bg-secondary-100 text-secondary-800';
+    return 'bg-gray-100 text-gray-800';
+  };
+
   const handleAssignToMe = async (patientId: string) => {
     if (!Array.isArray(patients)) return;
     
@@ -256,14 +290,19 @@ const Cardiology: React.FC = () => {
     const matchesAssigned = !assignedToMe || patient.assigned_to === 'current_user'; // Replace with actual user ID
     
     if (activeTab === 'waiting') {
-      return patient.current_flow_step === 'waiting_consultation' && matchesSearch && matchesPriority && matchesAssigned;
+      return (patient.current_flow_step === 'waiting_consultation' || 
+              patient.current_flow_step === 'waiting_cardiology') && 
+             matchesSearch && matchesPriority && matchesAssigned;
     } else {
       return patient.current_flow_step === 'consultation' && matchesSearch && matchesPriority && matchesAssigned;
     }
   }) : [];
 
   // Count patients in each category
-  const waitingCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'waiting_consultation').length : 0;
+  const waitingCount = Array.isArray(patients) ? patients.filter(p => 
+    p.current_flow_step === 'waiting_consultation' || 
+    p.current_flow_step === 'waiting_cardiology'
+  ).length : 0;
   const inProgressCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'consultation').length : 0;
   const completedCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'post_consultation').length : 0;
   const urgentCount = Array.isArray(patients) ? patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length : 0;
@@ -562,7 +601,7 @@ const Cardiology: React.FC = () => {
                       <div key={patient.id} className={`p-2 rounded-lg border ${patient.priority_level === 'critical' ? 'border-error-200 bg-error-50' : patient.priority_level === 'urgent' ? 'border-warning-200 bg-warning-50' : 'border-gray-200'} flex items-center justify-between`}>
                         <div className="flex items-center">
                           <div className="mr-2">
-                            {patient.current_flow_step === 'waiting_consultation' ? (
+                            {patient.current_flow_step === 'waiting_consultation' || patient.current_flow_step === 'waiting_cardiology' ? (
                               <Clock className="h-3.5 w-3.5 text-warning-500" />
                             ) : (
                               <Heart className="h-3.5 w-3.5 text-error-500" />
@@ -572,16 +611,18 @@ const Cardiology: React.FC = () => {
                             <p className="text-xs font-medium text-gray-900 line-clamp-1">
                               {patient.first_name} {patient.last_name}
                             </p>
-                            <p className="text-xs text-gray-500 line-clamp-1">
-                              {patient.chief_complaint || `${calculateAge(patient.date_of_birth)} years`}
-                            </p>
+                            <div className="flex items-center">
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full ${getStatusColor(patient.current_flow_step)}`}>
+                                {getPatientStatusLabel(patient.current_flow_step)}
+                              </span>
+                            </div>
                           </div>
                         </div>
                         <Link
                           to={`/patients/${patient.id}/consultation`}
                           className="text-xs text-primary-600 hover:text-primary-800 font-medium"
                         >
-                          {patient.current_flow_step === 'waiting_consultation' ? 'Start' : 'Continue'}
+                          {patient.current_flow_step === 'waiting_consultation' || patient.current_flow_step === 'waiting_cardiology' ? 'Start' : 'Continue'}
                         </Link>
                       </div>
                     ))}
@@ -667,7 +708,7 @@ const Cardiology: React.FC = () => {
               </div>
               <div className="flex items-center justify-between p-1.5 rounded-md hover:bg-gray-50">
                 <div className="flex items-center">
-                  <Heart className="h-4 w-4 text-error-500 mr-1.5" />
+                  <Heart className="h-4 w-4 text-primary-500 mr-1.5" />
                   <span className="text-sm text-gray-700">In Consultation</span>
                 </div>
                 <span className="font-medium text-sm">{inProgressCount}</span>
