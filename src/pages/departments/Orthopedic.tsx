@@ -24,7 +24,7 @@ import {
   Pill,
   Building2
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface Patient {
   id: string;
@@ -50,6 +50,7 @@ const Orthopedic: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'waiting' | 'in_progress'>('waiting');
   const [assignedToMe, setAssignedToMe] = useState(false);
   const { addNotification } = useNotificationStore();
+  const navigate = useNavigate();
   
   const { 
     data: patients, 
@@ -199,6 +200,9 @@ const Orthopedic: React.FC = () => {
         type: 'success',
         duration: 3000
       });
+      
+      // Redirect to department dashboard
+      navigate('/departments/orthopedic');
     } catch (error: any) {
       console.error('Error assigning patient:', error);
       addNotification({
@@ -230,6 +234,9 @@ const Orthopedic: React.FC = () => {
         type: 'info',
         duration: 3000
       });
+      
+      // Redirect to department dashboard
+      navigate('/departments/orthopedic');
     } catch (error: any) {
       console.error('Error releasing patient assignment:', error);
       addNotification({
@@ -262,6 +269,9 @@ const Orthopedic: React.FC = () => {
         type: 'success',
         duration: 3000
       });
+      
+      // Navigate to consultation form
+      navigate(`/patients/${patientId}/consultation`);
     } catch (error: any) {
       console.error('Error starting consultation:', error);
       addNotification({

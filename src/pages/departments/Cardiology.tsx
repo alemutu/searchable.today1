@@ -1,8 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { useHybridStorage } from '../../lib/hooks/useHybridStorage';
 import { useNotificationStore } from '../../lib/store';
-import { Search, Filter, Stethoscope, CheckCircle, Clock, ArrowLeft, FileText, User, Calendar, ChevronDown, Activity, AlertTriangle, Heart, Layers, XCircle, Loader2, FlaskRound as Flask, Microscope, DollarSign, Pill, Building2 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { 
+  Search, 
+  Filter, 
+  Stethoscope, 
+  CheckCircle, 
+  Clock, 
+  ArrowLeft, 
+  FileText, 
+  User, 
+  Calendar, 
+  ChevronDown,
+  Activity,
+  AlertTriangle,
+  Heart,
+  Layers,
+  XCircle,
+  Loader2,
+  FlaskRound as Flask,
+  Microscope,
+  DollarSign,
+  Pill,
+  Building2
+} from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
 
 interface Patient {
   id: string;
@@ -27,6 +49,7 @@ const Cardiology: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'waiting' | 'in_progress'>('waiting');
   const [assignedToMe, setAssignedToMe] = useState(false);
   const { addNotification } = useNotificationStore();
+  const navigate = useNavigate();
   
   const { 
     data: patients, 
@@ -67,8 +90,6 @@ const Cardiology: React.FC = () => {
   };
 
   const getTimeAgo = (dateString: string) => {
-    if (!dateString) return 'Unknown';
-    
     const date = new Date(dateString);
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
@@ -176,6 +197,9 @@ const Cardiology: React.FC = () => {
         type: 'success',
         duration: 3000
       });
+      
+      // Redirect to department dashboard
+      navigate('/departments/cardiology');
     } catch (error: any) {
       console.error('Error assigning patient:', error);
       addNotification({
@@ -207,6 +231,9 @@ const Cardiology: React.FC = () => {
         type: 'info',
         duration: 3000
       });
+      
+      // Redirect to department dashboard
+      navigate('/departments/cardiology');
     } catch (error: any) {
       console.error('Error releasing patient assignment:', error);
       addNotification({
@@ -239,6 +266,9 @@ const Cardiology: React.FC = () => {
         type: 'success',
         duration: 3000
       });
+      
+      // Navigate to consultation form
+      navigate(`/patients/${patientId}/consultation`);
     } catch (error: any) {
       console.error('Error starting consultation:', error);
       addNotification({
@@ -585,14 +615,6 @@ const Cardiology: React.FC = () => {
                         </Link>
                       </div>
                     ))}
-                  
-                  {patients && Array.isArray(patients) && patients.filter(p => p.assigned_to === 'current_user').length > 5 && (
-                    <div className="text-center pt-1">
-                      <button className="text-xs text-primary-600 hover:text-primary-800">
-                        View all ({patients.filter(p => p.assigned_to === 'current_user').length})
-                      </button>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
