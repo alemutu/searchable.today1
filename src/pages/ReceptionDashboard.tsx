@@ -19,6 +19,7 @@ import {
   TrendingDown
 } from 'lucide-react';
 import { useAuthStore } from '../lib/store';
+import { useHybridStorage } from '../lib/hooks/useHybridStorage';
 
 interface PatientData {
   id: string;
@@ -41,101 +42,24 @@ const ReceptionDashboard: React.FC = () => {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const { hospital } = useAuthStore();
   
+  // Use the hybrid storage hook to fetch patients
+  const { 
+    data: patientsData, 
+    loading: patientsLoading, 
+    error: patientsError,
+    fetchItems: fetchPatients
+  } = useHybridStorage<PatientData>('patients');
+  
   useEffect(() => {
     fetchPatients();
-  }, [hospital]);
+  }, [fetchPatients]);
   
-  const fetchPatients = async () => {
-    try {
-      setIsLoading(true);
-      
-      // In a real app, we would fetch from Supabase
-      // For now, we'll use mock data
-      const mockPatients = [
-        {
-          id: '00000000-0000-0000-0000-000000000001',
-          first_name: 'John',
-          last_name: 'Doe',
-          date_of_birth: '1980-05-15',
-          gender: 'Male',
-          current_flow_step: 'registration',
-          priority_level: 'normal',
-          department: 'General Medicine',
-          wait_time: '10 min',
-          arrival_time: '09:15 AM'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000002',
-          first_name: 'Jane',
-          last_name: 'Smith',
-          date_of_birth: '1992-08-22',
-          gender: 'Female',
-          current_flow_step: 'triage',
-          priority_level: 'urgent',
-          department: 'Cardiology',
-          wait_time: '5 min',
-          arrival_time: '09:30 AM'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000003',
-          first_name: 'Robert',
-          last_name: 'Johnson',
-          date_of_birth: '1975-12-10',
-          gender: 'Male',
-          current_flow_step: 'waiting_consultation',
-          priority_level: 'normal',
-          department: 'Orthopedics',
-          wait_time: '25 min',
-          arrival_time: '08:45 AM'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000004',
-          first_name: 'Emily',
-          last_name: 'Williams',
-          date_of_birth: '1988-03-30',
-          gender: 'Female',
-          current_flow_step: 'consultation',
-          priority_level: 'normal',
-          department: 'Gynecology',
-          wait_time: '0 min',
-          arrival_time: '10:00 AM'
-        },
-        {
-          id: '00000000-0000-0000-0000-000000000005',
-          first_name: 'Michael',
-          last_name: 'Brown',
-          date_of_birth: '1965-07-18',
-          gender: 'Male',
-          current_flow_step: 'emergency',
-          priority_level: 'critical',
-          department: 'Emergency',
-          wait_time: '0 min',
-          arrival_time: '10:15 AM'
-        }
-      ];
-      
-      setPatients(mockPatients);
-      
-      // Calculate stats
-      const today = new Date().toDateString();
-      const registeredToday = mockPatients.filter(p => 
-        new Date(p.arrival_time || '').toDateString() === today
-      ).length;
-      
-      const activePatients = mockPatients.filter(p => 
-        p.current_flow_step !== 'completed'
-      ).length;
-      
-      const completedToday = mockPatients.filter(p => 
-        p.current_flow_step === 'completed' && 
-        new Date(p.arrival_time || '').toDateString() === today
-      ).length;
-    } catch (error) {
-      console.error('Error fetching patients:', error);
-    } finally {
+  useEffect(() => {
+    if (Array.isArray(patientsData)) {
+      setPatients(patientsData);
       setIsLoading(false);
     }
-  };
+  }, [patientsData]);
   
   const getFlowStepLabel = (step: string | null) => {
     const labels: Record<string, string> = {
@@ -206,10 +130,14 @@ const ReceptionDashboard: React.FC = () => {
   });
   
   // Stats
-  const registeredToday = 0;
-  const avgWaitTime = 15; // minutes
+  const registeredToday = patients.filter(p => 
+    p.current_flow_step === 'registration' || 
+    p.current_flow_step === 'triage'
+  ).length;
+  
+  const avgWaitTime = 15; // minutes - this would be calculated from actual data in a real app
   const activePatients = patients.length;
-  const completedToday = 0;
+  const completedToday = patients.filter(p => p.current_flow_step === 'completed').length;
 
   return (
     <div className="space-y-6">
@@ -475,10 +403,10 @@ const ReceptionDashboard: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-                        {patient.arrival_time}
+                        {patient.arrival_time || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-                        {patient.department}
+                        {patient.department || 'Unassigned'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-medium rounded-full ${getFlowStepColor(patient.current_flow_step)}`}>
@@ -491,7 +419,7 @@ const ReceptionDashboard: React.FC = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
-                        {patient.wait_time}
+                        {patient.wait_time || '0 min'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-right text-xs font-medium">
                         <Link to={`/patients/${patient.id}`} className="text-primary-600 hover:text-primary-900 mr-3">
@@ -555,7 +483,7 @@ const ReceptionDashboard: React.FC = () => {
                     </div>
                     <div className="text-xs text-gray-500">
                       <span className="block font-medium text-gray-700">Wait Time</span>
-                      {patient.wait_time}
+                      {patient.wait_time || '0 min'}
                     </div>
                     <div className="text-xs text-gray-500">
                       <span className="block font-medium text-gray-700">Status</span>
@@ -565,7 +493,7 @@ const ReceptionDashboard: React.FC = () => {
                     </div>
                     <div className="text-xs text-gray-500">
                       <span className="block font-medium text-gray-700">Time</span>
-                      {patient.arrival_time}
+                      {patient.arrival_time || new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                     </div>
                   </div>
                   
