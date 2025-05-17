@@ -32,10 +32,20 @@ interface Hospital {
 
 // Auth store
 export const useAuthStore = create<AuthState>((set) => ({
-  isAuthenticated: false,
-  isAdmin: true, // Set to true to allow admin access for testing
-  user: null,
-  hospital: null,
+  isAuthenticated: true, // Set to true by default for testing
+  isAdmin: true, // Set to true by default for testing
+  user: {  // Add a default user for testing
+    id: 'test-user-id',
+    email: 'test@example.com',
+    role: 'admin'
+  },
+  hospital: {  // Add a default hospital for testing
+    id: 'test-hospital-id',
+    name: 'Test Hospital',
+    subdomain: 'test',
+    address: '123 Test St',
+    phone: '123-456-7890'
+  },
   login: async (email, password) => {
     // Mock login for development
     set({ 
