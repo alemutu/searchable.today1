@@ -9,7 +9,6 @@ import {
   Mail,
   MapPin,
   Calendar,
-  Heart,
   AlertTriangle,
   Save,
   ArrowLeft,
@@ -21,6 +20,7 @@ import {
   ChevronRight,
   ChevronLeft,
   Check,
+  Search,
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 
@@ -38,20 +38,29 @@ interface PatientFormData {
     relationship: string;
     phone: string;
   };
-  medicalInfo: {
-    allergies: string[];
-    chronicConditions: string[];
-    currentMedications: string[];
-    bloodType: string;
-    smoker: boolean;
-    alcoholConsumption: string;
-  };
   paymentMethod: string;
   mpesaNumber?: string;
   insuranceProvider?: string;
   insurancePolicyNumber?: string;
   insuranceCoveragePercentage?: number;
   isEmergency: boolean;
+  priorityLevel: string;
+}
+
+interface ExistingPatient {
+  id: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  gender: string;
+  contact_number: string;
+  email: string | null;
+  address: string;
+  emergency_contact: {
+    name: string;
+    relationship: string;
+    phone: string;
+  };
 }
 
 const PatientRegistrationForm: React.FC = () => {
@@ -63,6 +72,10 @@ const PatientRegistrationForm: React.FC = () => {
   const [formattedPatientId, setFormattedPatientId] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [searchResults, setSearchResults] = useState<ExistingPatient[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [patientType, setPatientType] = useState<"new" | "existing" | "emergency">("new");
 
   const {
     register,
@@ -70,6 +83,7 @@ const PatientRegistrationForm: React.FC = () => {
     watch,
     setValue,
     trigger,
+    reset,
     formState: { errors, isValid },
   } = useForm<PatientFormData>({
     defaultValues: {
@@ -86,21 +100,14 @@ const PatientRegistrationForm: React.FC = () => {
         relationship: "",
         phone: "",
       },
-      medicalInfo: {
-        allergies: [],
-        chronicConditions: [],
-        currentMedications: [],
-        bloodType: "",
-        smoker: false,
-        alcoholConsumption: "none",
-      },
       paymentMethod: "cash",
       isEmergency: false,
+      priorityLevel: "normal",
     },
     mode: "onChange",
   });
 
-  const { saveItem } = useHybridStorage<any>("patients");
+  const { saveItem, fetchItems } = useHybridStorage<any>("patients");
 
   const paymentMethod = watch("paymentMethod");
   const watchIsEmergency = watch("isEmergency");
@@ -117,7 +124,72 @@ const PatientRegistrationForm: React.FC = () => {
 
   useEffect(() => {
     setIsEmergency(watchIsEmergency);
-  }, [watchIsEmergency]);
+    if (watchIsEmergency) {
+      setValue("priorityLevel", "critical");
+      setPatientType("emergency");
+    }
+  }, [watchIsEmergency, setValue]);
+
+  const searchPatients = async () => {
+    if (!searchTerm || searchTerm.length < 2) return;
+    
+    setIsSearching(true);
+    try {
+      const allPatients = await fetchItems();
+      if (Array.isArray(allPatients)) {
+        const results = allPatients.filter((patient) => {
+          const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
+          return fullName.includes(searchTerm.toLowerCase()) || 
+                 patient.contact_number?.includes(searchTerm);
+        });
+        setSearchResults(results);
+      }
+    } catch (error) {
+      console.error("Error searching patients:", error);
+      addNotification({
+        message: "Failed to search patients",
+        type: "error",
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const selectExistingPatient = (patient: ExistingPatient) => {
+    reset({
+      firstName: patient.first_name,
+      lastName: patient.last_name,
+      dateOfBirth: patient.date_of_birth,
+      age: calculateAge(patient.date_of_birth),
+      gender: patient.gender,
+      contactNumber: patient.contact_number,
+      email: patient.email || "",
+      address: patient.address,
+      emergencyContact: patient.emergency_contact,
+      paymentMethod: "cash",
+      isEmergency: false,
+      priorityLevel: "normal",
+    });
+    
+    setPatientId(patient.id);
+    setFormattedPatientId(`PT${patient.id.substring(0, 6).toUpperCase()}`);
+    setSearchResults([]);
+    setSearchTerm("");
+    setCurrentStep(2);
+  };
+
+  const calculateAge = (dateOfBirth: string) => {
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
+  };
 
   const nextStep = async () => {
     let fieldsToValidate: string[] = [];
@@ -136,7 +208,7 @@ const PatientRegistrationForm: React.FC = () => {
         }
         break;
       case 4: // Priority/Payment
-        fieldsToValidate = ["paymentMethod"];
+        fieldsToValidate = ["paymentMethod", "priorityLevel"];
         if (paymentMethod === "insurance") {
           fieldsToValidate.push("insuranceProvider", "insurancePolicyNumber", "insuranceCoveragePercentage");
         } else if (paymentMethod === "mpesa") {
@@ -175,16 +247,9 @@ const PatientRegistrationForm: React.FC = () => {
         email: data.email || null,
         address: data.address,
         emergency_contact: data.emergencyContact,
-        medical_info: {
-          allergies: data.medicalInfo.allergies,
-          chronicConditions: data.medicalInfo.chronicConditions,
-          currentMedications: data.medicalInfo.currentMedications,
-          bloodType: data.medicalInfo.bloodType,
-          smoker: data.medicalInfo.smoker,
-          alcoholConsumption: data.medicalInfo.alcoholConsumption,
-        },
         status: "active",
         current_flow_step: data.isEmergency ? "emergency" : "registration",
+        priority_level: data.priorityLevel,
         payment_info: {
           method: data.paymentMethod,
           ...(data.paymentMethod === "insurance" && {
@@ -285,12 +350,15 @@ const PatientRegistrationForm: React.FC = () => {
         <h2 className="text-lg font-medium text-gray-900 mb-4">Patient Type</h2>
         <p className="text-sm text-gray-600 mb-6">Select the appropriate patient type</p>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div 
             className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-              !isEmergency ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
+              patientType === 'new' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
             }`}
-            onClick={() => setValue("isEmergency", false)}
+            onClick={() => {
+              setPatientType("new");
+              setValue("isEmergency", false);
+            }}
           >
             <div className="flex items-center mb-2">
               <User className="h-5 w-5 text-primary-500 mr-2" />
@@ -301,9 +369,29 @@ const PatientRegistrationForm: React.FC = () => {
           
           <div 
             className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-              isEmergency ? 'border-error-500 bg-error-50' : 'border-gray-200 hover:border-gray-300'
+              patientType === 'existing' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
             }`}
-            onClick={() => setValue("isEmergency", true)}
+            onClick={() => {
+              setPatientType("existing");
+              setValue("isEmergency", false);
+            }}
+          >
+            <div className="flex items-center mb-2">
+              <Search className="h-5 w-5 text-primary-500 mr-2" />
+              <h3 className="text-base font-medium text-gray-900">Existing Patient</h3>
+            </div>
+            <p className="text-sm text-gray-500">Find patient records</p>
+          </div>
+          
+          <div 
+            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+              patientType === 'emergency' ? 'border-error-500 bg-error-50' : 'border-gray-200 hover:border-gray-300'
+            }`}
+            onClick={() => {
+              setPatientType("emergency");
+              setValue("isEmergency", true);
+              setValue("priorityLevel", "critical");
+            }}
           >
             <div className="flex items-center mb-2">
               <AlertTriangle className="h-5 w-5 text-error-500 mr-2" />
@@ -313,7 +401,96 @@ const PatientRegistrationForm: React.FC = () => {
           </div>
         </div>
         
-        {isEmergency && (
+        {patientType === "existing" && (
+          <div className="mt-6 space-y-4">
+            <div className="flex space-x-2">
+              <div className="relative flex-grow">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="form-input pl-10 w-full"
+                  placeholder="Search by name or phone number"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={searchPatients}
+                disabled={isSearching || searchTerm.length < 2}
+                className="btn btn-primary"
+              >
+                {isSearching ? (
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                ) : (
+                  "Search"
+                )}
+              </button>
+            </div>
+            
+            {searchResults.length > 0 ? (
+              <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Name
+                        </th>
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Gender
+                        </th>
+                        <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Contact
+                        </th>
+                        <th scope="col" className="relative px-4 py-3">
+                          <span className="sr-only">Select</span>
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {searchResults.map((patient) => (
+                        <tr key={patient.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => selectExistingPatient(patient)}>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {patient.first_name} {patient.last_name}
+                            </div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">{patient.gender}</div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap">
+                            <div className="text-sm text-gray-500">{patient.contact_number}</div>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                              type="button"
+                              className="text-primary-600 hover:text-primary-900"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                selectExistingPatient(patient);
+                              }}
+                            >
+                              Select
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : searchTerm.length > 0 && !isSearching ? (
+              <div className="text-center p-4 bg-gray-50 rounded-lg">
+                <p className="text-gray-500">No patients found matching "{searchTerm}"</p>
+              </div>
+            ) : null}
+          </div>
+        )}
+        
+        {patientType === "emergency" && (
           <div className="mt-4 p-3 bg-error-50 border border-error-200 rounded-md">
             <p className="text-sm text-error-700 flex items-start">
               <AlertTriangle className="h-4 w-4 text-error-500 mt-0.5 mr-2 flex-shrink-0" />
@@ -565,63 +742,6 @@ const PatientRegistrationForm: React.FC = () => {
             </p>
           )}
         </div>
-        
-        {/* Medical Information */}
-        <div className="bg-gray-50 rounded-lg p-4">
-          <h3 className="text-base font-medium text-gray-900 mb-3">
-            Medical Information
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="form-label">Blood Type</label>
-              <select
-                {...register("medicalInfo.bloodType")}
-                className="form-input"
-              >
-                <option value="">Select blood type</option>
-                <option value="A+">A+</option>
-                <option value="A-">A-</option>
-                <option value="B+">B+</option>
-                <option value="B-">B-</option>
-                <option value="AB+">AB+</option>
-                <option value="AB-">AB-</option>
-                <option value="O+">O+</option>
-                <option value="O-">O-</option>
-                <option value="unknown">Unknown</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="form-label">Allergies</label>
-              <input
-                type="text"
-                {...register("medicalInfo.allergies")}
-                className="form-input"
-                placeholder="Separate with commas (e.g., Penicillin, Peanuts)"
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Chronic Conditions</label>
-              <input
-                type="text"
-                {...register("medicalInfo.chronicConditions")}
-                className="form-input"
-                placeholder="Separate with commas (e.g., Diabetes, Hypertension)"
-              />
-            </div>
-
-            <div>
-              <label className="form-label">Current Medications</label>
-              <input
-                type="text"
-                {...register("medicalInfo.currentMedications")}
-                className="form-input"
-                placeholder="Separate with commas (e.g., Insulin, Lisinopril)"
-              />
-            </div>
-          </div>
-        </div>
       </div>
     );
   };
@@ -629,10 +749,33 @@ const PatientRegistrationForm: React.FC = () => {
   const renderPriorityStep = () => {
     return (
       <div>
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Payment Information</h2>
-        <p className="text-sm text-gray-600 mb-6">Select payment method and provide necessary details</p>
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Priority & Payment Information</h2>
+        <p className="text-sm text-gray-600 mb-6">Set patient priority and payment details</p>
         
         <div className="space-y-6">
+          {/* Priority Level */}
+          <div>
+            <label className="form-label required">Priority Level</label>
+            <select
+              {...register("priorityLevel", { required: "Priority level is required" })}
+              className={`form-input ${errors.priorityLevel ? "border-error-300" : ""}`}
+              disabled={isEmergency} // Disable if it's an emergency case
+            >
+              <option value="normal">Normal</option>
+              <option value="urgent">Urgent</option>
+              <option value="critical">Critical</option>
+            </select>
+            {errors.priorityLevel && (
+              <p className="form-error">{errors.priorityLevel.message}</p>
+            )}
+            {isEmergency && (
+              <p className="mt-1 text-xs text-error-600">
+                Emergency cases are automatically set to critical priority
+              </p>
+            )}
+          </div>
+          
+          {/* Payment Method */}
           <div>
             <label className="form-label required">Payment Method</label>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -857,10 +1000,13 @@ const PatientRegistrationForm: React.FC = () => {
           )}
           
           <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="text-base font-medium text-gray-900 mb-2">Payment Information</h3>
+            <h3 className="text-base font-medium text-gray-900 mb-2">Priority & Payment</h3>
             <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="text-gray-500">Method:</div>
-              <div className="font-medium">{formData.paymentMethod}</div>
+              <div className="text-gray-500">Priority Level:</div>
+              <div className="font-medium">{formData.priorityLevel.charAt(0).toUpperCase() + formData.priorityLevel.slice(1)}</div>
+              
+              <div className="text-gray-500">Payment Method:</div>
+              <div className="font-medium">{formData.paymentMethod.charAt(0).toUpperCase() + formData.paymentMethod.slice(1)}</div>
               
               {formData.paymentMethod === "insurance" && (
                 <>
