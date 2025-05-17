@@ -407,7 +407,7 @@ const TriageForm: React.FC = () => {
       // Save the updated patient
       await savePatient(updatedPatient, patient.id);
       
-      // Create triage record in local storage
+      // Create triage record
       await saveTriage({
         id: Date.now().toString(), // Generate a unique ID
         patient_id: patient.id,

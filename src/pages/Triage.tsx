@@ -209,7 +209,10 @@ const Triage: React.FC = () => {
   // Count patients in each category
   const waitingCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'registration').length : 0;
   const inProgressCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'triage').length : 0;
-  const completedCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'waiting_consultation').length : 0;
+  const completedCount = Array.isArray(patients) ? patients.filter(p => 
+    p.current_flow_step === 'waiting_consultation' || 
+    p.current_flow_step?.startsWith('waiting_')
+  ).length : 0;
   const urgentCount = Array.isArray(patients) ? patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length : 0;
   const assignedToMeCount = Array.isArray(patients) ? patients.filter(p => p.assigned_to === 'current_user').length : 0; // Replace with actual user ID
 
