@@ -32,6 +32,15 @@ export const supabase = {
     upsert: (data: any) => Promise.resolve({ data: null, error: null }),
   }),
   rpc: (func: string, params?: any) => Promise.resolve({ data: null, error: null }),
+  auth: {
+    getSession: () => Promise.resolve({ data: { session: null }, error: null }),
+    signUp: () => Promise.resolve({ data: { user: { id: 'mock-user-id' } }, error: null }),
+    signIn: () => Promise.resolve({ data: { user: null }, error: null }),
+    signOut: () => Promise.resolve({ error: null }),
+    onAuthStateChange: () => ({ data: { subscription: { unsubscribe: () => {} } } }),
+    resetPasswordForEmail: () => Promise.resolve({ data: null, error: null }),
+    updateUser: () => Promise.resolve({ data: { user: null }, error: null }),
+  }
 };
 
 // Placeholder for future implementation

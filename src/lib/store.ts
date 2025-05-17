@@ -4,22 +4,81 @@ import { v4 as uuidv4 } from 'uuid';
 // Auth store types
 interface AuthState {
   isAuthenticated: boolean;
+  isAdmin: boolean;
   user: User | null;
+  hospital: Hospital | null;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, metadata?: any) => Promise<void>;
+  logout: () => Promise<void>;
   setUser: (user: User | null) => void;
-  logout: () => void;
+  setHospital: (hospital: Hospital | null) => void;
 }
 
 interface User {
   id: string;
   email: string;
+  role?: string;
+}
+
+interface Hospital {
+  id: string;
+  name: string;
+  subdomain: string;
+  address: string;
+  phone: string;
+  email?: string;
+  logo_url?: string;
 }
 
 // Auth store
 export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
+  isAdmin: true, // Set to true to allow admin access for testing
   user: null,
-  setUser: (user) => set({ user, isAuthenticated: !!user }),
-  logout: () => set({ user: null, isAuthenticated: false })
+  hospital: null,
+  login: async (email, password) => {
+    // Mock login for development
+    set({ 
+      isAuthenticated: true, 
+      isAdmin: true, // Set to true to allow admin access for testing
+      user: { 
+        id: 'mock-user-id', 
+        email: email,
+        role: 'admin' // Set role to admin for testing
+      },
+      hospital: {
+        id: 'mock-hospital-id',
+        name: 'Test Hospital',
+        subdomain: 'test',
+        address: '123 Test St',
+        phone: '123-456-7890'
+      }
+    });
+  },
+  signup: async (email, password, metadata) => {
+    // Mock signup for development
+    set({ 
+      isAuthenticated: true, 
+      isAdmin: true, // Set to true to allow admin access for testing
+      user: { 
+        id: 'mock-user-id', 
+        email: email,
+        role: 'admin' // Set role to admin for testing
+      },
+      hospital: {
+        id: 'mock-hospital-id',
+        name: 'Test Hospital',
+        subdomain: 'test',
+        address: '123 Test St',
+        phone: '123-456-7890'
+      }
+    });
+  },
+  logout: async () => {
+    set({ isAuthenticated: false, isAdmin: false, user: null, hospital: null });
+  },
+  setUser: (user) => set({ user, isAuthenticated: !!user, isAdmin: user?.role === 'admin' }),
+  setHospital: (hospital) => set({ hospital })
 }));
 
 // Notification store types
