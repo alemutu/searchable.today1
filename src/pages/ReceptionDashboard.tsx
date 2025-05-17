@@ -139,6 +139,13 @@ const ReceptionDashboard: React.FC = () => {
   const activePatients = patients.length;
   const completedToday = patients.filter(p => p.current_flow_step === 'completed').length;
 
+  // Helper function to safely get initials
+  const getInitials = (firstName: string | undefined, lastName: string | undefined) => {
+    const firstInitial = firstName?.charAt(0) || '';
+    const lastInitial = lastName?.charAt(0) || '';
+    return firstInitial + lastInitial || '??';
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -389,7 +396,7 @@ const ReceptionDashboard: React.FC = () => {
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
                             <span className="text-primary-600 text-xs font-medium">
-                              {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
+                              {getInitials(patient.first_name, patient.last_name)}
                             </span>
                           </div>
                           <div className="ml-3">
@@ -459,7 +466,7 @@ const ReceptionDashboard: React.FC = () => {
                     <div className="flex items-center">
                       <div className="flex-shrink-0 h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center">
                         <span className="text-primary-600 text-xs font-medium">
-                          {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
+                          {getInitials(patient.first_name, patient.last_name)}
                         </span>
                       </div>
                       <div className="ml-3">
