@@ -92,10 +92,12 @@ const TriageForm: React.FC = () => {
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
+  const [patientData, setPatientData] = useState<Patient | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
   
   // Patient storage hook
   const { 
-    data: patientData,
+    data: patientsData,
     loading: patientLoading,
     error: patientError,
     fetchById: fetchPatient,
@@ -114,10 +116,6 @@ const TriageForm: React.FC = () => {
   const { 
     saveItem: saveTriage
   } = useHybridStorage<any>('triage');
-  
-  // Local state for departments and patient
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [patient, setPatient] = useState<Patient | null>(null);
   
   const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<TriageFormData>({
     defaultValues: {
@@ -169,15 +167,15 @@ const TriageForm: React.FC = () => {
   
   useEffect(() => {
     // Update patient state when data is loaded
-    if (patientData) {
-      setPatient(patientData);
+    if (patientsData) {
+      setPatientData(patientsData);
     }
     
     // Set loading state based on both data fetches
     if (!patientLoading && !departmentsLoading) {
       setIsLoading(false);
     }
-  }, [patientData, patientLoading, departmentsLoading]);
+  }, [patientsData, patientLoading, departmentsLoading]);
   
   useEffect(() => {
     // Set departments from fetched data
@@ -346,7 +344,7 @@ const TriageForm: React.FC = () => {
   };
 
   const onSubmit = async (data: TriageFormData) => {
-    if (!user || !patient) return;
+    if (!user || !patientData) return;
     
     try {
       setIsSaving(true);
@@ -390,10 +388,10 @@ const TriageForm: React.FC = () => {
       
       // Update patient's current flow step and medical history
       const updatedPatient = {
-        ...patient,
+        ...patientData,
         current_flow_step: nextStep,
         medical_history: {
-          ...patient.medical_history,
+          ...patientData.medical_history,
           chronicConditions: data.medicalHistory.chronicConditions,
           allergies: data.medicalHistory.allergies.hasAllergies ? 
             data.medicalHistory.allergies.allergyList.split(',').map(a => a.trim()) : [],
@@ -405,12 +403,12 @@ const TriageForm: React.FC = () => {
       };
       
       // Save the updated patient
-      await savePatient(updatedPatient, patient.id);
+      await savePatient(updatedPatient, patientData.id);
       
       // Create triage record
       await saveTriage({
         id: Date.now().toString(), // Generate a unique ID
-        patient_id: patient.id,
+        patient_id: patientData.id,
         vital_signs: data.vitalSigns,
         chief_complaint: data.chiefComplaint,
         acuity_level: data.acuityLevel,
@@ -457,7 +455,7 @@ const TriageForm: React.FC = () => {
     );
   }
 
-  if (!patient) {
+  if (!patientData) {
     return (
       <div className="text-center p-3">
         <p className="text-gray-500">Patient not found</p>
@@ -472,15 +470,15 @@ const TriageForm: React.FC = () => {
         <div className="bg-gradient-to-r from-primary-700 to-primary-600 rounded-lg shadow-md p-4 mb-4">
           <div className="flex items-center">
             <div className="h-12 w-12 rounded-full bg-white text-primary-600 flex items-center justify-center text-lg font-bold shadow-md">
-              {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
+              {patientData.first_name.charAt(0)}{patientData.last_name.charAt(0)}
             </div>
             <div className="ml-4">
               <h2 className="text-xl font-bold text-white">
-                {patient.first_name} {patient.last_name}
+                {patientData.first_name} {patientData.last_name}
               </h2>
               <div className="flex items-center text-primary-100 text-sm">
                 <User className="h-4 w-4 mr-1" />
-                <span>{calculateAge(patient.date_of_birth)} years • {patient.gender}</span>
+                <span>{calculateAge(patientData.date_of_birth)} years • {patientData.gender}</span>
                 <span className="mx-2">•</span>
                 <Clock className="h-4 w-4 mr-1" />
                 <span className="bg-black bg-opacity-20 px-2 py-0.5 rounded">
