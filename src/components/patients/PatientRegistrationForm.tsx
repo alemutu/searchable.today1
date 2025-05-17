@@ -20,18 +20,22 @@ import {
   Building2,
   Shield,
   FileText,
-  CheckCircle
+  CheckCircle,
+  ChevronDown,
+  Hash
 } from 'lucide-react';
 
 interface PatientFormData {
   patientType: 'new' | 'existing' | 'emergency';
   firstName: string;
   lastName: string;
-  dateOfBirth: string;
+  age: number;
+  dateOfBirth?: string;
   gender: string;
   contactNumber: string;
   email: string;
   address: string;
+  showEmergencyContact: boolean;
   emergencyContact: {
     name: string;
     relationship: string;
@@ -51,7 +55,8 @@ interface Patient {
   id: string;
   first_name: string;
   last_name: string;
-  date_of_birth: string;
+  age: number;
+  date_of_birth?: string;
   gender: string;
   contact_number: string;
   email: string | null;
@@ -60,7 +65,7 @@ interface Patient {
     name: string;
     relationship: string;
     phone: string;
-  };
+  } | null;
   status: string;
   current_flow_step: string | null;
   medical_info?: any;
@@ -77,17 +82,20 @@ const PatientRegistrationForm: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [patientId, setPatientId] = useState<string>('');
   
   const { register, handleSubmit, control, watch, setValue, reset, formState: { errors } } = useForm<PatientFormData>({
     defaultValues: {
       patientType: 'new',
       firstName: '',
       lastName: '',
+      age: 0,
       dateOfBirth: '',
       gender: '',
       contactNumber: '',
       email: '',
       address: '',
+      showEmergencyContact: false,
       emergencyContact: {
         name: '',
         relationship: '',
@@ -104,10 +112,14 @@ const PatientRegistrationForm: React.FC = () => {
   const patientType = watch('patientType');
   const priority = watch('priority');
   const paymentMethod = watch('paymentMethod');
+  const showEmergencyContact = watch('showEmergencyContact');
   
   useEffect(() => {
     // Fetch existing patients for search
     fetchPatients();
+    
+    // Generate a unique patient ID
+    generatePatientId();
   }, [fetchPatients]);
   
   useEffect(() => {
@@ -118,6 +130,17 @@ const PatientRegistrationForm: React.FC = () => {
       setValue('priority', 'normal');
     }
   }, [patientType, priority, setValue]);
+  
+  const generatePatientId = () => {
+    // Generate a unique ID with format PT-YYYYMMDD-XXXX
+    const date = new Date();
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const random = Math.floor(1000 + Math.random() * 9000);
+    
+    setPatientId(`PT-${year}${month}${day}-${random}`);
+  };
   
   const searchPatients = () => {
     if (!searchTerm || !Array.isArray(existingPatients)) return;
@@ -144,12 +167,19 @@ const PatientRegistrationForm: React.FC = () => {
   const selectExistingPatient = (patient: Patient) => {
     setValue('firstName', patient.first_name);
     setValue('lastName', patient.last_name);
-    setValue('dateOfBirth', patient.date_of_birth);
+    setValue('age', patient.age || 0);
+    setValue('dateOfBirth', patient.date_of_birth || '');
     setValue('gender', patient.gender);
     setValue('contactNumber', patient.contact_number);
     setValue('email', patient.email || '');
     setValue('address', patient.address);
-    setValue('emergencyContact', patient.emergency_contact);
+    
+    if (patient.emergency_contact) {
+      setValue('showEmergencyContact', true);
+      setValue('emergencyContact', patient.emergency_contact);
+    } else {
+      setValue('showEmergencyContact', false);
+    }
     
     // Clear search results
     setSearchResults([]);
@@ -171,24 +201,18 @@ const PatientRegistrationForm: React.FC = () => {
     setIsLoading(true);
     
     try {
-      // Create a unique ID
-      const patientId = `patient_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      
       // Prepare patient data
       const patientData: Patient = {
         id: patientId,
         first_name: data.firstName,
         last_name: data.lastName,
-        date_of_birth: data.dateOfBirth || new Date().toISOString().split('T')[0], // Default to today for emergency cases
+        age: data.age,
+        date_of_birth: data.dateOfBirth,
         gender: data.gender || 'Unknown', // Default for emergency cases
         contact_number: data.contactNumber || 'Unknown', // Default for emergency cases
         email: data.email || null,
         address: data.address || 'Unknown', // Default for emergency cases
-        emergency_contact: data.emergencyContact.name ? data.emergencyContact : {
-          name: 'Unknown',
-          relationship: 'Unknown',
-          phone: 'Unknown'
-        },
+        emergency_contact: data.showEmergencyContact ? data.emergencyContact : null,
         status: 'active',
         current_flow_step: data.priority === 'emergency' ? 'emergency' : 'registration',
         priority_level: data.priority,
@@ -380,7 +404,7 @@ const PatientRegistrationForm: React.FC = () => {
                           <div>
                             <div className="font-medium">{patient.first_name} {patient.last_name}</div>
                             <div className="text-sm text-gray-500">
-                              {new Date(patient.date_of_birth).toLocaleDateString()} • {patient.contact_number}
+                              {patient.age} years • {patient.contact_number}
                             </div>
                           </div>
                           <ChevronRight className="h-5 w-5 text-gray-400" />
@@ -414,6 +438,17 @@ const PatientRegistrationForm: React.FC = () => {
                 </div>
               )}
               
+              <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg flex items-center justify-between">
+                <div className="flex items-center">
+                  <Hash className="h-5 w-5 text-gray-500 mr-2" />
+                  <div>
+                    <p className="text-sm font-medium text-gray-700">Patient ID</p>
+                    <p className="text-base font-mono text-primary-600">{patientId}</p>
+                  </div>
+                </div>
+                <div className="text-xs text-gray-500">Auto-generated</div>
+              </div>
+              
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="form-label required">First Name</label>
@@ -445,19 +480,33 @@ const PatientRegistrationForm: React.FC = () => {
                 {patientType !== 'emergency' && (
                   <>
                     <div>
-                      <label className="form-label required">Date of Birth</label>
+                      <label className="form-label required">Age</label>
+                      <input
+                        type="number"
+                        {...register('age', { 
+                          required: 'Age is required',
+                          min: { value: 0, message: 'Age must be a positive number' },
+                          valueAsNumber: true
+                        })}
+                        className={`form-input ${errors.age ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                        placeholder="Enter age"
+                      />
+                      {errors.age && <p className="form-error">{errors.age.message}</p>}
+                    </div>
+                    
+                    <div>
+                      <label className="form-label">Date of Birth (Optional)</label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                           <Calendar className="h-5 w-5 text-gray-400" />
                         </div>
                         <input
                           type="date"
-                          {...register('dateOfBirth', { required: 'Date of birth is required' })}
-                          className={`form-input pl-10 ${errors.dateOfBirth ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                          {...register('dateOfBirth')}
+                          className="form-input pl-10"
                           max={new Date().toISOString().split('T')[0]}
                         />
                       </div>
-                      {errors.dateOfBirth && <p className="form-error">{errors.dateOfBirth.message}</p>}
                     </div>
                     
                     <div>
@@ -522,46 +571,57 @@ const PatientRegistrationForm: React.FC = () => {
                     </div>
                     
                     <div className="sm:col-span-2">
-                      <h3 className="text-base font-medium text-gray-900 mb-2">Emergency Contact</h3>
-                      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                          <label className="form-label required">Name</label>
-                          <input
-                            type="text"
-                            {...register('emergencyContact.name', { required: 'Emergency contact name is required' })}
-                            className={`form-input ${errors.emergencyContact?.name ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                            placeholder="Enter contact name"
-                          />
-                          {errors.emergencyContact?.name && <p className="form-error">{errors.emergencyContact.name.message}</p>}
-                        </div>
-                        
-                        <div>
-                          <label className="form-label required">Relationship</label>
-                          <input
-                            type="text"
-                            {...register('emergencyContact.relationship', { required: 'Relationship is required' })}
-                            className={`form-input ${errors.emergencyContact?.relationship ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                            placeholder="E.g., Spouse, Parent, Sibling"
-                          />
-                          {errors.emergencyContact?.relationship && <p className="form-error">{errors.emergencyContact.relationship.message}</p>}
-                        </div>
-                        
-                        <div className="sm:col-span-2">
-                          <label className="form-label required">Phone Number</label>
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                              <Phone className="h-5 w-5 text-gray-400" />
-                            </div>
+                      <button
+                        type="button"
+                        className="flex items-center text-primary-600 hover:text-primary-800 mb-2"
+                        onClick={() => setValue('showEmergencyContact', !showEmergencyContact)}
+                      >
+                        {showEmergencyContact ? (
+                          <ChevronDown className="h-5 w-5 mr-1" />
+                        ) : (
+                          <ChevronRight className="h-5 w-5 mr-1" />
+                        )}
+                        <span className="font-medium">Emergency Contact (Optional)</span>
+                      </button>
+                      
+                      {showEmergencyContact && (
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 p-4 border border-gray-200 rounded-lg">
+                          <div>
+                            <label className="form-label">Name</label>
                             <input
-                              type="tel"
-                              {...register('emergencyContact.phone', { required: 'Emergency contact phone is required' })}
-                              className={`form-input pl-10 ${errors.emergencyContact?.phone ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                              placeholder="Enter emergency contact number"
+                              type="text"
+                              {...register('emergencyContact.name')}
+                              className="form-input"
+                              placeholder="Enter contact name"
                             />
                           </div>
-                          {errors.emergencyContact?.phone && <p className="form-error">{errors.emergencyContact.phone.message}</p>}
+                          
+                          <div>
+                            <label className="form-label">Relationship</label>
+                            <input
+                              type="text"
+                              {...register('emergencyContact.relationship')}
+                              className="form-input"
+                              placeholder="E.g., Spouse, Parent, Sibling"
+                            />
+                          </div>
+                          
+                          <div className="sm:col-span-2">
+                            <label className="form-label">Phone Number</label>
+                            <div className="relative">
+                              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Phone className="h-5 w-5 text-gray-400" />
+                              </div>
+                              <input
+                                type="tel"
+                                {...register('emergencyContact.phone')}
+                                className="form-input pl-10"
+                                placeholder="Enter emergency contact number"
+                              />
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
                   </>
                 )}
@@ -781,7 +841,10 @@ const PatientRegistrationForm: React.FC = () => {
               
               <div className="space-y-6">
                 <div className="bg-gray-50 p-4 rounded-lg">
-                  <h3 className="text-base font-medium text-gray-900 mb-3">Patient Information</h3>
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="text-base font-medium text-gray-900">Patient Information</h3>
+                    <div className="text-sm font-mono text-primary-600">{patientId}</div>
+                  </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <p className="text-sm font-medium text-gray-500">Patient Type</p>
@@ -810,9 +873,16 @@ const PatientRegistrationForm: React.FC = () => {
                     {patientType !== 'emergency' && (
                       <>
                         <div>
-                          <p className="text-sm font-medium text-gray-500">Date of Birth</p>
-                          <p className="text-sm text-gray-900">{watch('dateOfBirth')}</p>
+                          <p className="text-sm font-medium text-gray-500">Age</p>
+                          <p className="text-sm text-gray-900">{watch('age')} years</p>
                         </div>
+                        
+                        {watch('dateOfBirth') && (
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Date of Birth</p>
+                            <p className="text-sm text-gray-900">{watch('dateOfBirth')}</p>
+                          </div>
+                        )}
                         
                         <div>
                           <p className="text-sm font-medium text-gray-500">Gender</p>
@@ -838,23 +908,23 @@ const PatientRegistrationForm: React.FC = () => {
                   </div>
                 </div>
                 
-                {patientType !== 'emergency' && (
+                {patientType !== 'emergency' && showEmergencyContact && (
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h3 className="text-base font-medium text-gray-900 mb-3">Emergency Contact</h3>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <p className="text-sm font-medium text-gray-500">Name</p>
-                        <p className="text-sm text-gray-900">{watch('emergencyContact.name')}</p>
+                        <p className="text-sm text-gray-900">{watch('emergencyContact.name') || 'N/A'}</p>
                       </div>
                       
                       <div>
                         <p className="text-sm font-medium text-gray-500">Relationship</p>
-                        <p className="text-sm text-gray-900">{watch('emergencyContact.relationship')}</p>
+                        <p className="text-sm text-gray-900">{watch('emergencyContact.relationship') || 'N/A'}</p>
                       </div>
                       
                       <div>
                         <p className="text-sm font-medium text-gray-500">Phone Number</p>
-                        <p className="text-sm text-gray-900">{watch('emergencyContact.phone')}</p>
+                        <p className="text-sm text-gray-900">{watch('emergencyContact.phone') || 'N/A'}</p>
                       </div>
                     </div>
                   </div>
@@ -939,7 +1009,7 @@ const PatientRegistrationForm: React.FC = () => {
               onClick={nextStep}
               disabled={
                 (currentStep === 1 && !patientType) ||
-                (currentStep === 2 && patientType !== 'emergency' && (!watch('firstName') || !watch('lastName')))
+                (currentStep === 2 && patientType !== 'emergency' && (!watch('firstName') || !watch('lastName') || !watch('age')))
               }
               className="btn btn-primary flex items-center"
             >
