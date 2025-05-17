@@ -256,14 +256,22 @@ const GeneralMedicine: React.FC = () => {
     const matchesAssigned = !assignedToMe || patient.assigned_to === 'current_user'; // Replace with actual user ID
     
     if (activeTab === 'waiting') {
-      return patient.current_flow_step === 'waiting_consultation' && matchesSearch && matchesPriority && matchesAssigned;
+      // Include patients with waiting_consultation OR waiting_general_medicine flow step
+      return (patient.current_flow_step === 'waiting_consultation' || 
+              patient.current_flow_step === 'waiting_general_medicine' ||
+              patient.current_flow_step === 'waiting_general') && 
+             matchesSearch && matchesPriority && matchesAssigned;
     } else {
       return patient.current_flow_step === 'consultation' && matchesSearch && matchesPriority && matchesAssigned;
     }
   }) : [];
 
   // Count patients in each category
-  const waitingCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'waiting_consultation').length : 0;
+  const waitingCount = Array.isArray(patients) ? patients.filter(p => 
+    p.current_flow_step === 'waiting_consultation' || 
+    p.current_flow_step === 'waiting_general_medicine' ||
+    p.current_flow_step === 'waiting_general'
+  ).length : 0;
   const inProgressCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'consultation').length : 0;
   const completedCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'post_consultation').length : 0;
   const urgentCount = Array.isArray(patients) ? patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length : 0;
