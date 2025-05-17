@@ -98,6 +98,41 @@ const Triage: React.FC = () => {
     return `${diffDays}d ago`;
   };
   
+  // Get patient status label
+  const getPatientStatusLabel = (flowStep: string) => {
+    switch (flowStep) {
+      case 'registration':
+        return 'Waiting for Triage';
+      case 'triage':
+        return 'In Triage';
+      case 'waiting_consultation':
+        return 'Waiting for Doctor';
+      case 'consultation':
+        return 'With Doctor';
+      case 'emergency':
+        return 'Emergency';
+      case 'completed':
+        return 'Completed';
+      default:
+        if (flowStep.startsWith('waiting_')) {
+          const dept = flowStep.replace('waiting_', '').replace(/_/g, ' ');
+          return `Waiting for ${dept.charAt(0).toUpperCase() + dept.slice(1)}`;
+        }
+        return flowStep.replace(/_/g, ' ').charAt(0).toUpperCase() + flowStep.replace(/_/g, ' ').slice(1);
+    }
+  };
+
+  // Get status color for patient status badge
+  const getStatusColor = (flowStep: string) => {
+    if (flowStep === 'registration') return 'bg-blue-100 text-blue-800';
+    if (flowStep === 'triage') return 'bg-primary-100 text-primary-800';
+    if (flowStep === 'emergency') return 'bg-error-100 text-error-800';
+    if (flowStep.startsWith('waiting_')) return 'bg-warning-100 text-warning-800';
+    if (flowStep === 'consultation') return 'bg-secondary-100 text-secondary-800';
+    if (flowStep === 'completed') return 'bg-success-100 text-success-800';
+    return 'bg-gray-100 text-gray-800';
+  };
+  
   const handleAssignToMe = async (patientId: string) => {
     if (!Array.isArray(patients)) return;
     
@@ -192,36 +227,27 @@ const Triage: React.FC = () => {
     }
   };
 
-  // Get patient status label
-  const getPatientStatusLabel = (flowStep: string) => {
-    switch (flowStep) {
-      case 'registration':
-        return 'Waiting for Triage';
-      case 'triage':
-        return 'In Triage';
-      case 'waiting_consultation':
-        return 'Waiting for Doctor';
-      case 'consultation':
-        return 'With Doctor';
-      case 'emergency':
-        return 'Emergency';
-      default:
-        if (flowStep.startsWith('waiting_')) {
-          const dept = flowStep.replace('waiting_', '').replace(/_/g, ' ');
-          return `Waiting for ${dept.charAt(0).toUpperCase() + dept.slice(1)}`;
-        }
-        return flowStep.replace(/_/g, ' ').charAt(0).toUpperCase() + flowStep.replace(/_/g, ' ').slice(1);
+  // Check if a patient is already processed and forwarded to a department
+  const isPatientProcessed = (patient: Patient): boolean => {
+    // If patient is in triage, they're not processed yet
+    if (patient.current_flow_step === 'triage') {
+      return false;
     }
-  };
-
-  // Get status color for patient status badge
-  const getStatusColor = (flowStep: string) => {
-    if (flowStep === 'registration') return 'bg-blue-100 text-blue-800';
-    if (flowStep === 'triage') return 'bg-primary-100 text-primary-800';
-    if (flowStep === 'emergency') return 'bg-error-100 text-error-800';
-    if (flowStep.startsWith('waiting_')) return 'bg-warning-100 text-warning-800';
-    if (flowStep === 'consultation') return 'bg-secondary-100 text-secondary-800';
-    return 'bg-gray-100 text-gray-800';
+    
+    // If patient is in registration, they're not processed yet
+    if (patient.current_flow_step === 'registration') {
+      return false;
+    }
+    
+    // If patient is waiting for a specific department or consultation, they've been processed
+    if (patient.current_flow_step.startsWith('waiting_') || 
+        patient.current_flow_step === 'consultation' ||
+        patient.current_flow_step === 'emergency' ||
+        patient.current_flow_step === 'completed') {
+      return true;
+    }
+    
+    return false;
   };
 
   // Filter patients based on their current flow step and the active tab
@@ -243,7 +269,8 @@ const Triage: React.FC = () => {
   const inProgressCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'triage').length : 0;
   const completedCount = Array.isArray(patients) ? patients.filter(p => 
     p.current_flow_step === 'waiting_consultation' || 
-    p.current_flow_step?.startsWith('waiting_')
+    p.current_flow_step?.startsWith('waiting_') ||
+    p.current_flow_step === 'completed'
   ).length : 0;
   const urgentCount = Array.isArray(patients) ? patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length : 0;
   const assignedToMeCount = Array.isArray(patients) ? patients.filter(p => p.assigned_to === 'current_user').length : 0; // Replace with actual user ID
@@ -438,7 +465,7 @@ const Triage: React.FC = () => {
                                       to={`/patients/${patient.id}/triage`}
                                       className="btn btn-primary inline-flex items-center text-xs py-1 px-2 rounded-lg"
                                     >
-                                      Continue Triage <ArrowRight className="h-3 w-3 ml-1" />
+                                      Continue <ArrowRight className="h-3 w-3 ml-1" />
                                     </Link>
                                     <button 
                                       onClick={() => handleReleaseAssignment(patient.id)}
@@ -538,12 +565,14 @@ const Triage: React.FC = () => {
                             </div>
                           </div>
                         </div>
-                        <Link
-                          to={`/patients/${patient.id}/triage`}
-                          className="text-xs text-primary-600 hover:text-primary-800 font-medium"
-                        >
-                          {patient.current_flow_step === 'registration' ? 'Start' : 'Continue'}
-                        </Link>
+                        {!isPatientProcessed(patient) && (
+                          <Link
+                            to={`/patients/${patient.id}/triage`}
+                            className="text-xs text-primary-600 hover:text-primary-800 font-medium"
+                          >
+                            {patient.current_flow_step === 'registration' ? 'Start' : 'Continue'}
+                          </Link>
+                        )}
                       </div>
                     ))}
                 </div>

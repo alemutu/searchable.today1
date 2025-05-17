@@ -9,10 +9,11 @@ interface Patient {
   first_name: string;
   last_name: string;
   date_of_birth: string;
-  current_flow_step: string;
+  current_flow_step: string | null;
   priority_level: string;
-  arrival_time?: string;
+  department?: string;
   wait_time?: string;
+  arrival_time?: string;
   assigned_to?: string;
   last_updated?: string;
   chief_complaint?: string;
@@ -169,6 +170,10 @@ const Cardiology: React.FC = () => {
         return 'In Consultation';
       case 'emergency':
         return 'Emergency';
+      case 'completed':
+        return 'Completed';
+      case 'discharged':
+        return 'Discharged';
       default:
         if (flowStep.startsWith('waiting_')) {
           const dept = flowStep.replace('waiting_', '').replace(/_/g, ' ');
@@ -185,7 +190,28 @@ const Cardiology: React.FC = () => {
     if (flowStep === 'emergency') return 'bg-error-100 text-error-800';
     if (flowStep.startsWith('waiting_')) return 'bg-warning-100 text-warning-800';
     if (flowStep === 'consultation') return 'bg-secondary-100 text-secondary-800';
+    if (flowStep === 'completed' || flowStep === 'discharged') return 'bg-success-100 text-success-800';
     return 'bg-gray-100 text-gray-800';
+  };
+
+  // Check if a patient is already processed and should not show action buttons
+  const isPatientProcessed = (patient: Patient): boolean => {
+    // If patient is in consultation, they're being actively treated
+    if (patient.current_flow_step === 'consultation') {
+      return false;
+    }
+    
+    // If patient is completed or discharged, they're done
+    if (patient.current_flow_step === 'completed' || patient.current_flow_step === 'discharged') {
+      return true;
+    }
+    
+    // If patient is at an external location (lab, radiology, etc.), they're being processed elsewhere
+    if (patient.external_location) {
+      return true;
+    }
+    
+    return false;
   };
 
   const handleAssignToMe = async (patientId: string) => {
@@ -282,6 +308,37 @@ const Cardiology: React.FC = () => {
     }
   };
 
+  const handleCompleteConsultation = async (patientId: string) => {
+    if (!Array.isArray(patients)) return;
+    
+    const patient = patients.find(p => p.id === patientId);
+    if (!patient) return;
+    
+    try {
+      // Update the patient status to completed
+      const updatedPatient: Patient = {
+        ...patient,
+        current_flow_step: 'completed',
+        last_updated: new Date().toISOString()
+      };
+      
+      await saveItem(updatedPatient, patientId);
+      
+      // Show notification
+      addNotification({
+        message: `Completed treatment for ${patient.first_name} ${patient.last_name}`,
+        type: 'success',
+        duration: 3000
+      });
+    } catch (error: any) {
+      console.error('Error completing treatment:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
+        type: 'error'
+      });
+    }
+  };
+
   // Filter patients based on their current flow step and the active tab
   const filteredPatients = Array.isArray(patients) ? patients.filter(patient => {
     const matchesSearch = patient.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -304,7 +361,7 @@ const Cardiology: React.FC = () => {
     p.current_flow_step === 'waiting_cardiology'
   ).length : 0;
   const inProgressCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'consultation').length : 0;
-  const completedCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'post_consultation').length : 0;
+  const completedCount = Array.isArray(patients) ? patients.filter(p => p.current_flow_step === 'completed' || p.current_flow_step === 'discharged').length : 0;
   const urgentCount = Array.isArray(patients) ? patients.filter(p => p.priority_level === 'urgent' || p.priority_level === 'critical').length : 0;
   const assignedToMeCount = Array.isArray(patients) ? patients.filter(p => p.assigned_to === 'current_user').length : 0; // Replace with actual user ID
   const externalCount = Array.isArray(patients) ? patients.filter(p => p.external_location).length : 0;
@@ -439,7 +496,7 @@ const Cardiology: React.FC = () => {
                         <div className="flex items-center justify-between">
                           <div>
                             <h3 className="text-base font-medium text-gray-900">{patient.first_name} {patient.last_name}</h3>
-                            <div className="flex items-center text-xs text-gray-500">
+                            <div className="flex items-center text-xs text-gray-500 mt-0.5">
                               <Clock className="h-3 w-3 mr-1" />
                               <span>{getTimeAgo(patient.last_updated || '')}</span>
                               {patient.wait_time && (
@@ -508,6 +565,13 @@ const Cardiology: React.FC = () => {
                                     >
                                       Continue <Heart className="h-3 w-3 ml-1" />
                                     </Link>
+                                    <button 
+                                      onClick={() => handleCompleteConsultation(patient.id)}
+                                      className="btn btn-success inline-flex items-center text-xs py-1 px-2 rounded-lg"
+                                      title="Complete treatment"
+                                    >
+                                      <CheckCircle className="h-3.5 w-3.5" />
+                                    </button>
                                     <button 
                                       onClick={() => handleReleaseAssignment(patient.id)}
                                       className="btn btn-outline inline-flex items-center text-xs py-1 px-2 rounded-lg"
@@ -590,7 +654,7 @@ const Cardiology: React.FC = () => {
                       }
                       
                       // Then sort by flow step
-                      const stepOrder = { 'consultation': 0, 'waiting_consultation': 1 };
+                      const stepOrder = { 'consultation': 0, 'waiting_consultation': 1, 'waiting_cardiology': 1 };
                       const aStep = stepOrder[a.current_flow_step as keyof typeof stepOrder] || 2;
                       const bStep = stepOrder[b.current_flow_step as keyof typeof stepOrder] || 2;
                       
@@ -604,7 +668,7 @@ const Cardiology: React.FC = () => {
                             {patient.current_flow_step === 'waiting_consultation' || patient.current_flow_step === 'waiting_cardiology' ? (
                               <Clock className="h-3.5 w-3.5 text-warning-500" />
                             ) : (
-                              <Heart className="h-3.5 w-3.5 text-error-500" />
+                              <Heart className="h-3.5 w-3.5 text-primary-500" />
                             )}
                           </div>
                           <div>
@@ -612,18 +676,20 @@ const Cardiology: React.FC = () => {
                               {patient.first_name} {patient.last_name}
                             </p>
                             <div className="flex items-center">
-                              <span className={`text-xs px-1.5 py-0.5 rounded-full ${getStatusColor(patient.current_flow_step)}`}>
-                                {getPatientStatusLabel(patient.current_flow_step)}
+                              <span className={`text-xs px-1.5 py-0.5 rounded-full ${getStatusColor(patient.current_flow_step || '')}`}>
+                                {getPatientStatusLabel(patient.current_flow_step || '')}
                               </span>
                             </div>
                           </div>
                         </div>
-                        <Link
-                          to={`/patients/${patient.id}/consultation`}
-                          className="text-xs text-primary-600 hover:text-primary-800 font-medium"
-                        >
-                          {patient.current_flow_step === 'waiting_consultation' || patient.current_flow_step === 'waiting_cardiology' ? 'Start' : 'Continue'}
-                        </Link>
+                        {!isPatientProcessed(patient) && (
+                          <Link
+                            to={`/patients/${patient.id}/consultation`}
+                            className="text-xs text-primary-600 hover:text-primary-800 font-medium"
+                          >
+                            {patient.current_flow_step === 'waiting_consultation' || patient.current_flow_step === 'waiting_cardiology' ? 'Start' : 'Continue'}
+                          </Link>
+                        )}
                       </div>
                     ))}
                   
@@ -766,7 +832,7 @@ const Cardiology: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm p-3">
             <div className="flex items-center justify-between mb-2">
               <h2 className="text-sm font-medium text-gray-900 flex items-center">
-                <Heart className="h-4 w-4 text-error-500 mr-1.5" />
+                <Heart className="h-4 w-4 text-primary-500 mr-1.5" />
                 Cardiology Reference
               </h2>
               <ChevronDown className="h-4 w-4 text-gray-400" />

@@ -29,6 +29,7 @@ interface RadiologyTest {
     first_name: string;
     last_name: string;
     date_of_birth: string;
+    current_flow_step?: string;
   };
   scan_type: string;
   scan_date: string;
@@ -121,7 +122,8 @@ const RadiologyProcessForm: React.FC = () => {
             id: '00000000-0000-0000-0000-000000000001',
             first_name: 'John',
             last_name: 'Doe',
-            date_of_birth: '1980-05-15'
+            date_of_birth: '1980-05-15',
+            current_flow_step: 'radiology'
           },
           scan_type: 'x_ray',
           scan_date: new Date().toISOString(),
@@ -157,7 +159,7 @@ const RadiologyProcessForm: React.FC = () => {
         .from('radiology_results')
         .select(`
           *,
-          patient:patient_id(id, first_name, last_name, date_of_birth)
+          patient:patient_id(id, first_name, last_name, date_of_birth, current_flow_step)
         `)
         .eq('id', scanId)
         .single();
@@ -305,6 +307,35 @@ const RadiologyProcessForm: React.FC = () => {
     }
   };
 
+  // Update patient status after completing radiology scan
+  const updatePatientStatus = async () => {
+    if (!scan || !scan.patient) return;
+    
+    try {
+      // Check if the patient is currently in radiology flow step
+      if (scan.patient.current_flow_step === 'radiology') {
+        // Update patient flow step to waiting_consultation
+        if (import.meta.env.DEV) {
+          console.log('Updating patient flow step to waiting_consultation');
+          return;
+        }
+        
+        const { error } = await supabase
+          .from('patients')
+          .update({
+            current_flow_step: 'waiting_consultation'
+          })
+          .eq('id', scan.patient.id);
+          
+        if (error) throw error;
+        
+        console.log('Patient status updated to waiting_consultation');
+      }
+    } catch (error) {
+      console.error('Error updating patient status:', error);
+    }
+  };
+
   const handleSave = async () => {
     if (!scan || !user) return;
     
@@ -355,6 +386,11 @@ const RadiologyProcessForm: React.FC = () => {
           type: 'success'
         });
         
+        // Update patient status
+        if (scan.patient.current_flow_step === 'radiology') {
+          console.log('Updating patient flow step to waiting_consultation');
+        }
+        
         return;
       }
       
@@ -378,12 +414,7 @@ const RadiologyProcessForm: React.FC = () => {
       if (error) throw error;
       
       // Update patient flow step if needed
-      await supabase
-        .from('patients')
-        .update({
-          current_flow_step: 'waiting_consultation'
-        })
-        .eq('id', scan.patient.id);
+      await updatePatientStatus();
       
       // Update local state
       setScan({
@@ -890,6 +921,7 @@ const RadiologyProcessForm: React.FC = () => {
                     onClick={() => {
                       setConfirmRelease(false);
                       handleSave();
+                      updatePatientStatus(); // Update patient status after completing the scan
                     }}
                     className="btn btn-primary py-2 text-sm px-4"
                   >

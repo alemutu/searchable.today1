@@ -10,6 +10,7 @@ interface PharmacyOrder {
     id: string;
     first_name: string;
     last_name: string;
+    current_flow_step?: string;
   };
   medications: {
     medication: string;
@@ -43,7 +44,7 @@ const PharmacyDispense: React.FC = () => {
           .from('pharmacy')
           .select(`
             *,
-            patient:patients(id, first_name, last_name)
+            patient:patients(id, first_name, last_name, current_flow_step)
           `)
           .eq('id', orderId)
           .single();
@@ -92,14 +93,16 @@ const PharmacyDispense: React.FC = () => {
       if (error) throw error;
 
       // Update patient's current flow step to post_consultation or completed
-      const { error: patientError } = await supabase
-        .from('patients')
-        .update({
-          current_flow_step: 'post_consultation'
-        })
-        .eq('id', order.patient.id);
+      if (order.patient.current_flow_step === 'pharmacy') {
+        const { error: patientError } = await supabase
+          .from('patients')
+          .update({
+            current_flow_step: 'completed'
+          })
+          .eq('id', order.patient.id);
 
-      if (patientError) throw patientError;
+        if (patientError) throw patientError;
+      }
 
       addNotification({
         message: `Medications dispensed successfully for ${order.patient.first_name} ${order.patient.last_name}`,

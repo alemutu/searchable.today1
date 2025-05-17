@@ -11,6 +11,7 @@ interface LabTest {
     first_name: string;
     last_name: string;
     date_of_birth: string;
+    current_flow_step?: string;
   };
   test_type: string;
   test_date: string;
@@ -100,7 +101,8 @@ const LabTestProcessForm: React.FC = () => {
             id: '00000000-0000-0000-0000-000000000001',
             first_name: 'John',
             last_name: 'Doe',
-            date_of_birth: '1980-05-15'
+            date_of_birth: '1980-05-15',
+            current_flow_step: 'lab_tests'
           },
           test_type: 'complete_blood_count',
           test_date: new Date().toISOString(),
@@ -153,7 +155,7 @@ const LabTestProcessForm: React.FC = () => {
         .from('lab_results')
         .select(`
           *,
-          patient:patient_id(id, first_name, last_name, date_of_birth)
+          patient:patient_id(id, first_name, last_name, date_of_birth, current_flow_step)
         `)
         .eq('id', testId)
         .single();
@@ -397,6 +399,15 @@ const LabTestProcessForm: React.FC = () => {
           type: 'success'
         });
         
+        // Update patient flow step if needed
+        if (test.patient.current_flow_step === 'lab_tests') {
+          // Create a mock function to update patient status
+          console.log('Updating patient flow step to waiting_consultation');
+          
+          // In a real app, we would update the patient's flow step
+          // For now, we'll just log it
+        }
+        
         return;
       }
       
@@ -419,12 +430,14 @@ const LabTestProcessForm: React.FC = () => {
       if (error) throw error;
       
       // Update patient flow step if needed
-      await supabase
-        .from('patients')
-        .update({
-          current_flow_step: 'waiting_consultation'
-        })
-        .eq('id', test.patient.id);
+      if (test.patient.current_flow_step === 'lab_tests') {
+        await supabase
+          .from('patients')
+          .update({
+            current_flow_step: 'waiting_consultation'
+          })
+          .eq('id', test.patient.id);
+      }
       
       // Update local state
       setTest({
@@ -642,6 +655,35 @@ const LabTestProcessForm: React.FC = () => {
     }
     
     return false;
+  };
+
+  // Update patient status after completing lab test
+  const updatePatientStatus = async () => {
+    if (!test || !test.patient) return;
+    
+    try {
+      // Check if the patient is currently in lab_tests flow step
+      if (test.patient.current_flow_step === 'lab_tests') {
+        // Update patient flow step to waiting_consultation
+        if (import.meta.env.DEV) {
+          console.log('Updating patient flow step to waiting_consultation');
+          return;
+        }
+        
+        const { error } = await supabase
+          .from('patients')
+          .update({
+            current_flow_step: 'waiting_consultation'
+          })
+          .eq('id', test.patient.id);
+          
+        if (error) throw error;
+        
+        console.log('Patient status updated to waiting_consultation');
+      }
+    } catch (error) {
+      console.error('Error updating patient status:', error);
+    }
   };
 
   if (isLoading) {
@@ -1178,6 +1220,7 @@ const LabTestProcessForm: React.FC = () => {
                     onClick={() => {
                       setConfirmRelease(false);
                       handleReviewComplete();
+                      updatePatientStatus(); // Update patient status after completing the test
                     }}
                     className={`btn py-2 text-sm px-4 ${isApproved ? 'btn-primary' : 'btn-error'}`}
                   >
