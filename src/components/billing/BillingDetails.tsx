@@ -25,6 +25,7 @@ interface Bill {
     coverage_percentage: number;
   } | null;
   payment_date: string | null;
+  is_emergency: boolean;
 }
 
 const BillingDetails: React.FC = () => {
@@ -188,6 +189,12 @@ const BillingDetails: React.FC = () => {
             <p className="mt-1 text-gray-600">
               {bill.patient.first_name} {bill.patient.last_name}
             </p>
+            {bill.is_emergency && (
+              <div className="mt-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-error-100 text-error-800">
+                <AlertTriangle className="h-3.5 w-3.5 mr-1" />
+                Emergency Case
+              </div>
+            )}
           </div>
 
           {bill.insurance_info && (
@@ -249,6 +256,17 @@ const BillingDetails: React.FC = () => {
         {!isFullyPaid && (
           <div className="border-t border-gray-200 pt-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Process Payment</h2>
+            {bill.is_emergency && (
+              <div className="mb-4 p-3 bg-warning-50 border border-warning-200 rounded-lg flex items-start">
+                <AlertTriangle className="h-5 w-5 text-warning-500 mt-0.5 mr-2 flex-shrink-0" />
+                <div>
+                  <p className="font-medium text-warning-800">Emergency Case</p>
+                  <p className="text-sm text-warning-700">
+                    This is an emergency case. Payment can be processed later if needed.
+                  </p>
+                </div>
+              </div>
+            )}
             <div className="space-y-4">
               <div>
                 <label htmlFor="paymentAmount" className="form-label">Payment Amount</label>
@@ -286,6 +304,15 @@ const BillingDetails: React.FC = () => {
                   </>
                 )}
               </button>
+              
+              {bill.is_emergency && (
+                <button
+                  onClick={() => navigate('/billing')}
+                  className="btn btn-outline w-full flex justify-center items-center mt-2"
+                >
+                  Process Payment Later
+                </button>
+              )}
             </div>
           </div>
         )}

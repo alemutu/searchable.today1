@@ -181,6 +181,12 @@ const PharmacyDispense: React.FC = () => {
             }`}>
               {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
             </span>
+            {order.is_emergency && order.payment_status === 'pending' && (
+              <p className="mt-2 text-sm text-error-600">
+                <AlertTriangle className="h-4 w-4 inline mr-1" />
+                Emergency case - medications can be dispensed before payment
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -245,9 +251,9 @@ const PharmacyDispense: React.FC = () => {
               </button>
               <button
                 onClick={handleDispense}
-                disabled={!allDispensed || order.payment_status === 'pending'}
+                disabled={!allDispensed || (order.payment_status === 'pending' && !order.is_emergency)}
                 className="btn btn-primary"
-                title={order.payment_status === 'pending' ? 'Cannot dispense until payment is completed' : ''}
+                title={order.payment_status === 'pending' && !order.is_emergency ? 'Cannot dispense until payment is completed' : ''}
               >
                 Complete Dispensing
               </button>
