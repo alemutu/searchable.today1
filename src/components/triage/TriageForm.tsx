@@ -473,7 +473,8 @@ const TriageForm: React.FC = () => {
         type: 'success'
       });
       
-      navigate('/patients');
+      // Redirect to the triage dashboard
+      navigate('/triage');
     } catch (error: any) {
       console.error('Error submitting triage form:', error.message);
       

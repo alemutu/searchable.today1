@@ -449,6 +449,9 @@ const LabTestProcessForm: React.FC = () => {
         type: 'success'
       });
       
+      // Redirect to laboratory dashboard
+      navigate('/laboratory');
+      
     } catch (error: any) {
       console.error('Error completing review:', error);
       addNotification({

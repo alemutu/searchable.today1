@@ -355,6 +355,9 @@ const RadiologyProcessForm: React.FC = () => {
           type: 'success'
         });
         
+        // Redirect to radiology dashboard
+        navigate('/radiology');
+        
         return;
       }
       
@@ -405,6 +408,9 @@ const RadiologyProcessForm: React.FC = () => {
         type: 'success'
       });
       
+      // Redirect to radiology dashboard
+      navigate('/radiology');
+      
     } catch (error: any) {
       console.error('Error saving radiology scan results:', error);
       addNotification({
@@ -430,7 +436,9 @@ const RadiologyProcessForm: React.FC = () => {
     return types[type] || type;
   };
 
-  const getEquipmentLabel = (equipment: string) => {
+  const getEquipmentLabel = (equipment?: string) => {
+    if (!equipment) return '';
+    
     const types: Record<string, string> = {
       'x_ray_machine': 'X-Ray Machine',
       'ct_scanner': 'CT Scanner',

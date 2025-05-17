@@ -141,6 +141,7 @@ const BillingDetails: React.FC = () => {
         type: 'success'
       });
       
+      // Redirect to billing dashboard
       navigate('/billing');
     } catch (error) {
       console.error('Error processing payment:', error);

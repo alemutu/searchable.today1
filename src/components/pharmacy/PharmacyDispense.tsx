@@ -106,6 +106,7 @@ const PharmacyDispense: React.FC = () => {
         type: 'success'
       });
 
+      // Redirect to pharmacy dashboard
       navigate('/pharmacy');
     } catch (error) {
       console.error('Error dispensing medications:', error);
