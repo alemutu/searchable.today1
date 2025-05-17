@@ -35,41 +35,43 @@ const PharmacyDispense: React.FC = () => {
   const [dispensedMeds, setDispensedMeds] = useState<{ [key: number]: boolean }>({});
 
   useEffect(() => {
-    const fetchOrder = async () => {
-      if (!hospital || !orderId) return;
+    if (orderId) {
+      fetchOrder();
+    }
+  }, [orderId, hospital]);
 
-      try {
-        const { data, error } = await supabase
-          .from('pharmacy')
-          .select(`
-            *,
-            patient:patients(id, first_name, last_name)
-          `)
-          .eq('id', orderId)
-          .single();
+  const fetchOrder = async () => {
+    if (!hospital || !orderId) return;
 
-        if (error) throw error;
-        setOrder(data);
-        
-        // Initialize dispensed state
-        const initialDispensed = {};
-        data.medications.forEach((_, index) => {
-          initialDispensed[index] = false;
-        });
-        setDispensedMeds(initialDispensed);
-      } catch (error) {
-        console.error('Error fetching pharmacy order:', error);
-        addNotification({
-          message: 'Failed to load pharmacy order',
-          type: 'error'
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    try {
+      const { data, error } = await supabase
+        .from('pharmacy')
+        .select(`
+          *,
+          patient:patients(id, first_name, last_name)
+        `)
+        .eq('id', orderId)
+        .single();
 
-    fetchOrder();
-  }, [hospital, orderId, addNotification]);
+      if (error) throw error;
+      setOrder(data);
+      
+      // Initialize dispensed state
+      const initialDispensed = {};
+      data.medications.forEach((_, index) => {
+        initialDispensed[index] = false;
+      });
+      setDispensedMeds(initialDispensed);
+    } catch (error) {
+      console.error('Error fetching pharmacy order:', error);
+      addNotification({
+        message: 'Failed to load pharmacy order',
+        type: 'error'
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleDispense = async () => {
     if (!order || !user) return;

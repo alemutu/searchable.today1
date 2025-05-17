@@ -74,6 +74,8 @@ interface Patient {
   medical_history: any;
   status: string;
   current_flow_step: string | null;
+  priority_level?: string;
+  is_emergency?: boolean;
 }
 
 interface Department {
@@ -157,6 +159,7 @@ const TriageForm: React.FC = () => {
   const acuityLevel = watch('acuityLevel');
   const chronicConditions = watch('medicalHistory.chronicConditions');
   const hasAllergies = watch('medicalHistory.allergies.hasAllergies');
+  const isEmergency = watch('isEmergency');
   
   useEffect(() => {
     // Clear any previous form errors
@@ -189,13 +192,18 @@ const TriageForm: React.FC = () => {
     // Update patient state when data is loaded
     if (patientData) {
       setPatient(patientData);
+      
+      // If patient is already marked as emergency, set the form value
+      if (patientData.is_emergency || patientData.current_flow_step === 'emergency') {
+        setValue('isEmergency', true);
+      }
     }
     
     // Set loading state based on both data fetches
     if (!patientLoading && !departmentsLoading) {
       setIsLoading(false);
     }
-  }, [patientData, patientLoading, departmentsLoading]);
+  }, [patientData, patientLoading, departmentsLoading, setValue]);
   
   useEffect(() => {
     // Set departments from fetched data
@@ -285,6 +293,7 @@ const TriageForm: React.FC = () => {
       // Suggest acuity level based on analysis
       if (analysis.includes('Critical') || analysis.includes('severe')) {
         setValue('acuityLevel', 1);
+        setValue('isEmergency', true);
       } else if (analysis.includes('Concerning') || analysis.includes('moderate')) {
         setValue('acuityLevel', 2);
       } else if (analysis.includes('Abnormal') || analysis.includes('mild')) {
@@ -416,9 +425,30 @@ const TriageForm: React.FC = () => {
       
       // Determine the next flow step based on department and emergency status
       let nextStep = 'waiting_consultation';
+      let priorityLevel = 'normal';
+      
+      // Set priority level based on acuity level
+      switch (data.acuityLevel) {
+        case 1:
+          priorityLevel = 'critical';
+          break;
+        case 2:
+          priorityLevel = 'urgent';
+          break;
+        case 3:
+          priorityLevel = 'normal';
+          break;
+        case 4:
+        case 5:
+          priorityLevel = 'non-urgent';
+          break;
+        default:
+          priorityLevel = 'normal';
+      }
       
       if (data.isEmergency) {
         nextStep = 'emergency';
+        priorityLevel = 'critical';
       } else if (data.departmentId) {
         // If a specific department is selected, update the flow step to include the department
         const selectedDepartment = departments.find(dept => dept.id === data.departmentId);
@@ -432,6 +462,8 @@ const TriageForm: React.FC = () => {
       const updatedPatient = {
         ...patient,
         current_flow_step: nextStep,
+        priority_level: priorityLevel,
+        is_emergency: data.isEmergency,
         medical_history: {
           ...patient.medical_history,
           chronicConditions: data.medicalHistory.chronicConditions,
@@ -554,6 +586,15 @@ const TriageForm: React.FC = () => {
                 <span className="bg-black bg-opacity-20 px-2 py-0.5 rounded">
                   {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                 </span>
+                {patient.is_emergency && (
+                  <>
+                    <span className="mx-2">•</span>
+                    <span className="bg-error-600 text-white px-2 py-0.5 rounded flex items-center">
+                      <AlertTriangle className="h-3 w-3 mr-1" />
+                      EMERGENCY
+                    </span>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -1051,6 +1092,7 @@ const TriageForm: React.FC = () => {
                     id="isEmergency"
                     {...register('isEmergency')}
                     className="h-3.5 w-3.5 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                    checked={isEmergency || patient.is_emergency || patient.current_flow_step === 'emergency'}
                   />
                   <label htmlFor="isEmergency" className="ml-1.5 flex items-center text-xs font-medium text-red-700">
                     <AlertTriangle className="h-3.5 w-3.5 mr-1 text-red-500" />
