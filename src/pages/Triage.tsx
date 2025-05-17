@@ -38,7 +38,7 @@ interface Patient {
 const Triage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterPriority, setFilterPriority] = useState('all');
-  const [activeTab, setActiveTab] = useState<'waiting' | 'in_progress'>('in_progress');
+  const [activeTab, setActiveTab] = useState<'waiting' | 'in_progress'>('waiting');
   const [assignedToMe, setAssignedToMe] = useState(false);
   const { addNotification } = useNotificationStore();
   
@@ -200,7 +200,8 @@ const Triage: React.FC = () => {
     const matchesAssigned = !assignedToMe || patient.assigned_to === 'current_user'; // Replace with actual user ID
     
     if (activeTab === 'waiting') {
-      return patient.current_flow_step === 'registration' && matchesSearch && matchesPriority && matchesAssigned;
+      // Show patients in 'registration' flow step in the waiting tab
+      return (patient.current_flow_step === 'registration') && matchesSearch && matchesPriority && matchesAssigned;
     } else {
       return patient.current_flow_step === 'triage' && matchesSearch && matchesPriority && matchesAssigned;
     }
