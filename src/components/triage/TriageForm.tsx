@@ -93,16 +93,16 @@ const TriageForm: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   
-  // Use the useHybridStorage hook for patients
+  // Patient storage hook
   const { 
-    data: patient,
+    data: patientData,
     loading: patientLoading,
     error: patientError,
     fetchById: fetchPatient,
     saveItem: savePatient
   } = useHybridStorage<Patient>('patients');
   
-  // Use the useHybridStorage hook for departments
+  // Departments storage hook
   const { 
     data: departmentsData,
     loading: departmentsLoading,
@@ -110,8 +110,14 @@ const TriageForm: React.FC = () => {
     fetchItems: fetchDepartments
   } = useHybridStorage<Department>('departments');
   
-  // State for departments
+  // Triage storage hook
+  const { 
+    saveItem: saveTriage
+  } = useHybridStorage<any>('triage');
+  
+  // Local state for departments and patient
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [patient, setPatient] = useState<Patient | null>(null);
   
   const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<TriageFormData>({
     defaultValues: {
@@ -162,6 +168,18 @@ const TriageForm: React.FC = () => {
   }, [patientId, fetchPatient, fetchDepartments]);
   
   useEffect(() => {
+    // Update patient state when data is loaded
+    if (patientData) {
+      setPatient(patientData);
+    }
+    
+    // Set loading state based on both data fetches
+    if (!patientLoading && !departmentsLoading) {
+      setIsLoading(false);
+    }
+  }, [patientData, patientLoading, departmentsLoading]);
+  
+  useEffect(() => {
     // Set departments from fetched data
     if (departmentsData && Array.isArray(departmentsData)) {
       setDepartments(departmentsData);
@@ -199,12 +217,7 @@ const TriageForm: React.FC = () => {
         setValue('departmentId', generalMedicineDept.id);
       }
     }
-    
-    // Set loading state based on both data fetches
-    if (!patientLoading && !departmentsLoading) {
-      setIsLoading(false);
-    }
-  }, [departmentsData, patientLoading, departmentsLoading, setValue]);
+  }, [departmentsData, departmentsLoading, setValue]);
   
   useEffect(() => {
     // Calculate BMI if height and weight are available
@@ -395,8 +408,7 @@ const TriageForm: React.FC = () => {
       await savePatient(updatedPatient, patient.id);
       
       // Create triage record in local storage
-      const { saveItem: saveTriageItem } = useHybridStorage('triage');
-      await saveTriageItem({
+      await saveTriage({
         id: Date.now().toString(), // Generate a unique ID
         patient_id: patient.id,
         vital_signs: data.vitalSigns,
