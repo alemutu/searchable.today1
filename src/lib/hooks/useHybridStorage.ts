@@ -13,10 +13,10 @@ export function useHybridStorage<T extends object>(
   // Fetch data
   const fetchItems = useCallback(async (query?: { [key: string]: any }) => {
     setLoading(true);
+    setError(null);
     try {
       const result = await fetchData<T>(table, undefined, query || initialQuery);
       setData(result);
-      setError(null);
     } catch (err) {
       console.error(`Error fetching ${table}:`, err);
       setError(err as Error);
@@ -28,10 +28,10 @@ export function useHybridStorage<T extends object>(
   // Fetch a single item by ID
   const fetchById = useCallback(async (id: string) => {
     setLoading(true);
+    setError(null);
     try {
       const result = await fetchData<T>(table, id);
       setData(result);
-      setError(null);
     } catch (err) {
       console.error(`Error fetching ${table} by ID:`, err);
       setError(err as Error);
@@ -43,6 +43,7 @@ export function useHybridStorage<T extends object>(
   // Save an item
   const saveItem = useCallback(async (item: T, id?: string): Promise<T> => {
     setLoading(true);
+    setError(null);
     try {
       const result = await saveData<T>(table, item, id);
       
@@ -60,7 +61,6 @@ export function useHybridStorage<T extends object>(
         setData(result);
       }
       
-      setError(null);
       return result;
     } catch (err) {
       console.error(`Error saving ${table}:`, err);
@@ -74,6 +74,7 @@ export function useHybridStorage<T extends object>(
   // Delete an item
   const deleteItem = useCallback(async (id: string) => {
     setLoading(true);
+    setError(null);
     try {
       await deleteData(table, id);
       
@@ -83,8 +84,6 @@ export function useHybridStorage<T extends object>(
       } else if (data && (data as any).id === id) {
         setData(null);
       }
-      
-      setError(null);
     } catch (err) {
       console.error(`Error deleting ${table}:`, err);
       setError(err as Error);

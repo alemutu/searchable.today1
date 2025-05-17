@@ -94,6 +94,7 @@ const TriageForm: React.FC = () => {
   const [currentStep, setCurrentStep] = useState(1);
   const [patientData, setPatientData] = useState<Patient | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [formError, setFormError] = useState<string | null>(null);
   
   // Patient storage hook
   const { 
@@ -114,7 +115,8 @@ const TriageForm: React.FC = () => {
   
   // Triage storage hook
   const { 
-    saveItem: saveTriage
+    saveItem: saveTriage,
+    error: triageError
   } = useHybridStorage<any>('triage');
   
   const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<TriageFormData>({
@@ -155,15 +157,31 @@ const TriageForm: React.FC = () => {
   const hasAllergies = watch('medicalHistory.allergies.hasAllergies');
   
   useEffect(() => {
+    // Clear any previous form errors
+    setFormError(null);
+    
     // Fetch departments data
-    fetchDepartments();
+    fetchDepartments().catch(error => {
+      console.error("Error fetching departments:", error);
+      addNotification({
+        message: `Failed to load departments: ${error.message}`,
+        type: 'error'
+      });
+    });
     
     if (patientId) {
-      fetchPatient(patientId);
+      fetchPatient(patientId).catch(error => {
+        console.error("Error fetching patient:", error);
+        addNotification({
+          message: `Failed to load patient data: ${error.message}`,
+          type: 'error'
+        });
+      });
     } else {
       setIsLoading(false);
+      setFormError("No patient ID provided");
     }
-  }, [patientId, fetchPatient, fetchDepartments]);
+  }, [patientId, fetchPatient, fetchDepartments, addNotification]);
   
   useEffect(() => {
     // Update patient state when data is loaded
@@ -226,6 +244,16 @@ const TriageForm: React.FC = () => {
     }
   }, [vitalSigns.height, vitalSigns.weight, setValue]);
 
+  // Display error notification if there's a triage error
+  useEffect(() => {
+    if (triageError) {
+      addNotification({
+        message: `Error with triage data: ${triageError.message}`,
+        type: 'error'
+      });
+    }
+  }, [triageError, addNotification]);
+
   const calculateAge = (dateOfBirth: string) => {
     const birthDate = new Date(dateOfBirth);
     const today = new Date();
@@ -264,6 +292,10 @@ const TriageForm: React.FC = () => {
       }
     } catch (error) {
       console.error('Error analyzing vitals:', error);
+      addNotification({
+        message: 'Failed to analyze vital signs',
+        type: 'error'
+      });
     } finally {
       setIsAnalyzing(false);
     }
@@ -324,12 +356,71 @@ const TriageForm: React.FC = () => {
   };
 
   const nextStep = () => {
-    if (currentStep < 3) {
+    // Validate current step before proceeding
+    let isValid = true;
+    
+    if (currentStep === 1) {
+      // For vital signs, we don't require all fields, but if any are filled, validate them
+      const { temperature, heartRate, respiratoryRate, bloodPressureSystolic, bloodPressureDiastolic, oxygenSaturation } = vitalSigns;
+      
+      if (temperature && (temperature < 35 || temperature > 42)) {
+        addNotification({
+          message: 'Temperature should be between 35°C and 42°C',
+          type: 'warning'
+        });
+        isValid = false;
+      }
+      
+      if (heartRate && (heartRate < 40 || heartRate > 220)) {
+        addNotification({
+          message: 'Heart rate should be between 40 and 220 bpm',
+          type: 'warning'
+        });
+        isValid = false;
+      }
+      
+      if (respiratoryRate && (respiratoryRate < 8 || respiratoryRate > 40)) {
+        addNotification({
+          message: 'Respiratory rate should be between 8 and 40 breaths/min',
+          type: 'warning'
+        });
+        isValid = false;
+      }
+      
+      if (bloodPressureSystolic && (bloodPressureSystolic < 70 || bloodPressureSystolic > 250)) {
+        addNotification({
+          message: 'Systolic blood pressure should be between 70 and 250 mmHg',
+          type: 'warning'
+        });
+        isValid = false;
+      }
+      
+      if (bloodPressureDiastolic && (bloodPressureDiastolic < 40 || bloodPressureDiastolic > 150)) {
+        addNotification({
+          message: 'Diastolic blood pressure should be between 40 and 150 mmHg',
+          type: 'warning'
+        });
+        isValid = false;
+      }
+      
+      if (oxygenSaturation && (oxygenSaturation < 70 || oxygenSaturation > 100)) {
+        addNotification({
+          message: 'Oxygen saturation should be between 70% and 100%',
+          type: 'warning'
+        });
+        isValid = false;
+      }
+    }
+    
+    if (isValid && currentStep < 3) {
       setCurrentStep(currentStep + 1);
       
       // Map step to tab
       if (currentStep === 1) setActiveTab('medical-history');
       if (currentStep === 2) setActiveTab('assessment');
+      
+      // Scroll to top
+      window.scrollTo(0, 0);
     }
   };
 
@@ -340,19 +431,40 @@ const TriageForm: React.FC = () => {
       // Map step to tab
       if (currentStep === 2) setActiveTab('vitals');
       if (currentStep === 3) setActiveTab('medical-history');
+      
+      // Scroll to top
+      window.scrollTo(0, 0);
     }
   };
 
   const onSubmit = async (data: TriageFormData) => {
-    if (!user || !patientData) return;
+    if (!user) {
+      setFormError("User authentication error. Please log in again.");
+      addNotification({
+        message: 'Authentication error. Please log in again.',
+        type: 'error'
+      });
+      return;
+    }
+    
+    if (!patientData) {
+      setFormError("Patient data not found. Please try again.");
+      addNotification({
+        message: 'Patient data not found',
+        type: 'error'
+      });
+      return;
+    }
     
     try {
       setIsSaving(true);
+      setFormError(null);
       
       console.log('Triage form submitted:', data);
       
       // Validate required fields
       if (!data.chiefComplaint) {
+        setFormError("Chief complaint is required");
         addNotification({
           message: 'Chief complaint is required',
           type: 'error'
@@ -363,6 +475,7 @@ const TriageForm: React.FC = () => {
       }
       
       if (!data.departmentId) {
+        setFormError("Please select a department");
         addNotification({
           message: 'Please select a department',
           type: 'error'
@@ -386,6 +499,26 @@ const TriageForm: React.FC = () => {
         }
       }
       
+      // Create a unique ID for the triage record
+      const triageId = `triage_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      
+      // Create triage record first
+      const triageRecord = {
+        id: triageId,
+        patient_id: patientData.id,
+        vital_signs: data.vitalSigns,
+        chief_complaint: data.chiefComplaint,
+        acuity_level: data.acuityLevel,
+        notes: data.notes,
+        triaged_by: user.id,
+        department_id: data.departmentId || null,
+        is_emergency: data.isEmergency,
+        created_at: new Date().toISOString()
+      };
+      
+      // Save the triage record
+      await saveTriage(triageRecord, triageId);
+      
       // Update patient's current flow step and medical history
       const updatedPatient = {
         ...patientData,
@@ -405,20 +538,6 @@ const TriageForm: React.FC = () => {
       // Save the updated patient
       await savePatient(updatedPatient, patientData.id);
       
-      // Create triage record
-      await saveTriage({
-        id: Date.now().toString(), // Generate a unique ID
-        patient_id: patientData.id,
-        vital_signs: data.vitalSigns,
-        chief_complaint: data.chiefComplaint,
-        acuity_level: data.acuityLevel,
-        notes: data.notes,
-        triaged_by: user.id,
-        department_id: data.departmentId || null,
-        is_emergency: data.isEmergency,
-        created_at: new Date().toISOString()
-      });
-      
       // Show success notification
       addNotification({
         message: 'Triage completed successfully',
@@ -428,6 +547,9 @@ const TriageForm: React.FC = () => {
       navigate('/patients');
     } catch (error: any) {
       console.error('Error submitting triage form:', error.message);
+      
+      // Set form error
+      setFormError(`Error: ${error.message}`);
       
       // Show error notification
       addNotification({
@@ -451,6 +573,12 @@ const TriageForm: React.FC = () => {
     return (
       <div className="text-center p-3">
         <p className="text-error-500">Error loading patient: {patientError.message}</p>
+        <button 
+          onClick={() => navigate('/patients')}
+          className="mt-4 btn btn-outline"
+        >
+          Return to Patients
+        </button>
       </div>
     );
   }
@@ -459,6 +587,12 @@ const TriageForm: React.FC = () => {
     return (
       <div className="text-center p-3">
         <p className="text-gray-500">Patient not found</p>
+        <button 
+          onClick={() => navigate('/patients')}
+          className="mt-4 btn btn-outline"
+        >
+          Return to Patients
+        </button>
       </div>
     );
   }
@@ -488,6 +622,17 @@ const TriageForm: React.FC = () => {
             </div>
           </div>
         </div>
+
+        {/* Form Error Message */}
+        {formError && (
+          <div className="bg-error-50 border border-error-200 text-error-700 px-4 py-3 rounded-md mb-4 flex items-start">
+            <AlertCircle className="h-5 w-5 text-error-400 mt-0.5 mr-3 flex-shrink-0" />
+            <div>
+              <p className="font-medium">Error</p>
+              <p>{formError}</p>
+            </div>
+          </div>
+        )}
 
         {/* Progress Steps */}
         <div className="bg-white rounded-lg shadow-md mb-4">
@@ -565,11 +710,17 @@ const TriageForm: React.FC = () => {
                     <input
                       type="number"
                       step="0.1"
-                      {...register('vitalSigns.temperature')}
-                      className="form-input pl-9 py-2 text-sm"
+                      {...register('vitalSigns.temperature', {
+                        min: { value: 35, message: 'Temperature should be at least 35°C' },
+                        max: { value: 42, message: 'Temperature should be at most 42°C' }
+                      })}
+                      className={`form-input pl-9 py-2 text-sm ${errors.vitalSigns?.temperature ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                       placeholder="36.5"
                     />
                   </div>
+                  {errors.vitalSigns?.temperature && (
+                    <p className="form-error text-xs">{errors.vitalSigns.temperature.message}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-1">
@@ -580,11 +731,17 @@ const TriageForm: React.FC = () => {
                     </div>
                     <input
                       type="number"
-                      {...register('vitalSigns.heartRate')}
-                      className="form-input pl-9 py-2 text-sm"
+                      {...register('vitalSigns.heartRate', {
+                        min: { value: 40, message: 'Heart rate should be at least 40 bpm' },
+                        max: { value: 220, message: 'Heart rate should be at most 220 bpm' }
+                      })}
+                      className={`form-input pl-9 py-2 text-sm ${errors.vitalSigns?.heartRate ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                       placeholder="75"
                     />
                   </div>
+                  {errors.vitalSigns?.heartRate && (
+                    <p className="form-error text-xs">{errors.vitalSigns.heartRate.message}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-1">
@@ -595,11 +752,17 @@ const TriageForm: React.FC = () => {
                     </div>
                     <input
                       type="number"
-                      {...register('vitalSigns.respiratoryRate')}
-                      className="form-input pl-9 py-2 text-sm"
+                      {...register('vitalSigns.respiratoryRate', {
+                        min: { value: 8, message: 'Respiratory rate should be at least 8 breaths/min' },
+                        max: { value: 40, message: 'Respiratory rate should be at most 40 breaths/min' }
+                      })}
+                      className={`form-input pl-9 py-2 text-sm ${errors.vitalSigns?.respiratoryRate ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                       placeholder="16"
                     />
                   </div>
+                  {errors.vitalSigns?.respiratoryRate && (
+                    <p className="form-error text-xs">{errors.vitalSigns.respiratoryRate.message}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-1">
@@ -608,19 +771,31 @@ const TriageForm: React.FC = () => {
                     <div className="relative flex-1">
                       <input
                         type="number"
-                        {...register('vitalSigns.bloodPressureSystolic')}
-                        className="form-input py-2 text-sm"
+                        {...register('vitalSigns.bloodPressureSystolic', {
+                          min: { value: 70, message: 'Systolic BP should be at least 70 mmHg' },
+                          max: { value: 250, message: 'Systolic BP should be at most 250 mmHg' }
+                        })}
+                        className={`form-input py-2 text-sm ${errors.vitalSigns?.bloodPressureSystolic ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                         placeholder="120"
                       />
+                      {errors.vitalSigns?.bloodPressureSystolic && (
+                        <p className="form-error text-xs">{errors.vitalSigns.bloodPressureSystolic.message}</p>
+                      )}
                     </div>
                     <span className="text-gray-500">/</span>
                     <div className="relative flex-1">
                       <input
                         type="number"
-                        {...register('vitalSigns.bloodPressureDiastolic')}
-                        className="form-input py-2 text-sm"
+                        {...register('vitalSigns.bloodPressureDiastolic', {
+                          min: { value: 40, message: 'Diastolic BP should be at least 40 mmHg' },
+                          max: { value: 150, message: 'Diastolic BP should be at most 150 mmHg' }
+                        })}
+                        className={`form-input py-2 text-sm ${errors.vitalSigns?.bloodPressureDiastolic ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                         placeholder="80"
                       />
+                      {errors.vitalSigns?.bloodPressureDiastolic && (
+                        <p className="form-error text-xs">{errors.vitalSigns.bloodPressureDiastolic.message}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -635,11 +810,17 @@ const TriageForm: React.FC = () => {
                       type="number"
                       min="0"
                       max="100"
-                      {...register('vitalSigns.oxygenSaturation')}
-                      className="form-input pl-9 py-2 text-sm"
+                      {...register('vitalSigns.oxygenSaturation', {
+                        min: { value: 70, message: 'O2 saturation should be at least 70%' },
+                        max: { value: 100, message: 'O2 saturation cannot exceed 100%' }
+                      })}
+                      className={`form-input pl-9 py-2 text-sm ${errors.vitalSigns?.oxygenSaturation ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                       placeholder="98"
                     />
                   </div>
+                  {errors.vitalSigns?.oxygenSaturation && (
+                    <p className="form-error text-xs">{errors.vitalSigns.oxygenSaturation.message}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-1">
@@ -648,6 +829,10 @@ const TriageForm: React.FC = () => {
                     <Controller
                       name="vitalSigns.painLevel"
                       control={control}
+                      rules={{
+                        min: { value: 0, message: 'Pain level cannot be negative' },
+                        max: { value: 10, message: 'Pain level cannot exceed 10' }
+                      }}
                       render={({ field }) => (
                         <div className="flex items-center">
                           <input
@@ -671,6 +856,9 @@ const TriageForm: React.FC = () => {
                       <span>Severe</span>
                     </div>
                   </div>
+                  {errors.vitalSigns?.painLevel && (
+                    <p className="form-error text-xs">{errors.vitalSigns.painLevel.message}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-1">
@@ -682,11 +870,17 @@ const TriageForm: React.FC = () => {
                     <input
                       type="number"
                       step="0.1"
-                      {...register('vitalSigns.weight')}
-                      className="form-input pl-9 py-2 text-sm"
+                      {...register('vitalSigns.weight', {
+                        min: { value: 0.5, message: 'Weight should be at least 0.5 kg' },
+                        max: { value: 500, message: 'Weight should be at most 500 kg' }
+                      })}
+                      className={`form-input pl-9 py-2 text-sm ${errors.vitalSigns?.weight ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                       placeholder="70"
                     />
                   </div>
+                  {errors.vitalSigns?.weight && (
+                    <p className="form-error text-xs">{errors.vitalSigns.weight.message}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-1">
@@ -697,11 +891,17 @@ const TriageForm: React.FC = () => {
                     </div>
                     <input
                       type="number"
-                      {...register('vitalSigns.height')}
-                      className="form-input pl-9 py-2 text-sm"
+                      {...register('vitalSigns.height', {
+                        min: { value: 30, message: 'Height should be at least 30 cm' },
+                        max: { value: 250, message: 'Height should be at most 250 cm' }
+                      })}
+                      className={`form-input pl-9 py-2 text-sm ${errors.vitalSigns?.height ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                       placeholder="170"
                     />
                   </div>
+                  {errors.vitalSigns?.height && (
+                    <p className="form-error text-xs">{errors.vitalSigns.height.message}</p>
+                  )}
                 </div>
                 
                 <div className="space-y-1">
@@ -849,11 +1049,23 @@ const TriageForm: React.FC = () => {
                   
                   {hasAllergies && (
                     <textarea
-                      {...register('medicalHistory.allergies.allergyList')}
-                      className="form-input py-2 text-sm w-full"
+                      {...register('medicalHistory.allergies.allergyList', {
+                        validate: value => {
+                          if (hasAllergies && !value.trim()) {
+                            return 'Please list the allergies or uncheck the box';
+                          }
+                          return true;
+                        }
+                      })}
+                      className={`form-input py-2 text-sm w-full ${
+                        errors.medicalHistory?.allergies?.allergyList ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''
+                      }`}
                       rows={2}
                       placeholder="List allergies, separated by commas (e.g., Penicillin, Peanuts, Latex)..."
                     />
+                  )}
+                  {errors.medicalHistory?.allergies?.allergyList && (
+                    <p className="form-error text-xs mt-1">{errors.medicalHistory.allergies.allergyList.message}</p>
                   )}
                 </div>
                 
@@ -892,7 +1104,10 @@ const TriageForm: React.FC = () => {
                 <div>
                   <label className="form-label text-sm required">Chief Complaint</label>
                   <textarea
-                    {...register('chiefComplaint', { required: 'Chief complaint is required' })}
+                    {...register('chiefComplaint', { 
+                      required: 'Chief complaint is required',
+                      minLength: { value: 3, message: 'Please provide a more detailed complaint' }
+                    })}
                     className={`form-input py-2 text-sm ${errors.chiefComplaint ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                     rows={3}
                     placeholder="Describe the patient's main complaint"

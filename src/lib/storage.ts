@@ -113,18 +113,24 @@ export const saveData = async <T extends object>(
   // Save to local storage
   const localStorageKey = `${table}_${itemId}`;
   const itemToSave = { ...sanitizedData, id: itemId };
-  localStorage.setItem(localStorageKey, JSON.stringify(itemToSave));
   
-  // Add to queue for later sync when online
-  addToQueue({
-    table,
-    type: id ? 'update' : 'insert',
-    data: itemToSave,
-    id: itemId,
-    timestamp: Date.now()
-  });
-  
-  return itemToSave as T;
+  try {
+    localStorage.setItem(localStorageKey, JSON.stringify(itemToSave));
+    
+    // Add to queue for later sync when online
+    addToQueue({
+      table,
+      type: id ? 'update' : 'insert',
+      data: itemToSave,
+      id: itemId,
+      timestamp: Date.now()
+    });
+    
+    return itemToSave as T;
+  } catch (error) {
+    console.error('Error saving to localStorage:', error);
+    throw new Error(`Failed to save data: ${error instanceof Error ? error.message : String(error)}`);
+  }
 };
 
 // Generic fetch function that works with local storage
@@ -133,49 +139,69 @@ export const fetchData = async <T>(
   id?: string,
   query?: any
 ): Promise<T | T[] | null> => {
-  // If fetching a specific item by ID
-  if (id) {
-    const localData = localStorage.getItem(`${table}_${id}`);
-    if (localData) {
-      try {
-        return JSON.parse(localData) as T;
-      } catch (e) {
-        console.error('Error parsing local data:', e);
-        return null;
+  try {
+    // If fetching a specific item by ID
+    if (id) {
+      const localData = localStorage.getItem(`${table}_${id}`);
+      if (localData) {
+        try {
+          return JSON.parse(localData) as T;
+        } catch (e) {
+          console.error('Error parsing local data:', e);
+          return null;
+        }
       }
-    }
-    return null;
-  } 
-  
-  // If fetching all items or with a query
-  const results: T[] = [];
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    if (key && key.startsWith(`${table}_`)) {
-      try {
-        const item = JSON.parse(localStorage.getItem(key) || '{}');
-        
-        // Apply query filter if provided
-        if (query) {
-          let matches = true;
-          Object.entries(query).forEach(([queryKey, queryValue]) => {
-            if (item[queryKey] !== queryValue) {
-              matches = false;
-            }
-          });
+      return null;
+    } 
+    
+    // If fetching all items or with a query
+    const results: T[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith(`${table}_`)) {
+        try {
+          const item = JSON.parse(localStorage.getItem(key) || '{}');
           
-          if (matches) {
+          // Apply query filter if provided
+          if (query) {
+            let matches = true;
+            Object.entries(query).forEach(([queryKey, queryValue]) => {
+              if (queryKey === 'search' && typeof queryValue === 'string') {
+                // Special case for search - check if any string field contains the search term
+                const searchTerm = queryValue.toLowerCase();
+                let foundMatch = false;
+                
+                for (const [itemKey, itemValue] of Object.entries(item)) {
+                  if (typeof itemValue === 'string' && itemValue.toLowerCase().includes(searchTerm)) {
+                    foundMatch = true;
+                    break;
+                  }
+                }
+                
+                if (!foundMatch) {
+                  matches = false;
+                }
+              } else if (item[queryKey] !== queryValue) {
+                matches = false;
+              }
+            });
+            
+            if (matches) {
+              results.push(item as T);
+            }
+          } else {
             results.push(item as T);
           }
-        } else {
-          results.push(item as T);
+        } catch (e) {
+          console.error('Error parsing local storage item:', e);
         }
-      } catch (e) {
-        console.error('Error parsing local storage item:', e);
       }
     }
+    return results;
+  } catch (error) {
+    console.error('Error fetching from localStorage:', error);
+    throw new Error(`Failed to fetch data: ${error instanceof Error ? error.message : String(error)}`);
   }
-  return results;
 };
 
 // Delete data from storage
@@ -183,17 +209,22 @@ export const deleteData = async (
   table: string,
   id: string
 ): Promise<void> => {
-  // Remove from local storage
-  localStorage.removeItem(`${table}_${id}`);
-  
-  // Add to queue for later sync when online
-  addToQueue({
-    table,
-    type: 'delete',
-    data: {},
-    id,
-    timestamp: Date.now()
-  });
+  try {
+    // Remove from local storage
+    localStorage.removeItem(`${table}_${id}`);
+    
+    // Add to queue for later sync when online
+    addToQueue({
+      table,
+      type: 'delete',
+      data: {},
+      id,
+      timestamp: Date.now()
+    });
+  } catch (error) {
+    console.error('Error deleting from localStorage:', error);
+    throw new Error(`Failed to delete data: ${error instanceof Error ? error.message : String(error)}`);
+  }
 };
 
 // Sync all local data
