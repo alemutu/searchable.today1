@@ -1,41 +1,56 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useForm, Controller } from 'react-hook-form';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuthStore, useNotificationStore } from '../../lib/store';
 import { useHybridStorage } from '../../lib/hooks/useHybridStorage';
+import { useNotificationStore } from '../../lib/store';
 import { 
   User, 
-  ArrowLeft, 
+  Phone, 
+  Mail, 
+  MapPin, 
+  Calendar, 
+  AlertTriangle, 
   Save, 
-  ChevronRight, 
-  ChevronLeft, 
-  UserPlus, 
-  Search, 
+  ArrowLeft, 
+  ArrowRight, 
   CheckCircle, 
-  AlertTriangle,
-  Calendar,
-  Mail,
-  Phone,
-  MapPin,
-  UserRound,
-  Users,
-  Heart
+  Search,
+  UserPlus,
+  UserCheck,
+  CreditCard,
+  Building2,
+  Smartphone,
+  DollarSign,
+  AlertCircle
 } from 'lucide-react';
-import { debounce } from 'lodash';
 
 interface PatientFormData {
   patientType: 'new' | 'existing' | 'emergency';
+  existingPatientId?: string;
   firstName: string;
   lastName: string;
   dateOfBirth: string;
+  age: string;
   gender: string;
   contactNumber: string;
   email: string;
   address: string;
-  emergencyContactName: string;
-  emergencyContactRelationship: string;
-  emergencyContactPhone: string;
+  emergencyContact: {
+    name: string;
+    relationship: string;
+    phone: string;
+  };
   priority: 'normal' | 'urgent' | 'critical';
+  paymentMethod: 'cash' | 'insurance' | 'mobile_money';
+  insuranceDetails?: {
+    provider: string;
+    policyNumber: string;
+    coveragePercentage: number;
+  };
+  mobileMoneyDetails?: {
+    provider: string;
+    phoneNumber: string;
+  };
 }
 
 interface Patient {
@@ -54,103 +69,126 @@ interface Patient {
   };
   status: string;
   current_flow_step: string | null;
-  medical_info?: any;
 }
 
 const PatientRegistrationForm: React.FC = () => {
-  const { user } = useAuthStore();
-  const { addNotification } = useNotificationStore();
   const navigate = useNavigate();
+  const { addNotification } = useNotificationStore();
   const [currentStep, setCurrentStep] = useState(1);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   
-  const { register, handleSubmit, control, setValue, watch, formState: { errors } } = useForm<PatientFormData>({
+  const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<PatientFormData>({
     defaultValues: {
       patientType: 'new',
       firstName: '',
       lastName: '',
       dateOfBirth: '',
-      gender: '',
+      age: '',
+      gender: 'male',
       contactNumber: '',
       email: '',
       address: '',
-      emergencyContactName: '',
-      emergencyContactRelationship: '',
-      emergencyContactPhone: '',
-      priority: 'normal'
+      emergencyContact: {
+        name: '',
+        relationship: '',
+        phone: ''
+      },
+      priority: 'normal',
+      paymentMethod: 'cash'
     }
   });
   
-  const patientType = watch('patientType');
-  
-  // Patient storage hook
   const { 
     saveItem: savePatient,
     fetchItems: fetchPatients,
-    data: patientsData,
-    loading: patientsLoading,
-    error: patientsError
+    data: patientsData
   } = useHybridStorage<Patient>('patients');
   
-  // Debounced search function
-  const debouncedSearch = useCallback(
-    debounce((term: string) => {
-      if (!term || term.length < 2) {
-        setSearchResults([]);
-        return;
+  const patientType = watch('patientType');
+  const dateOfBirth = watch('dateOfBirth');
+  const paymentMethod = watch('paymentMethod');
+  
+  // Calculate age when date of birth changes
+  useEffect(() => {
+    if (dateOfBirth) {
+      const birthDate = new Date(dateOfBirth);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
       }
       
-      setIsSearching(true);
-      
-      // Fetch patients and filter by search term
-      fetchPatients()
-        .then(() => {
-          if (Array.isArray(patientsData)) {
-            const results = patientsData.filter(patient => {
-              const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
-              return fullName.includes(term.toLowerCase()) || 
-                    patient.contact_number.includes(term) ||
-                    (patient.email && patient.email.toLowerCase().includes(term.toLowerCase()));
-            });
-            setSearchResults(results);
-          }
-        })
-        .catch(error => {
-          console.error('Error searching patients:', error);
-          addNotification({
-            message: 'Error searching for patients',
-            type: 'error'
-          });
-        })
-        .finally(() => {
-          setIsSearching(false);
-        });
-    }, 300),
-    [fetchPatients, patientsData]
-  );
-  
-  // Handle search input change
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const term = e.target.value;
-    setSearchTerm(term);
-    debouncedSearch(term);
-  };
-  
-  // Handle search form submission
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchTerm.length >= 2) {
-      debouncedSearch.flush();
+      setValue('age', age.toString());
     }
-  };
+  }, [dateOfBirth, setValue]);
   
-  // Select an existing patient
+  // Set priority to critical for emergency patients
+  useEffect(() => {
+    if (patientType === 'emergency') {
+      setValue('priority', 'critical');
+    }
+  }, [patientType, setValue]);
+  
+  // Handle patient search
+  const handleSearch = useCallback(async (e?: React.FormEvent) => {
+    if (e) {
+      e.preventDefault();
+    }
+    
+    if (!searchTerm.trim()) {
+      setSearchResults([]);
+      setHasSearched(false);
+      return;
+    }
+    
+    setIsSearching(true);
+    setHasSearched(true);
+    
+    try {
+      // Fetch all patients and filter them based on search term
+      await fetchPatients();
+      
+      if (Array.isArray(patientsData)) {
+        const results = patientsData.filter(patient => {
+          const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
+          const contactNumber = patient.contact_number || '';
+          
+          return fullName.includes(searchTerm.toLowerCase()) || 
+                 contactNumber.includes(searchTerm);
+        });
+        
+        setSearchResults(results);
+      }
+    } catch (error) {
+      console.error('Error searching patients:', error);
+      addNotification({
+        message: 'Failed to search patients',
+        type: 'error'
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  }, [searchTerm, fetchPatients, patientsData, addNotification]);
+  
+  // Search when search term changes
+  useEffect(() => {
+    if (patientType === 'existing' && searchTerm.trim().length >= 3) {
+      const debounceTimer = setTimeout(() => {
+        handleSearch();
+      }, 500);
+      
+      return () => clearTimeout(debounceTimer);
+    }
+  }, [searchTerm, patientType, handleSearch]);
+  
   const selectExistingPatient = (patient: Patient) => {
-    setSelectedPatient(patient);
+    setValue('existingPatientId', patient.id);
     setValue('firstName', patient.first_name);
     setValue('lastName', patient.last_name);
     setValue('dateOfBirth', patient.date_of_birth);
@@ -158,20 +196,10 @@ const PatientRegistrationForm: React.FC = () => {
     setValue('contactNumber', patient.contact_number);
     setValue('email', patient.email || '');
     setValue('address', patient.address);
-    setValue('emergencyContactName', patient.emergency_contact.name);
-    setValue('emergencyContactRelationship', patient.emergency_contact.relationship);
-    setValue('emergencyContactPhone', patient.emergency_contact.phone);
+    setValue('emergencyContact', patient.emergency_contact);
     
-    // Clear search results
-    setSearchResults([]);
-    setSearchTerm('');
-    
-    // Move to next step
-    setCurrentStep(2);
-  };
-  
-  const calculateAge = (dateOfBirth: string) => {
-    const birthDate = new Date(dateOfBirth);
+    // Calculate age
+    const birthDate = new Date(patient.date_of_birth);
     const today = new Date();
     let age = today.getFullYear() - birthDate.getFullYear();
     const monthDiff = today.getMonth() - birthDate.getMonth();
@@ -180,787 +208,1005 @@ const PatientRegistrationForm: React.FC = () => {
       age--;
     }
     
-    return age;
+    setValue('age', age.toString());
+    
+    // Move to next step
+    setCurrentStep(3);
   };
   
   const nextStep = () => {
+    window.scrollTo(0, 0);
     setCurrentStep(currentStep + 1);
   };
   
   const prevStep = () => {
+    window.scrollTo(0, 0);
     setCurrentStep(currentStep - 1);
   };
   
   const onSubmit = async (data: PatientFormData) => {
+    setIsSaving(true);
+    
     try {
-      setIsSubmitting(true);
-      
-      // If we're updating an existing patient
-      if (data.patientType === 'existing' && selectedPatient) {
-        const updatedPatient = {
-          ...selectedPatient,
-          first_name: data.firstName,
-          last_name: data.lastName,
-          date_of_birth: data.dateOfBirth,
-          gender: data.gender,
-          contact_number: data.contactNumber,
-          email: data.email,
-          address: data.address,
-          emergency_contact: {
-            name: data.emergencyContactName,
-            relationship: data.emergencyContactRelationship,
-            phone: data.emergencyContactPhone
-          },
-          current_flow_step: data.patientType === 'emergency' ? 'emergency' : 'registration',
-          priority_level: data.priority
-        };
+      if (data.patientType === 'existing' && data.existingPatientId) {
+        // Update existing patient
+        const existingPatient = searchResults.find(p => p.id === data.existingPatientId);
         
-        await savePatient(updatedPatient, selectedPatient.id);
-        
-        addNotification({
-          message: 'Patient information updated successfully',
-          type: 'success'
-        });
-        
-        // Navigate to appropriate next step
-        if (data.patientType === 'emergency') {
-          navigate(`/patients/${selectedPatient.id}/triage`);
-        } else {
-          navigate(`/patients/${selectedPatient.id}`);
-        }
-      } 
-      // If we're creating a new patient
-      else {
-        const newPatient: Omit<Patient, 'id'> = {
-          first_name: data.firstName,
-          last_name: data.lastName,
-          date_of_birth: data.dateOfBirth,
-          gender: data.gender,
-          contact_number: data.contactNumber,
-          email: data.email || null,
-          address: data.address,
-          emergency_contact: {
-            name: data.emergencyContactName,
-            relationship: data.emergencyContactRelationship,
-            phone: data.emergencyContactPhone
-          },
-          status: 'active',
-          current_flow_step: data.patientType === 'emergency' ? 'emergency' : 'registration',
-          medical_info: {}
-        };
-        
-        // Generate a unique ID for the patient
-        const patientId = `patient_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        
-        // Save the patient
-        const savedPatient = await savePatient(newPatient, patientId);
-        
-        addNotification({
-          message: 'Patient registered successfully',
-          type: 'success'
-        });
-        
-        // Navigate to appropriate next step
-        if (data.patientType === 'emergency') {
-          navigate(`/patients/${patientId}/triage`);
-        } else {
-          navigate(`/patients/${patientId}`);
+        if (existingPatient) {
+          const updatedPatient: Patient = {
+            ...existingPatient,
+            current_flow_step: data.patientType === 'emergency' ? 'emergency' : 'registration',
+            status: 'active'
+          };
+          
+          await savePatient(updatedPatient, existingPatient.id);
+          
+          addNotification({
+            message: `Patient ${data.firstName} ${data.lastName} updated successfully`,
+            type: 'success'
+          });
+          
+          navigate('/reception');
+          return;
         }
       }
+      
+      // Create new patient
+      const newPatient: Omit<Patient, 'id'> = {
+        first_name: data.firstName,
+        last_name: data.lastName,
+        date_of_birth: data.dateOfBirth,
+        gender: data.gender,
+        contact_number: data.contactNumber,
+        email: data.email || null,
+        address: data.address,
+        emergency_contact: data.emergencyContact,
+        status: 'active',
+        current_flow_step: data.patientType === 'emergency' ? 'emergency' : 'registration'
+      };
+      
+      const patientId = `patient_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      await savePatient(newPatient as Patient, patientId);
+      
+      addNotification({
+        message: `Patient ${data.firstName} ${data.lastName} registered successfully`,
+        type: 'success'
+      });
+      
+      navigate('/reception');
     } catch (error: any) {
-      console.error('Error registering patient:', error);
+      console.error('Error saving patient:', error);
       addNotification({
         message: `Error: ${error.message}`,
         type: 'error'
       });
     } finally {
-      setIsSubmitting(false);
+      setIsSaving(false);
     }
   };
-  
-  // Generate steps based on patient type
-  const getSteps = () => {
-    const steps = ['Patient Type', 'Personal Info', 'Contact', 'Priority', 'Review'];
-    return steps;
-  };
-  
-  const steps = getSteps();
   
   return (
     <div className="max-w-4xl mx-auto">
       <form onSubmit={handleSubmit(onSubmit)}>
         {/* Header */}
-        <div className="bg-primary-600 rounded-lg shadow-md p-3 mb-3">
+        <div className="bg-primary-600 rounded-lg shadow-md p-6 mb-6">
           <div className="flex items-center">
-            <Link to="/patients" className="text-white mr-2">
+            <button 
+              type="button"
+              onClick={() => navigate(-1)}
+              className="mr-4 p-2 rounded-full text-white hover:bg-primary-500"
+            >
               <ArrowLeft className="h-5 w-5" />
-            </Link>
+            </button>
             <div>
-              <h1 className="text-lg font-bold text-white">Patient Registration</h1>
-              <p className="text-primary-100 text-xs">Register new or manage existing patients</p>
+              <h1 className="text-2xl font-bold text-white">Patient Registration</h1>
+              <p className="text-primary-100">Register new or manage existing patients</p>
             </div>
           </div>
         </div>
         
         {/* Progress Steps */}
-        <div className="bg-white rounded-lg shadow-sm mb-3">
-          <div className="p-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                {steps.map((step, index) => (
-                  <React.Fragment key={index}>
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-                      currentStep > index + 1 ? 'bg-primary-500 text-white' : 
-                      currentStep === index + 1 ? 'bg-primary-500 text-white' : 
-                      'bg-gray-200 text-gray-500'
-                    }`}>
-                      {currentStep > index + 1 ? (
-                        <CheckCircle className="h-4 w-4" />
-                      ) : (
-                        index + 1
-                      )}
-                    </div>
-                    {index < steps.length - 1 && (
-                      <div className={`h-1 w-8 ${
-                        currentStep > index + 1 ? 'bg-primary-500' : 'bg-gray-200'
-                      }`}></div>
-                    )}
-                  </React.Fragment>
-                ))}
+        <div className="mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                currentStep >= 1 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'
+              }`}>
+                {currentStep > 1 ? <CheckCircle className="h-6 w-6" /> : 1}
               </div>
-              <div className="text-xs text-gray-500">
-                Step {currentStep} of {steps.length}
+              <div className={`h-1 w-16 ${
+                currentStep > 1 ? 'bg-primary-500' : 'bg-gray-200'
+              }`}></div>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                currentStep >= 2 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'
+              }`}>
+                {currentStep > 2 ? <CheckCircle className="h-6 w-6" /> : 2}
+              </div>
+              <div className={`h-1 w-16 ${
+                currentStep > 2 ? 'bg-primary-500' : 'bg-gray-200'
+              }`}></div>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                currentStep >= 3 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'
+              }`}>
+                {currentStep > 3 ? <CheckCircle className="h-6 w-6" /> : 3}
+              </div>
+              <div className={`h-1 w-16 ${
+                currentStep > 3 ? 'bg-primary-500' : 'bg-gray-200'
+              }`}></div>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                currentStep >= 4 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'
+              }`}>
+                {currentStep > 4 ? <CheckCircle className="h-6 w-6" /> : 4}
+              </div>
+              <div className={`h-1 w-16 ${
+                currentStep > 4 ? 'bg-primary-500' : 'bg-gray-200'
+              }`}></div>
+              <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                currentStep >= 5 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'
+              }`}>
+                5
               </div>
             </div>
-            <div className="flex justify-between mt-1 text-xs text-gray-500">
-              {steps.map((step, index) => (
-                <div 
-                  key={index} 
-                  className={`text-center ${currentStep === index + 1 ? 'text-primary-600 font-medium' : ''}`}
-                  style={{ width: `${100 / steps.length}%` }}
-                >
-                  {step}
-                </div>
-              ))}
+            <div className="text-sm text-gray-500">
+              Step {currentStep} of 5
             </div>
+          </div>
+          <div className="flex justify-between mt-2 text-sm text-gray-500">
+            <div className={currentStep === 1 ? 'text-primary-600 font-medium' : ''}>Patient Type</div>
+            <div className={currentStep === 2 ? 'text-primary-600 font-medium' : ''}>Personal Info</div>
+            <div className={currentStep === 3 ? 'text-primary-600 font-medium' : ''}>Contact</div>
+            <div className={currentStep === 4 ? 'text-primary-600 font-medium' : ''}>Priority</div>
+            <div className={currentStep === 5 ? 'text-primary-600 font-medium' : ''}>Review</div>
           </div>
         </div>
         
-        {/* Step Content */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-3">
-          {/* Step 1: Patient Type */}
-          {currentStep === 1 && (
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 mb-3">Patient Type</h2>
-              <p className="text-sm text-gray-600 mb-4">Select the appropriate patient type</p>
-              
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <label 
-                    className={`border rounded-lg p-3 flex items-center cursor-pointer transition-colors ${
-                      patientType === 'new' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      value="new"
-                      {...register('patientType')}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        patientType === 'new' ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        <UserPlus className="h-4 w-4" />
-                      </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">New Patient</div>
-                        <div className="text-xs text-gray-500">Register a new patient</div>
-                      </div>
-                    </div>
-                    {patientType === 'new' && (
-                      <CheckCircle className="h-5 w-5 text-primary-500 ml-auto" />
-                    )}
-                  </label>
-                  
-                  <label 
-                    className={`border rounded-lg p-3 flex items-center cursor-pointer transition-colors ${
-                      patientType === 'existing' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      value="existing"
-                      {...register('patientType')}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        patientType === 'existing' ? 'bg-primary-100 text-primary-600' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        <User className="h-4 w-4" />
-                      </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">Existing Patient</div>
-                        <div className="text-xs text-gray-500">Find patient records</div>
-                      </div>
-                    </div>
-                    {patientType === 'existing' && (
-                      <CheckCircle className="h-5 w-5 text-primary-500 ml-auto" />
-                    )}
-                  </label>
-                  
-                  <label 
-                    className={`border rounded-lg p-3 flex items-center cursor-pointer transition-colors ${
-                      patientType === 'emergency' ? 'border-error-500 bg-error-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      value="emergency"
-                      {...register('patientType')}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        patientType === 'emergency' ? 'bg-error-100 text-error-600' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        <AlertTriangle className="h-4 w-4" />
-                      </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">Emergency</div>
-                        <div className="text-xs text-gray-500">Fast-track emergency case</div>
-                      </div>
-                    </div>
-                    {patientType === 'emergency' && (
-                      <CheckCircle className="h-5 w-5 text-error-500 ml-auto" />
-                    )}
-                  </label>
+        {/* Step 1: Patient Type */}
+        {currentStep === 1 && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Patient Type</h2>
+            <p className="text-gray-600 mb-6">Select the appropriate patient type</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div 
+                className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                  watch('patientType') === 'new' 
+                    ? 'border-primary-500 bg-primary-50 shadow-md' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => setValue('patientType', 'new')}
+              >
+                <div className="flex items-center mb-2">
+                  <div className={`p-2 rounded-full ${
+                    watch('patientType') === 'new' ? 'bg-primary-100' : 'bg-gray-100'
+                  }`}>
+                    <UserPlus className={`h-5 w-5 ${
+                      watch('patientType') === 'new' ? 'text-primary-600' : 'text-gray-500'
+                    }`} />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="font-medium text-gray-900">New Patient</h3>
+                  </div>
                 </div>
+                <p className="text-sm text-gray-500">Register a new patient</p>
+              </div>
+              
+              <div 
+                className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                  watch('patientType') === 'existing' 
+                    ? 'border-primary-500 bg-primary-50 shadow-md' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => setValue('patientType', 'existing')}
+              >
+                <div className="flex items-center mb-2">
+                  <div className={`p-2 rounded-full ${
+                    watch('patientType') === 'existing' ? 'bg-primary-100' : 'bg-gray-100'
+                  }`}>
+                    <UserCheck className={`h-5 w-5 ${
+                      watch('patientType') === 'existing' ? 'text-primary-600' : 'text-gray-500'
+                    }`} />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="font-medium text-gray-900">Existing Patient</h3>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500">Find patient records</p>
+              </div>
+              
+              <div 
+                className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                  watch('patientType') === 'emergency' 
+                    ? 'border-error-500 bg-error-50 shadow-md' 
+                    : 'border-gray-200 hover:border-gray-300'
+                }`}
+                onClick={() => setValue('patientType', 'emergency')}
+              >
+                <div className="flex items-center mb-2">
+                  <div className={`p-2 rounded-full ${
+                    watch('patientType') === 'emergency' ? 'bg-error-100' : 'bg-gray-100'
+                  }`}>
+                    <AlertTriangle className={`h-5 w-5 ${
+                      watch('patientType') === 'emergency' ? 'text-error-600' : 'text-gray-500'
+                    }`} />
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="font-medium text-gray-900">Emergency</h3>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-500">Fast-track emergency case</p>
+              </div>
+            </div>
+            
+            {/* Existing Patient Search */}
+            {watch('patientType') === 'existing' && (
+              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Find Existing Patient</h3>
                 
-                {/* Existing Patient Search */}
-                {patientType === 'existing' && (
-                  <div className="mt-4 p-3 bg-gray-50 rounded-lg">
-                    <h3 className="text-sm font-medium text-gray-900 mb-2">Find Existing Patient</h3>
-                    <form onSubmit={handleSearchSubmit} className="mb-3">
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <Search className="h-4 w-4 text-gray-400" />
-                        </div>
-                        <input
-                          type="text"
-                          value={searchTerm}
-                          onChange={handleSearchChange}
-                          className="form-input pl-9 w-full"
-                          placeholder="Search by name, phone, or email..."
-                        />
-                        <button
-                          type="submit"
-                          className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                <form onSubmit={handleSearch} className="mb-4">
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Search className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="form-input pl-10 w-full"
+                      placeholder="Search by name or contact number"
+                    />
+                    <button
+                      type="submit"
+                      className="absolute inset-y-0 right-0 px-3 flex items-center bg-primary-500 text-white rounded-r-md"
+                    >
+                      Search
+                    </button>
+                  </div>
+                </form>
+                
+                {isSearching ? (
+                  <div className="flex justify-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
+                  </div>
+                ) : hasSearched ? (
+                  searchResults.length > 0 ? (
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {searchResults.map((patient) => (
+                        <div 
+                          key={patient.id}
+                          className="flex items-center justify-between p-3 bg-white rounded-lg border border-gray-200 hover:border-primary-300 hover:bg-primary-50 cursor-pointer"
+                          onClick={() => selectExistingPatient(patient)}
                         >
-                          <Search className="h-4 w-4 text-primary-500" />
-                        </button>
-                      </div>
-                    </form>
-                    
-                    {isSearching ? (
-                      <div className="flex justify-center py-4">
-                        <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-primary-500"></div>
-                      </div>
-                    ) : searchResults.length > 0 ? (
-                      <div className="max-h-60 overflow-y-auto">
-                        {searchResults.map((patient) => (
-                          <div 
-                            key={patient.id}
-                            onClick={() => selectExistingPatient(patient)}
-                            className="p-2 border-b border-gray-200 hover:bg-gray-100 cursor-pointer flex items-center"
-                          >
-                            <div className="h-8 w-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-medium text-sm mr-3">
+                          <div className="flex items-center">
+                            <div className="h-10 w-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600 font-medium">
                               {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
                             </div>
-                            <div>
-                              <div className="text-sm font-medium">{patient.first_name} {patient.last_name}</div>
-                              <div className="text-xs text-gray-500">
-                                {calculateAge(patient.date_of_birth)} years • {patient.gender} • {patient.contact_number}
-                              </div>
+                            <div className="ml-3">
+                              <div className="text-sm font-medium text-gray-900">{patient.first_name} {patient.last_name}</div>
+                              <div className="text-sm text-gray-500">{patient.contact_number}</div>
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    ) : searchTerm.length >= 2 ? (
-                      <div className="text-center py-4">
-                        <p className="text-sm text-gray-500 mb-2">No patients found matching "{searchTerm}"</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setValue('patientType', 'new');
-                            setValue('firstName', '');
-                            setValue('lastName', '');
-                          }}
-                          className="btn btn-outline text-xs py-1 px-2"
-                        >
-                          Register as new patient
-                        </button>
-                      </div>
-                    ) : null}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {/* Step 2: Personal Information */}
-          {currentStep === 2 && (
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 mb-3">Personal Information</h2>
-              <p className="text-sm text-gray-600 mb-4">Enter the patient's personal details</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="form-label required text-sm">First Name</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <UserRound className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      {...register('firstName', { required: 'First name is required' })}
-                      className={`form-input pl-9 py-2 text-sm ${errors.firstName ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                    />
-                  </div>
-                  {errors.firstName && (
-                    <p className="form-error text-xs mt-1">{errors.firstName.message}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label className="form-label required text-sm">Last Name</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <UserRound className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      {...register('lastName', { required: 'Last name is required' })}
-                      className={`form-input pl-9 py-2 text-sm ${errors.lastName ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                    />
-                  </div>
-                  {errors.lastName && (
-                    <p className="form-error text-xs mt-1">{errors.lastName.message}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label className="form-label required text-sm">Date of Birth</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Calendar className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="date"
-                      {...register('dateOfBirth', { required: 'Date of birth is required' })}
-                      className={`form-input pl-9 py-2 text-sm ${errors.dateOfBirth ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                    />
-                  </div>
-                  {errors.dateOfBirth && (
-                    <p className="form-error text-xs mt-1">{errors.dateOfBirth.message}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label className="form-label required text-sm">Gender</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Users className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <select
-                      {...register('gender', { required: 'Gender is required' })}
-                      className={`form-input pl-9 py-2 text-sm ${errors.gender ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                    >
-                      <option value="">Select gender</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                      <option value="Other">Other</option>
-                    </select>
-                  </div>
-                  {errors.gender && (
-                    <p className="form-error text-xs mt-1">{errors.gender.message}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Step 3: Contact Information */}
-          {currentStep === 3 && (
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 mb-3">Contact Information</h2>
-              <p className="text-sm text-gray-600 mb-4">Enter the patient's contact details</p>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="form-label required text-sm">Phone Number</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Phone className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="tel"
-                      {...register('contactNumber', { required: 'Phone number is required' })}
-                      className={`form-input pl-9 py-2 text-sm ${errors.contactNumber ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                      placeholder="e.g., +1 (555) 123-4567"
-                    />
-                  </div>
-                  {errors.contactNumber && (
-                    <p className="form-error text-xs mt-1">{errors.contactNumber.message}</p>
-                  )}
-                </div>
-                
-                <div>
-                  <label className="form-label text-sm">Email Address</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Mail className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="email"
-                      {...register('email')}
-                      className="form-input pl-9 py-2 text-sm"
-                      placeholder="e.g., patient@example.com"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="form-label required text-sm">Address</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <MapPin className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <textarea
-                      {...register('address', { required: 'Address is required' })}
-                      className={`form-input pl-9 py-2 text-sm ${errors.address ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                      rows={2}
-                      placeholder="Enter full address"
-                    />
-                  </div>
-                  {errors.address && (
-                    <p className="form-error text-xs mt-1">{errors.address.message}</p>
-                  )}
-                </div>
-                
-                <div className="border-t border-gray-200 pt-3 mt-3">
-                  <h3 className="text-sm font-medium text-gray-900 mb-3">Emergency Contact</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="form-label required text-sm">Name</label>
-                      <input
-                        type="text"
-                        {...register('emergencyContactName', { required: 'Emergency contact name is required' })}
-                        className={`form-input py-2 text-sm ${errors.emergencyContactName ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                      />
-                      {errors.emergencyContactName && (
-                        <p className="form-error text-xs mt-1">{errors.emergencyContactName.message}</p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <label className="form-label required text-sm">Relationship</label>
-                      <input
-                        type="text"
-                        {...register('emergencyContactRelationship', { required: 'Relationship is required' })}
-                        className={`form-input py-2 text-sm ${errors.emergencyContactRelationship ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                      />
-                      {errors.emergencyContactRelationship && (
-                        <p className="form-error text-xs mt-1">{errors.emergencyContactRelationship.message}</p>
-                      )}
-                    </div>
-                    
-                    <div className="md:col-span-2">
-                      <label className="form-label required text-sm">Phone Number</label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                          <Phone className="h-4 w-4 text-gray-400" />
+                          <button
+                            type="button"
+                            className="text-primary-600 hover:text-primary-800"
+                          >
+                            Select
+                          </button>
                         </div>
-                        <input
-                          type="tel"
-                          {...register('emergencyContactPhone', { required: 'Emergency contact phone is required' })}
-                          className={`form-input pl-9 py-2 text-sm ${errors.emergencyContactPhone ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                          placeholder="e.g., +1 (555) 123-4567"
-                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8">
+                      <UserPlus className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                      <h3 className="text-lg font-medium text-gray-900 mb-1">No patients found</h3>
+                      <p className="text-gray-500 mb-4">No patients match your search criteria</p>
+                      <button
+                        type="button"
+                        onClick={() => setValue('patientType', 'new')}
+                        className="btn btn-primary"
+                      >
+                        Register as New Patient
+                      </button>
+                    </div>
+                  )
+                ) : (
+                  <div className="text-center py-8 text-gray-500">
+                    Enter a name or contact number to search
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+        
+        {/* Step 2: Personal Information */}
+        {currentStep === 2 && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Personal Information</h2>
+            <p className="text-gray-600 mb-6">Enter the patient's personal details</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="form-label required">First Name</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    {...register('firstName', { required: 'First name is required' })}
+                    className={`form-input pl-10 ${errors.firstName ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                  />
+                </div>
+                {errors.firstName && (
+                  <p className="form-error">{errors.firstName.message}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="form-label required">Last Name</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    {...register('lastName', { required: 'Last name is required' })}
+                    className={`form-input pl-10 ${errors.lastName ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                  />
+                </div>
+                {errors.lastName && (
+                  <p className="form-error">{errors.lastName.message}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="form-label required">Date of Birth</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Calendar className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="date"
+                    {...register('dateOfBirth', { 
+                      required: 'Date of birth is required',
+                      validate: value => {
+                        const date = new Date(value);
+                        const today = new Date();
+                        return date <= today || 'Date of birth cannot be in the future';
+                      }
+                    })}
+                    className={`form-input pl-10 ${errors.dateOfBirth ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    max={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+                {errors.dateOfBirth && (
+                  <p className="form-error">{errors.dateOfBirth.message}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="form-label">Age</label>
+                <input
+                  type="text"
+                  {...register('age')}
+                  className="form-input bg-gray-100"
+                  readOnly
+                />
+                <p className="mt-1 text-xs text-gray-500">Auto-calculated from date of birth</p>
+              </div>
+              
+              <div>
+                <label className="form-label required">Gender</label>
+                <select
+                  {...register('gender', { required: 'Gender is required' })}
+                  className={`form-input ${errors.gender ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                >
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="other">Other</option>
+                </select>
+                {errors.gender && (
+                  <p className="form-error">{errors.gender.message}</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Step 3: Contact Information */}
+        {currentStep === 3 && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Contact Information</h2>
+            <p className="text-gray-600 mb-6">Enter the patient's contact details</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="form-label required">Contact Number</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Phone className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="tel"
+                    {...register('contactNumber', { required: 'Contact number is required' })}
+                    className={`form-input pl-10 ${errors.contactNumber ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    placeholder="+1 (555) 000-0000"
+                  />
+                </div>
+                {errors.contactNumber && (
+                  <p className="form-error">{errors.contactNumber.message}</p>
+                )}
+              </div>
+              
+              <div>
+                <label className="form-label">Email Address</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Mail className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="email"
+                    {...register('email', { 
+                      pattern: {
+                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                        message: 'Invalid email address'
+                      }
+                    })}
+                    className={`form-input pl-10 ${errors.email ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    placeholder="patient@example.com"
+                  />
+                </div>
+                {errors.email && (
+                  <p className="form-error">{errors.email.message}</p>
+                )}
+              </div>
+              
+              <div className="md:col-span-2">
+                <label className="form-label required">Address</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <MapPin className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <textarea
+                    {...register('address', { required: 'Address is required' })}
+                    className={`form-input pl-10 ${errors.address ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    rows={3}
+                    placeholder="Enter complete address"
+                  />
+                </div>
+                {errors.address && (
+                  <p className="form-error">{errors.address.message}</p>
+                )}
+              </div>
+              
+              <div className="md:col-span-2">
+                <h3 className="text-lg font-medium text-gray-900 mb-4">Emergency Contact</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="form-label required">Contact Name</label>
+                    <input
+                      type="text"
+                      {...register('emergencyContact.name', { required: 'Emergency contact name is required' })}
+                      className={`form-input ${errors.emergencyContact?.name ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                      placeholder="Full name"
+                    />
+                    {errors.emergencyContact?.name && (
+                      <p className="form-error">{errors.emergencyContact.name.message}</p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="form-label required">Relationship</label>
+                    <input
+                      type="text"
+                      {...register('emergencyContact.relationship', { required: 'Relationship is required' })}
+                      className={`form-input ${errors.emergencyContact?.relationship ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                      placeholder="e.g., Spouse, Parent, Child"
+                    />
+                    {errors.emergencyContact?.relationship && (
+                      <p className="form-error">{errors.emergencyContact.relationship.message}</p>
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="form-label required">Contact Phone</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Phone className="h-5 w-5 text-gray-400" />
                       </div>
-                      {errors.emergencyContactPhone && (
-                        <p className="form-error text-xs mt-1">{errors.emergencyContactPhone.message}</p>
+                      <input
+                        type="tel"
+                        {...register('emergencyContact.phone', { required: 'Emergency contact phone is required' })}
+                        className={`form-input pl-10 ${errors.emergencyContact?.phone ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                        placeholder="+1 (555) 000-0000"
+                      />
+                    </div>
+                    {errors.emergencyContact?.phone && (
+                      <p className="form-error">{errors.emergencyContact.phone.message}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Step 4: Priority & Payment */}
+        {currentStep === 4 && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Priority & Payment</h2>
+            <p className="text-gray-600 mb-6">Set patient priority and payment method</p>
+            
+            <div className="mb-8">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Priority Level</h3>
+              
+              {patientType === 'emergency' ? (
+                <div className="bg-error-50 border border-error-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-start">
+                    <AlertTriangle className="h-5 w-5 text-error-500 mt-0.5 mr-3" />
+                    <div>
+                      <h4 className="text-error-800 font-medium">Emergency Case</h4>
+                      <p className="text-error-600 text-sm">
+                        This patient has been marked as an emergency case and will be given critical priority.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div 
+                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                      watch('priority') === 'normal' 
+                        ? 'border-success-500 bg-success-50 shadow-md' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setValue('priority', 'normal')}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-gray-900">Normal</h4>
+                      <div className={`w-3 h-3 rounded-full ${
+                        watch('priority') === 'normal' ? 'bg-success-500' : 'bg-gray-300'
+                      }`}></div>
+                    </div>
+                    <p className="text-sm text-gray-500">Standard priority for routine cases</p>
+                  </div>
+                  
+                  <div 
+                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                      watch('priority') === 'urgent' 
+                        ? 'border-warning-500 bg-warning-50 shadow-md' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setValue('priority', 'urgent')}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-gray-900">Urgent</h4>
+                      <div className={`w-3 h-3 rounded-full ${
+                        watch('priority') === 'urgent' ? 'bg-warning-500' : 'bg-gray-300'
+                      }`}></div>
+                    </div>
+                    <p className="text-sm text-gray-500">Requires prompt attention</p>
+                  </div>
+                  
+                  <div 
+                    className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                      watch('priority') === 'critical' 
+                        ? 'border-error-500 bg-error-50 shadow-md' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setValue('priority', 'critical')}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <h4 className="font-medium text-gray-900">Critical</h4>
+                      <div className={`w-3 h-3 rounded-full ${
+                        watch('priority') === 'critical' ? 'bg-error-500' : 'bg-gray-300'
+                      }`}></div>
+                    </div>
+                    <p className="text-sm text-gray-500">Immediate life-threatening condition</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <h3 className="text-lg font-medium text-gray-900 mb-4">Payment Method</h3>
+              
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                <div 
+                  className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    watch('paymentMethod') === 'cash' 
+                      ? 'border-primary-500 bg-primary-50 shadow-md' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setValue('paymentMethod', 'cash')}
+                >
+                  <div className="flex items-center mb-2">
+                    <div className={`p-2 rounded-full ${
+                      watch('paymentMethod') === 'cash' ? 'bg-primary-100' : 'bg-gray-100'
+                    }`}>
+                      <DollarSign className={`h-5 w-5 ${
+                        watch('paymentMethod') === 'cash' ? 'text-primary-600' : 'text-gray-500'
+                      }`} />
+                    </div>
+                    <div className="ml-3">
+                      <h4 className="font-medium text-gray-900">Cash</h4>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500">Pay with cash</p>
+                </div>
+                
+                <div 
+                  className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    watch('paymentMethod') === 'insurance' 
+                      ? 'border-primary-500 bg-primary-50 shadow-md' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setValue('paymentMethod', 'insurance')}
+                >
+                  <div className="flex items-center mb-2">
+                    <div className={`p-2 rounded-full ${
+                      watch('paymentMethod') === 'insurance' ? 'bg-primary-100' : 'bg-gray-100'
+                    }`}>
+                      <Building2 className={`h-5 w-5 ${
+                        watch('paymentMethod') === 'insurance' ? 'text-primary-600' : 'text-gray-500'
+                      }`} />
+                    </div>
+                    <div className="ml-3">
+                      <h4 className="font-medium text-gray-900">Insurance</h4>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500">Pay with health insurance</p>
+                </div>
+                
+                <div 
+                  className={`border rounded-lg p-4 cursor-pointer transition-all ${
+                    watch('paymentMethod') === 'mobile_money' 
+                      ? 'border-primary-500 bg-primary-50 shadow-md' 
+                      : 'border-gray-200 hover:border-gray-300'
+                  }`}
+                  onClick={() => setValue('paymentMethod', 'mobile_money')}
+                >
+                  <div className="flex items-center mb-2">
+                    <div className={`p-2 rounded-full ${
+                      watch('paymentMethod') === 'mobile_money' ? 'bg-primary-100' : 'bg-gray-100'
+                    }`}>
+                      <Smartphone className={`h-5 w-5 ${
+                        watch('paymentMethod') === 'mobile_money' ? 'text-primary-600' : 'text-gray-500'
+                      }`} />
+                    </div>
+                    <div className="ml-3">
+                      <h4 className="font-medium text-gray-900">Mobile Money</h4>
+                    </div>
+                  </div>
+                  <p className="text-sm text-gray-500">Pay with mobile money</p>
+                </div>
+              </div>
+              
+              {/* Insurance Details */}
+              {paymentMethod === 'insurance' && (
+                <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                  <h4 className="text-md font-medium text-gray-900 mb-4">Insurance Details</h4>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label required">Insurance Provider</label>
+                      <input
+                        type="text"
+                        {...register('insuranceDetails.provider', { 
+                          required: paymentMethod === 'insurance' ? 'Insurance provider is required' : false
+                        })}
+                        className={`form-input ${errors.insuranceDetails?.provider ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                        placeholder="e.g., Blue Cross, Aetna"
+                      />
+                      {errors.insuranceDetails?.provider && (
+                        <p className="form-error">{errors.insuranceDetails.provider.message}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="form-label required">Policy Number</label>
+                      <input
+                        type="text"
+                        {...register('insuranceDetails.policyNumber', { 
+                          required: paymentMethod === 'insurance' ? 'Policy number is required' : false
+                        })}
+                        className={`form-input ${errors.insuranceDetails?.policyNumber ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                        placeholder="e.g., ABC123456789"
+                      />
+                      {errors.insuranceDetails?.policyNumber && (
+                        <p className="form-error">{errors.insuranceDetails.policyNumber.message}</p>
+                      )}
+                    </div>
+                    
+                    <div>
+                      <label className="form-label required">Coverage Percentage</label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          {...register('insuranceDetails.coveragePercentage', { 
+                            required: paymentMethod === 'insurance' ? 'Coverage percentage is required' : false,
+                            min: { value: 0, message: 'Must be at least 0%' },
+                            max: { value: 100, message: 'Must be at most 100%' }
+                          })}
+                          className={`form-input pr-8 ${errors.insuranceDetails?.coveragePercentage ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                          placeholder="e.g., 80"
+                        />
+                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                          <span className="text-gray-500">%</span>
+                        </div>
+                      </div>
+                      {errors.insuranceDetails?.coveragePercentage && (
+                        <p className="form-error">{errors.insuranceDetails.coveragePercentage.message}</p>
                       )}
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Step 4: Priority */}
-          {currentStep === 4 && (
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 mb-3">Priority Level</h2>
-              <p className="text-sm text-gray-600 mb-4">Select the appropriate priority level for this patient</p>
+              )}
               
-              <div className="space-y-3">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <label 
-                    className={`border rounded-lg p-3 flex items-center cursor-pointer transition-colors ${
-                      watch('priority') === 'normal' ? 'border-success-500 bg-success-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      value="normal"
-                      {...register('priority')}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        watch('priority') === 'normal' ? 'bg-success-100 text-success-600' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        <Heart className="h-4 w-4" />
-                      </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">Normal</div>
-                        <div className="text-xs text-gray-500">Standard care priority</div>
-                      </div>
-                    </div>
-                    {watch('priority') === 'normal' && (
-                      <CheckCircle className="h-5 w-5 text-success-500 ml-auto" />
-                    )}
-                  </label>
+              {/* Mobile Money Details */}
+              {paymentMethod === 'mobile_money' && (
+                <div className="bg-gray-50 p-4 rounded-lg mb-4">
+                  <h4 className="text-md font-medium text-gray-900 mb-4">Mobile Money Details</h4>
                   
-                  <label 
-                    className={`border rounded-lg p-3 flex items-center cursor-pointer transition-colors ${
-                      watch('priority') === 'urgent' ? 'border-warning-500 bg-warning-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      value="urgent"
-                      {...register('priority')}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        watch('priority') === 'urgent' ? 'bg-warning-100 text-warning-600' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        <Heart className="h-4 w-4" />
-                      </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">Urgent</div>
-                        <div className="text-xs text-gray-500">Requires prompt attention</div>
-                      </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label required">Provider</label>
+                      <select
+                        {...register('mobileMoneyDetails.provider', { 
+                          required: paymentMethod === 'mobile_money' ? 'Provider is required' : false
+                        })}
+                        className={`form-input ${errors.mobileMoneyDetails?.provider ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                      >
+                        <option value="">Select Provider</option>
+                        <option value="mpesa">M-Pesa</option>
+                        <option value="airtel">Airtel Money</option>
+                        <option value="orange">Orange Money</option>
+                        <option value="mtn">MTN Mobile Money</option>
+                      </select>
+                      {errors.mobileMoneyDetails?.provider && (
+                        <p className="form-error">{errors.mobileMoneyDetails.provider.message}</p>
+                      )}
                     </div>
-                    {watch('priority') === 'urgent' && (
-                      <CheckCircle className="h-5 w-5 text-warning-500 ml-auto" />
-                    )}
-                  </label>
-                  
-                  <label 
-                    className={`border rounded-lg p-3 flex items-center cursor-pointer transition-colors ${
-                      watch('priority') === 'critical' ? 'border-error-500 bg-error-50' : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      value="critical"
-                      {...register('priority')}
-                      className="sr-only"
-                    />
-                    <div className="flex items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                        watch('priority') === 'critical' ? 'bg-error-100 text-error-600' : 'bg-gray-100 text-gray-500'
-                      }`}>
-                        <Heart className="h-4 w-4" />
-                      </div>
-                      <div className="ml-3">
-                        <div className="text-sm font-medium text-gray-900">Critical</div>
-                        <div className="text-xs text-gray-500">Immediate medical attention</div>
-                      </div>
+                    
+                    <div>
+                      <label className="form-label required">Phone Number</label>
+                      <input
+                        type="tel"
+                        {...register('mobileMoneyDetails.phoneNumber', { 
+                          required: paymentMethod === 'mobile_money' ? 'Phone number is required' : false
+                        })}
+                        className={`form-input ${errors.mobileMoneyDetails?.phoneNumber ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                        placeholder="e.g., +254 712 345 678"
+                      />
+                      {errors.mobileMoneyDetails?.phoneNumber && (
+                        <p className="form-error">{errors.mobileMoneyDetails.phoneNumber.message}</p>
+                      )}
+                      <p className="mt-1 text-xs text-gray-500">Enter the number in international format</p>
                     </div>
-                    {watch('priority') === 'critical' && (
-                      <CheckCircle className="h-5 w-5 text-error-500 ml-auto" />
-                    )}
-                  </label>
+                  </div>
                 </div>
-                
-                {watch('priority') === 'urgent' && (
-                  <div className="p-3 bg-warning-50 border border-warning-200 rounded-lg mt-3">
-                    <div className="flex items-start">
-                      <AlertTriangle className="h-5 w-5 text-warning-500 mt-0.5 mr-2" />
-                      <div>
-                        <h4 className="text-sm font-medium text-warning-800">Urgent Care Required</h4>
-                        <p className="text-xs text-warning-700 mt-1">
-                          This patient will be prioritized in the queue and should be seen promptly by a healthcare provider.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                {watch('priority') === 'critical' && (
-                  <div className="p-3 bg-error-50 border border-error-200 rounded-lg mt-3">
-                    <div className="flex items-start">
-                      <AlertTriangle className="h-5 w-5 text-error-500 mt-0.5 mr-2" />
-                      <div>
-                        <h4 className="text-sm font-medium text-error-800">Critical Condition</h4>
-                        <p className="text-xs text-error-700 mt-1">
-                          This patient requires immediate medical attention. Alert the emergency response team immediately.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
+              )}
             </div>
-          )}
-          
-          {/* Step 5: Review */}
-          {currentStep === 5 && (
-            <div>
-              <h2 className="text-lg font-medium text-gray-900 mb-3">Review Information</h2>
-              <p className="text-sm text-gray-600 mb-4">Please review the patient information before submitting</p>
+          </div>
+        )}
+        
+        {/* Step 5: Review */}
+        {currentStep === 5 && (
+          <div className="bg-white rounded-lg shadow-md p-6 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 mb-4">Review Information</h2>
+            <p className="text-gray-600 mb-6">Please review the patient information before submitting</p>
+            
+            {patientType === 'emergency' && (
+              <div className="bg-error-50 border border-error-200 rounded-lg p-4 mb-6">
+                <div className="flex items-start">
+                  <AlertTriangle className="h-5 w-5 text-error-500 mt-0.5 mr-3" />
+                  <div>
+                    <h4 className="text-error-800 font-medium">Emergency Case</h4>
+                    <p className="text-error-600 text-sm">
+                      This patient has been marked as an emergency case and will be given critical priority.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+            
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
+                  <User className="h-5 w-5 text-gray-400 mr-2" />
+                  Personal Information
+                </h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Full Name</p>
+                      <p className="text-sm font-medium text-gray-900">{watch('firstName')} {watch('lastName')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Date of Birth</p>
+                      <p className="text-sm font-medium text-gray-900">{watch('dateOfBirth')} ({watch('age')} years)</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Gender</p>
+                      <p className="text-sm font-medium text-gray-900">{watch('gender')?.charAt(0).toUpperCase() + watch('gender')?.slice(1)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
               
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <h3 className="text-sm font-medium text-gray-900 mb-2">Personal Information</h3>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Name:</span>
-                        <span className="font-medium">{watch('firstName')} {watch('lastName')}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Date of Birth:</span>
-                        <span className="font-medium">{watch('dateOfBirth')}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Gender:</span>
-                        <span className="font-medium">{watch('gender')}</span>
-                      </div>
+              <div>
+                <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
+                  <Phone className="h-5 w-5 text-gray-400 mr-2" />
+                  Contact Information
+                </h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Contact Number</p>
+                      <p className="text-sm font-medium text-gray-900">{watch('contactNumber')}</p>
                     </div>
-                  </div>
-                  
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <h3 className="text-sm font-medium text-gray-900 mb-2">Contact Information</h3>
-                    <div className="space-y-1 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Phone:</span>
-                        <span className="font-medium">{watch('contactNumber')}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Email:</span>
-                        <span className="font-medium">{watch('email') || 'N/A'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Address:</span>
-                        <span className="font-medium truncate max-w-[200px]">{watch('address')}</span>
-                      </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Email Address</p>
+                      <p className="text-sm font-medium text-gray-900">{watch('email') || 'Not provided'}</p>
+                    </div>
+                    <div className="md:col-span-2">
+                      <p className="text-sm text-gray-500">Address</p>
+                      <p className="text-sm font-medium text-gray-900">{watch('address')}</p>
                     </div>
                   </div>
                 </div>
-                
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Emergency Contact</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-sm">
+              </div>
+              
+              <div>
+                <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
+                  <AlertCircle className="h-5 w-5 text-gray-400 mr-2" />
+                  Emergency Contact
+                </h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <span className="text-gray-500">Name:</span>
-                      <div className="font-medium">{watch('emergencyContactName')}</div>
+                      <p className="text-sm text-gray-500">Name</p>
+                      <p className="text-sm font-medium text-gray-900">{watch('emergencyContact.name')}</p>
                     </div>
                     <div>
-                      <span className="text-gray-500">Relationship:</span>
-                      <div className="font-medium">{watch('emergencyContactRelationship')}</div>
+                      <p className="text-sm text-gray-500">Relationship</p>
+                      <p className="text-sm font-medium text-gray-900">{watch('emergencyContact.relationship')}</p>
                     </div>
                     <div>
-                      <span className="text-gray-500">Phone:</span>
-                      <div className="font-medium">{watch('emergencyContactPhone')}</div>
+                      <p className="text-sm text-gray-500">Phone</p>
+                      <p className="text-sm font-medium text-gray-900">{watch('emergencyContact.phone')}</p>
                     </div>
                   </div>
                 </div>
-                
-                <div className="bg-gray-50 p-3 rounded-lg">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Registration Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">Patient Type:</span>
-                      <div className="font-medium capitalize">{watch('patientType')}</div>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Priority Level:</span>
-                      <div className="font-medium capitalize">{watch('priority')}</div>
-                    </div>
+              </div>
+              
+              <div>
+                <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
+                  <AlertTriangle className="h-5 w-5 text-gray-400 mr-2" />
+                  Priority Level
+                </h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center">
+                    <div className={`w-3 h-3 rounded-full mr-2 ${
+                      watch('priority') === 'normal' ? 'bg-success-500' :
+                      watch('priority') === 'urgent' ? 'bg-warning-500' :
+                      'bg-error-500'
+                    }`}></div>
+                    <p className="text-sm font-medium text-gray-900">
+                      {watch('priority')?.charAt(0).toUpperCase() + watch('priority')?.slice(1)}
+                    </p>
                   </div>
                 </div>
-                
-                {watch('patientType') === 'emergency' && (
-                  <div className="p-3 bg-error-50 border border-error-200 rounded-lg">
-                    <div className="flex items-start">
-                      <AlertTriangle className="h-5 w-5 text-error-500 mt-0.5 mr-2" />
-                      <div>
-                        <h4 className="text-sm font-medium text-error-800">Emergency Registration</h4>
-                        <p className="text-xs text-error-700 mt-1">
-                          This patient will be registered as an emergency case and will be immediately directed to triage.
-                        </p>
-                      </div>
+              </div>
+              
+              <div>
+                <h3 className="text-md font-medium text-gray-900 mb-3 flex items-center">
+                  <CreditCard className="h-5 w-5 text-gray-400 mr-2" />
+                  Payment Method
+                </h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Method</p>
+                      <p className="text-sm font-medium text-gray-900">
+                        {watch('paymentMethod') === 'cash' ? 'Cash' :
+                         watch('paymentMethod') === 'insurance' ? 'Insurance' :
+                         'Mobile Money'}
+                      </p>
                     </div>
+                    
+                    {watch('paymentMethod') === 'insurance' && (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-500">Provider</p>
+                            <p className="text-sm font-medium text-gray-900">{watch('insuranceDetails.provider')}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Policy Number</p>
+                            <p className="text-sm font-medium text-gray-900">{watch('insuranceDetails.policyNumber')}</p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Coverage</p>
+                            <p className="text-sm font-medium text-gray-900">{watch('insuranceDetails.coveragePercentage')}%</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                    
+                    {watch('paymentMethod') === 'mobile_money' && (
+                      <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-500">Provider</p>
+                            <p className="text-sm font-medium text-gray-900">
+                              {watch('mobileMoneyDetails.provider')?.charAt(0).toUpperCase() + watch('mobileMoneyDetails.provider')?.slice(1)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-500">Phone Number</p>
+                            <p className="text-sm font-medium text-gray-900">{watch('mobileMoneyDetails.phoneNumber')}</p>
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
         
         {/* Navigation Buttons */}
-        <div className="flex justify-between">
+        <div className="flex justify-between mb-8">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={prevStep}
-              className="btn btn-outline flex items-center py-1.5 px-3 text-sm"
+              className="btn btn-outline flex items-center"
             >
-              <ChevronLeft className="h-4 w-4 mr-1" />
+              <ArrowLeft className="h-5 w-5 mr-2" />
               Back
             </button>
           ) : (
-            <Link
-              to="/patients"
-              className="btn btn-outline flex items-center py-1.5 px-3 text-sm"
+            <button
+              type="button"
+              onClick={() => navigate('/reception')}
+              className="btn btn-outline flex items-center"
             >
-              <ArrowLeft className="h-4 w-4 mr-1" />
+              <ArrowLeft className="h-5 w-5 mr-2" />
               Cancel
-            </Link>
+            </button>
           )}
           
-          {currentStep < steps.length ? (
+          {currentStep < 5 ? (
             <button
               type="button"
               onClick={nextStep}
-              disabled={currentStep === 1 && patientType === 'existing' && !selectedPatient}
-              className="btn btn-primary flex items-center py-1.5 px-3 text-sm"
+              className="btn btn-primary flex items-center"
+              disabled={
+                (currentStep === 1 && !watch('patientType')) ||
+                (currentStep === 1 && watch('patientType') === 'existing' && !watch('existingPatientId'))
+              }
             >
               Next
-              <ChevronRight className="h-4 w-4 ml-1" />
+              <ArrowRight className="h-5 w-5 ml-2" />
             </button>
           ) : (
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="btn btn-primary flex items-center py-1.5 px-3 text-sm"
+              disabled={isSaving}
+              className="btn btn-primary flex items-center"
             >
-              {isSubmitting ? (
+              {isSaving ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-1"></div>
-                  Submitting...
+                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
+                  Saving...
                 </>
               ) : (
                 <>
-                  <Save className="h-4 w-4 mr-1" />
+                  <Save className="h-5 w-5 mr-2" />
                   Complete Registration
                 </>
               )}
