@@ -17,7 +17,8 @@ import {
   Wallet,
   Building2,
   ArrowLeft,
-  Check
+  Check,
+  Search
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -27,8 +28,8 @@ interface PatientRegistrationFormData {
   personalInfo: {
     firstName: string;
     lastName: string;
-    dateOfBirth: string;
-    age?: string;
+    dateOfBirth?: string;
+    age: string;
     gender: string;
     contactNumber: string;
     email: string;
@@ -81,6 +82,7 @@ const PatientRegistrationForm: React.FC = () => {
         firstName: '',
         lastName: '',
         dateOfBirth: '',
+        age: '',
         gender: '',
         contactNumber: '',
         email: '',
@@ -130,6 +132,7 @@ const PatientRegistrationForm: React.FC = () => {
       firstName: patient.first_name,
       lastName: patient.last_name,
       dateOfBirth: patient.date_of_birth,
+      age: calculateAge(patient.date_of_birth).toString(),
       gender: patient.gender,
       contactNumber: patient.contact_number,
       email: patient.email || '',
@@ -156,11 +159,31 @@ const PatientRegistrationForm: React.FC = () => {
   };
   
   const nextStep = () => {
+    // If emergency patient, set priority to emergency
+    if (patientType === 'emergency' && currentStep === 1) {
+      setValue('patientPriority', 'emergency');
+    }
+    
     setCurrentStep(currentStep + 1);
   };
   
   const prevStep = () => {
     setCurrentStep(currentStep - 1);
+  };
+  
+  const calculateAge = (dateOfBirth: string): number => {
+    if (!dateOfBirth) return 0;
+    
+    const birthDate = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    
+    return age;
   };
   
   const onSubmit = async (data: PatientRegistrationFormData) => {
@@ -172,7 +195,7 @@ const PatientRegistrationForm: React.FC = () => {
         id: data.existingPatientId || uuidv4(),
         first_name: data.personalInfo.firstName,
         last_name: data.personalInfo.lastName,
-        date_of_birth: data.personalInfo.dateOfBirth,
+        date_of_birth: data.personalInfo.dateOfBirth || '',
         gender: data.personalInfo.gender,
         contact_number: data.personalInfo.contactNumber,
         email: data.personalInfo.email,
@@ -187,12 +210,14 @@ const PatientRegistrationForm: React.FC = () => {
           familyHistory: data.medicalInfo.familyHistory
         },
         status: 'active',
-        current_flow_step: 'registration', // Set initial flow step to registration
+        // Set initial flow step based on patient type
+        current_flow_step: data.patientType === 'emergency' ? 'emergency' : 'registration',
         priority_level: data.patientPriority,
         payment_method: data.paymentMethod,
         insurance_info: data.paymentMethod === 'insurance' ? data.insuranceInfo : null,
         created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
+        updated_at: new Date().toISOString(),
+        arrival_time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
       };
       
       // Save the patient data
@@ -356,13 +381,18 @@ const PatientRegistrationForm: React.FC = () => {
                 <div className="mt-6 p-4 bg-white rounded-lg border border-gray-200">
                   <h3 className="text-base font-medium text-gray-900 mb-3">Find Existing Patient</h3>
                   <div className="flex space-x-2 mb-4">
-                    <input
-                      type="text"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="form-input flex-1"
-                      placeholder="Search by name, ID, or phone number"
-                    />
+                    <div className="relative flex-grow">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="form-input pl-10 w-full"
+                        placeholder="Search by name, ID, or phone number"
+                      />
+                    </div>
                     <button
                       type="button"
                       onClick={handleSearch}
@@ -391,7 +421,7 @@ const PatientRegistrationForm: React.FC = () => {
                                 {patient.first_name} {patient.last_name}
                               </td>
                               <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
-                                {new Date(patient.date_of_birth).toLocaleDateString()}
+                                {patient.date_of_birth ? new Date(patient.date_of_birth).toLocaleDateString() : 'N/A'}
                               </td>
                               <td className="px-3 py-2 whitespace-nowrap text-sm text-gray-500">
                                 {patient.contact_number}
@@ -467,32 +497,34 @@ const PatientRegistrationForm: React.FC = () => {
                   </div>
                   
                   <div>
-                    <label className="form-label required">Date of Birth</label>
+                    <label className="form-label">Date of Birth</label>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                         <Calendar className="h-5 w-5 text-gray-400" />
                       </div>
                       <input
                         type="date"
-                        {...register('personalInfo.dateOfBirth', { required: 'Date of birth is required' })}
-                        className={`form-input pl-10 ${errors.personalInfo?.dateOfBirth ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                        {...register('personalInfo.dateOfBirth')}
+                        className="form-input pl-10"
                       />
                     </div>
-                    {errors.personalInfo?.dateOfBirth && (
-                      <p className="form-error">{errors.personalInfo.dateOfBirth.message}</p>
-                    )}
                   </div>
                   
                   <div>
-                    <label className="form-label">Age</label>
+                    <label className="form-label required">Age</label>
                     <input
-                      type="text"
-                      {...register('personalInfo.age')}
-                      className="form-input bg-gray-50"
-                      placeholder="Auto-calculated"
-                      readOnly
+                      type="number"
+                      {...register('personalInfo.age', { 
+                        required: 'Age is required',
+                        min: { value: 0, message: 'Age must be a positive number' },
+                        max: { value: 150, message: 'Age must be less than 150' }
+                      })}
+                      className={`form-input ${errors.personalInfo?.age ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                      placeholder="Enter age"
                     />
-                    <p className="text-xs text-gray-500 mt-1">Auto-generated based on date of birth</p>
+                    {errors.personalInfo?.age && (
+                      <p className="form-error">{errors.personalInfo.age.message}</p>
+                    )}
                   </div>
                   
                   <div>
@@ -878,9 +910,9 @@ const PatientRegistrationForm: React.FC = () => {
                         </span>
                       </div>
                       <div>
-                        <span className="text-sm font-medium text-gray-500">Date of Birth:</span>
+                        <span className="text-sm font-medium text-gray-500">Age:</span>
                         <span className="text-sm text-gray-900 ml-2">
-                          {watch('personalInfo.dateOfBirth')}
+                          {watch('personalInfo.age')} years
                         </span>
                       </div>
                       <div>
@@ -1000,6 +1032,7 @@ const PatientRegistrationForm: React.FC = () => {
                 type="button"
                 onClick={nextStep}
                 className="btn btn-primary flex items-center"
+                disabled={patientType === 'existing' && !watch('existingPatientId') && currentStep === 1}
               >
                 Next
                 <ChevronRight className="h-4 w-4 ml-2" />
