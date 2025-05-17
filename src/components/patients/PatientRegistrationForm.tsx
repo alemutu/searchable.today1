@@ -20,7 +20,11 @@ import {
   Activity,
   Siren,
   Search,
-  X
+  X,
+  CreditCard,
+  Building2,
+  DollarSign,
+  Smartphone
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -93,6 +97,7 @@ const PatientRegistrationForm: React.FC = () => {
   const [searchResults, setSearchResults] = useState<ExistingPatient[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<ExistingPatient | null>(null);
+  const [showInsuranceInfo, setShowInsuranceInfo] = useState(false);
   
   // Use the hybrid storage hook to access patient data
   const { 
@@ -119,6 +124,15 @@ const PatientRegistrationForm: React.FC = () => {
       fetchPatients();
     }
   }, [patientType, fetchPatients]);
+  
+  // Show insurance info when payment method is insurance
+  useEffect(() => {
+    if (paymentMethod === 'insurance') {
+      setShowInsuranceInfo(true);
+    } else {
+      setShowInsuranceInfo(false);
+    }
+  }, [paymentMethod]);
   
   const nextStep = () => {
     setCurrentStep(currentStep + 1);
@@ -892,6 +906,160 @@ const PatientRegistrationForm: React.FC = () => {
                   </div>
                 </div>
               )}
+              
+              {/* Payment Methods */}
+              <div className="mt-6">
+                <h3 className="text-base font-medium text-gray-900 mb-3">Payment Method</h3>
+                <p className="text-sm text-gray-500 mb-4">Select how the patient will pay for services</p>
+                
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div 
+                    className={`border rounded-lg p-3 cursor-pointer transition-all ${
+                      paymentMethod === 'cash' 
+                        ? 'border-success-500 bg-success-50 ring-2 ring-success-200' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setValue('paymentMethod', 'cash')}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col items-center text-center w-full">
+                        <div className="bg-success-100 p-2 rounded-full mb-2">
+                          <DollarSign className="h-5 w-5 text-success-600" />
+                        </div>
+                        <h3 className="text-sm font-medium text-gray-900">Cash</h3>
+                        <p className="text-xs text-gray-500 mt-1">Pay with cash</p>
+                      </div>
+                      {paymentMethod === 'cash' && (
+                        <Check className="h-5 w-5 text-success-500 absolute top-2 right-2" />
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div 
+                    className={`border rounded-lg p-3 cursor-pointer transition-all ${
+                      paymentMethod === 'card' 
+                        ? 'border-primary-500 bg-primary-50 ring-2 ring-primary-200' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setValue('paymentMethod', 'card')}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col items-center text-center w-full">
+                        <div className="bg-primary-100 p-2 rounded-full mb-2">
+                          <CreditCard className="h-5 w-5 text-primary-600" />
+                        </div>
+                        <h3 className="text-sm font-medium text-gray-900">Card</h3>
+                        <p className="text-xs text-gray-500 mt-1">Credit/Debit card</p>
+                      </div>
+                      {paymentMethod === 'card' && (
+                        <Check className="h-5 w-5 text-primary-500 absolute top-2 right-2" />
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div 
+                    className={`border rounded-lg p-3 cursor-pointer transition-all ${
+                      paymentMethod === 'insurance' 
+                        ? 'border-secondary-500 bg-secondary-50 ring-2 ring-secondary-200' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setValue('paymentMethod', 'insurance')}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col items-center text-center w-full">
+                        <div className="bg-secondary-100 p-2 rounded-full mb-2">
+                          <Building2 className="h-5 w-5 text-secondary-600" />
+                        </div>
+                        <h3 className="text-sm font-medium text-gray-900">Insurance</h3>
+                        <p className="text-xs text-gray-500 mt-1">Health insurance</p>
+                      </div>
+                      {paymentMethod === 'insurance' && (
+                        <Check className="h-5 w-5 text-secondary-500 absolute top-2 right-2" />
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div 
+                    className={`border rounded-lg p-3 cursor-pointer transition-all ${
+                      paymentMethod === 'mobile' 
+                        ? 'border-accent-500 bg-accent-50 ring-2 ring-accent-200' 
+                        : 'border-gray-200 hover:border-gray-300'
+                    }`}
+                    onClick={() => setValue('paymentMethod', 'mobile')}
+                  >
+                    <div className="flex justify-between items-start">
+                      <div className="flex flex-col items-center text-center w-full">
+                        <div className="bg-accent-100 p-2 rounded-full mb-2">
+                          <Smartphone className="h-5 w-5 text-accent-600" />
+                        </div>
+                        <h3 className="text-sm font-medium text-gray-900">Mobile</h3>
+                        <p className="text-xs text-gray-500 mt-1">Mobile payment</p>
+                      </div>
+                      {paymentMethod === 'mobile' && (
+                        <Check className="h-5 w-5 text-accent-500 absolute top-2 right-2" />
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                {showInsuranceInfo && (
+                  <div className="mt-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                    <h3 className="text-sm font-medium text-gray-900 mb-3">Insurance Information</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="form-label text-sm required">Insurance Provider</label>
+                        <input
+                          type="text"
+                          {...register('insuranceInfo.provider', { 
+                            required: paymentMethod === 'insurance' ? 'Provider is required' : false 
+                          })}
+                          className="form-input py-2 text-sm"
+                          placeholder="Enter insurance provider"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="form-label text-sm required">Policy Number</label>
+                        <input
+                          type="text"
+                          {...register('insuranceInfo.policyNumber', { 
+                            required: paymentMethod === 'insurance' ? 'Policy number is required' : false 
+                          })}
+                          className="form-input py-2 text-sm"
+                          placeholder="Enter policy number"
+                        />
+                      </div>
+                      
+                      <div>
+                        <label className="form-label text-sm">Group Number</label>
+                        <input
+                          type="text"
+                          {...register('insuranceInfo.groupNumber')}
+                          className="form-input py-2 text-sm"
+                          placeholder="Enter group number (if applicable)"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {priority === 'emergency' && (
+                  <div className="mt-4 p-3 bg-error-50 rounded-lg border border-error-100">
+                    <div className="flex items-start">
+                      <AlertTriangle className="h-5 w-5 text-error-500 mt-0.5 mr-2" />
+                      <div>
+                        <p className="text-sm font-medium text-error-800">
+                          Emergency Payment Note
+                        </p>
+                        <p className="text-sm text-error-700 mt-1">
+                          For emergency cases, treatment will be provided regardless of payment method. 
+                          Payment details can be collected after stabilization.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
           
@@ -949,6 +1117,33 @@ const PatientRegistrationForm: React.FC = () => {
                     </p>
                     {watch('priorityNotes') && (
                       <p><span className="font-medium">Notes:</span> {watch('priorityNotes')}</p>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 p-3 rounded-lg">
+                  <h3 className="text-sm font-medium text-gray-900 mb-2">Payment Information</h3>
+                  <div className="space-y-1 text-sm">
+                    <p>
+                      <span className="font-medium">Payment Method:</span> 
+                      <span className={`ml-2 px-2 py-0.5 rounded-full text-xs font-medium ${
+                        paymentMethod === 'cash' ? 'bg-success-100 text-success-800' :
+                        paymentMethod === 'card' ? 'bg-primary-100 text-primary-800' :
+                        paymentMethod === 'insurance' ? 'bg-secondary-100 text-secondary-800' :
+                        'bg-accent-100 text-accent-800'
+                      }`}>
+                        {paymentMethod.charAt(0).toUpperCase() + paymentMethod.slice(1)}
+                      </span>
+                    </p>
+                    
+                    {paymentMethod === 'insurance' && watch('insuranceInfo.provider') && (
+                      <>
+                        <p><span className="font-medium">Insurance Provider:</span> {watch('insuranceInfo.provider')}</p>
+                        <p><span className="font-medium">Policy Number:</span> {watch('insuranceInfo.policyNumber')}</p>
+                        {watch('insuranceInfo.groupNumber') && (
+                          <p><span className="font-medium">Group Number:</span> {watch('insuranceInfo.groupNumber')}</p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
