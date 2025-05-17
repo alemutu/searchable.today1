@@ -894,10 +894,12 @@ const PatientRegistrationForm: React.FC = () => {
                           <p className="text-sm text-gray-900">{watch('contactNumber')}</p>
                         </div>
                         
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Email</p>
-                          <p className="text-sm text-gray-900">{watch('email') || 'N/A'}</p>
-                        </div>
+                        {watch('email') && (
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Email</p>
+                            <p className="text-sm text-gray-900">{watch('email')}</p>
+                          </div>
+                        )}
                         
                         <div className="sm:col-span-2">
                           <p className="text-sm font-medium text-gray-500">Address</p>
@@ -908,24 +910,28 @@ const PatientRegistrationForm: React.FC = () => {
                   </div>
                 </div>
                 
-                {patientType !== 'emergency' && showEmergencyContact && (
+                {patientType !== 'emergency' && showEmergencyContact && watch('emergencyContact.name') && (
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <h3 className="text-base font-medium text-gray-900 mb-3">Emergency Contact</h3>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div>
                         <p className="text-sm font-medium text-gray-500">Name</p>
-                        <p className="text-sm text-gray-900">{watch('emergencyContact.name') || 'N/A'}</p>
+                        <p className="text-sm text-gray-900">{watch('emergencyContact.name')}</p>
                       </div>
                       
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Relationship</p>
-                        <p className="text-sm text-gray-900">{watch('emergencyContact.relationship') || 'N/A'}</p>
-                      </div>
+                      {watch('emergencyContact.relationship') && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Relationship</p>
+                          <p className="text-sm text-gray-900">{watch('emergencyContact.relationship')}</p>
+                        </div>
+                      )}
                       
-                      <div>
-                        <p className="text-sm font-medium text-gray-500">Phone Number</p>
-                        <p className="text-sm text-gray-900">{watch('emergencyContact.phone') || 'N/A'}</p>
-                      </div>
+                      {watch('emergencyContact.phone') && (
+                        <div>
+                          <p className="text-sm font-medium text-gray-500">Phone Number</p>
+                          <p className="text-sm text-gray-900">{watch('emergencyContact.phone')}</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -940,7 +946,7 @@ const PatientRegistrationForm: React.FC = () => {
                       </p>
                     </div>
                     
-                    {paymentMethod === 'nhif' && (
+                    {paymentMethod === 'nhif' && watch('nhifNumber') && (
                       <div>
                         <p className="text-sm font-medium text-gray-500">NHIF Number</p>
                         <p className="text-sm text-gray-900">{watch('nhifNumber')}</p>
@@ -949,26 +955,30 @@ const PatientRegistrationForm: React.FC = () => {
                     
                     {paymentMethod === 'insurance' && (
                       <>
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Insurance Provider</p>
-                          <p className="text-sm text-gray-900">{watch('insuranceProvider')}</p>
-                        </div>
+                        {watch('insuranceProvider') && (
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Insurance Provider</p>
+                            <p className="text-sm text-gray-900">{watch('insuranceProvider')}</p>
+                          </div>
+                        )}
                         
-                        <div>
-                          <p className="text-sm font-medium text-gray-500">Policy Number</p>
-                          <p className="text-sm text-gray-900">{watch('insurancePolicyNumber')}</p>
-                        </div>
+                        {watch('insurancePolicyNumber') && (
+                          <div>
+                            <p className="text-sm font-medium text-gray-500">Policy Number</p>
+                            <p className="text-sm text-gray-900">{watch('insurancePolicyNumber')}</p>
+                          </div>
+                        )}
                       </>
                     )}
                     
-                    {paymentMethod === 'corporate' && (
+                    {paymentMethod === 'corporate' && watch('corporateName') && (
                       <div>
                         <p className="text-sm font-medium text-gray-500">Company Name</p>
                         <p className="text-sm text-gray-900">{watch('corporateName')}</p>
                       </div>
                     )}
                     
-                    {paymentMethod === 'waiver' && (
+                    {paymentMethod === 'waiver' && watch('waiverReason') && (
                       <div className="sm:col-span-2">
                         <p className="text-sm font-medium text-gray-500">Waiver Reason</p>
                         <p className="text-sm text-gray-900">{watch('waiverReason')}</p>
