@@ -499,7 +499,7 @@ const TriageForm: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="flex justify-center p-3">
+      <div className="flex justify-center p-2">
         <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-500"></div>
       </div>
     );
@@ -507,11 +507,11 @@ const TriageForm: React.FC = () => {
 
   if (patientError) {
     return (
-      <div className="text-center p-3">
+      <div className="text-center p-2">
         <p className="text-error-500">Error loading patient: {patientError.message}</p>
         <button 
           onClick={() => navigate('/patients')}
-          className="mt-4 btn btn-outline"
+          className="mt-3 btn btn-outline"
         >
           Return to Patients
         </button>
@@ -521,11 +521,11 @@ const TriageForm: React.FC = () => {
 
   if (!patient) {
     return (
-      <div className="text-center p-3">
+      <div className="text-center p-2">
         <p className="text-gray-500">Patient not found</p>
         <button 
           onClick={() => navigate('/patients')}
-          className="mt-4 btn btn-outline"
+          className="mt-3 btn btn-outline"
         >
           Return to Patients
         </button>
@@ -537,20 +537,20 @@ const TriageForm: React.FC = () => {
     <div className="max-w-4xl mx-auto">
       <form onSubmit={handleSubmit(onSubmit)}>
         {/* Patient Header */}
-        <div className="bg-gradient-to-r from-primary-700 to-primary-600 rounded-lg shadow-md p-4 mb-4">
+        <div className="bg-gradient-to-r from-primary-700 to-primary-600 rounded-lg shadow-md p-3 mb-3">
           <div className="flex items-center">
-            <div className="h-12 w-12 rounded-full bg-white text-primary-600 flex items-center justify-center text-lg font-bold shadow-md">
+            <div className="h-10 w-10 rounded-full bg-white text-primary-600 flex items-center justify-center text-lg font-bold shadow-md">
               {patient.first_name.charAt(0)}{patient.last_name.charAt(0)}
             </div>
-            <div className="ml-4">
-              <h2 className="text-xl font-bold text-white">
+            <div className="ml-3">
+              <h2 className="text-lg font-bold text-white">
                 {patient.first_name} {patient.last_name}
               </h2>
-              <div className="flex items-center text-primary-100 text-sm">
-                <User className="h-4 w-4 mr-1" />
+              <div className="flex items-center text-primary-100 text-xs">
+                <User className="h-3.5 w-3.5 mr-1" />
                 <span>{calculateAge(patient.date_of_birth)} years • {patient.gender}</span>
                 <span className="mx-2">•</span>
-                <Clock className="h-4 w-4 mr-1" />
+                <Clock className="h-3.5 w-3.5 mr-1" />
                 <span className="bg-black bg-opacity-20 px-2 py-0.5 rounded">
                   {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                 </span>
@@ -561,47 +561,47 @@ const TriageForm: React.FC = () => {
         
         {/* Form Error Message */}
         {formError && (
-          <div className="bg-error-50 border border-error-200 text-error-700 px-4 py-3 rounded-md mb-4 flex items-start">
-            <AlertCircle className="h-5 w-5 text-error-400 mt-0.5 mr-3 flex-shrink-0" />
+          <div className="bg-error-50 border border-error-200 text-error-700 px-3 py-2 rounded-md mb-3 flex items-start">
+            <AlertCircle className="h-4 w-4 text-error-400 mt-0.5 mr-2 flex-shrink-0" />
             <div>
-              <p className="font-medium">Error</p>
-              <p>{formError}</p>
+              <p className="font-medium text-sm">Error</p>
+              <p className="text-sm">{formError}</p>
             </div>
           </div>
         )}
 
         {/* Progress Steps */}
-        <div className="bg-white rounded-lg shadow-md mb-4">
-          <div className="p-4">
+        <div className="bg-white rounded-lg shadow-md mb-3">
+          <div className="p-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
                   currentStep >= 1 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'
                 }`}>
-                  {currentStep > 1 ? <CheckCircle className="h-5 w-5" /> : 1}
+                  {currentStep > 1 ? <CheckCircle className="h-4 w-4" /> : 1}
                 </div>
-                <div className={`h-1 w-12 ${
+                <div className={`h-1 w-10 ${
                   currentStep > 1 ? 'bg-primary-500' : 'bg-gray-200'
                 }`}></div>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
                   currentStep >= 2 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'
                 }`}>
-                  {currentStep > 2 ? <CheckCircle className="h-5 w-5" /> : 2}
+                  {currentStep > 2 ? <CheckCircle className="h-4 w-4" /> : 2}
                 </div>
-                <div className={`h-1 w-12 ${
+                <div className={`h-1 w-10 ${
                   currentStep > 2 ? 'bg-primary-500' : 'bg-gray-200'
                 }`}></div>
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
                   currentStep >= 3 ? 'bg-primary-500 text-white' : 'bg-gray-200 text-gray-500'
                 }`}>
                   3
                 </div>
               </div>
-              <div className="text-sm text-gray-500">
+              <div className="text-xs text-gray-500">
                 Step {currentStep} of 3
               </div>
             </div>
-            <div className="flex justify-between mt-2 text-xs text-gray-500">
+            <div className="flex justify-between mt-1.5 text-xs text-gray-500">
               <div className={currentStep === 1 ? 'text-primary-600 font-medium' : ''}>Vital Signs</div>
               <div className={currentStep === 2 ? 'text-primary-600 font-medium' : ''}>Medical History</div>
               <div className={currentStep === 3 ? 'text-primary-600 font-medium' : ''}>Assessment</div>
@@ -610,87 +610,87 @@ const TriageForm: React.FC = () => {
         </div>
 
         {/* Step Content */}
-        <div className="bg-white rounded-lg shadow-md p-6 mb-4">
+        <div className="bg-white rounded-lg shadow-md p-4 mb-3">
           {/* Step 1: Vital Signs */}
           {currentStep === 1 && (
             <div>
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-medium text-gray-900">Vital Signs</h3>
+              <div className="flex justify-between items-center mb-3">
+                <h3 className="text-base font-medium text-gray-900">Vital Signs</h3>
                 <button
                   type="button"
                   onClick={analyzeVitals}
                   disabled={isAnalyzing}
-                  className="btn btn-outline flex items-center text-sm"
+                  className="btn btn-outline flex items-center text-xs py-1.5 px-3"
                 >
                   {isAnalyzing ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-primary-500 mr-2"></div>
+                      <div className="animate-spin rounded-full h-3.5 w-3.5 border-t-2 border-b-2 border-primary-500 mr-1.5"></div>
                       Analyzing...
                     </>
                   ) : (
                     <>
-                      <Brain className="h-4 w-4 mr-2" />
+                      <Brain className="h-3.5 w-3.5 mr-1.5" />
                       Analyze Vitals
                     </>
                   )}
                 </button>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="form-label text-sm">Temperature (°C)</label>
+                  <label className="form-label text-xs">Temperature (°C)</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Thermometer className="h-4 w-4 text-gray-400" />
+                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                      <Thermometer className="h-3.5 w-3.5 text-gray-400" />
                     </div>
                     <input
                       type="number"
                       step="0.1"
                       {...register('vitalSigns.temperature')}
-                      className="form-input pl-9 py-2 text-sm"
+                      className="form-input pl-8 py-1.5 text-sm"
                       placeholder="36.5"
                     />
                   </div>
                 </div>
                 
                 <div className="space-y-1">
-                  <label className="form-label text-sm">Heart Rate (bpm)</label>
+                  <label className="form-label text-xs">Heart Rate (bpm)</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Heart className="h-4 w-4 text-gray-400" />
+                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                      <Heart className="h-3.5 w-3.5 text-gray-400" />
                     </div>
                     <input
                       type="number"
                       {...register('vitalSigns.heartRate')}
-                      className="form-input pl-9 py-2 text-sm"
+                      className="form-input pl-8 py-1.5 text-sm"
                       placeholder="75"
                     />
                   </div>
                 </div>
                 
                 <div className="space-y-1">
-                  <label className="form-label text-sm">Respiratory Rate (breaths/min)</label>
+                  <label className="form-label text-xs">Respiratory Rate (breaths/min)</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Activity className="h-4 w-4 text-gray-400" />
+                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                      <Activity className="h-3.5 w-3.5 text-gray-400" />
                     </div>
                     <input
                       type="number"
                       {...register('vitalSigns.respiratoryRate')}
-                      className="form-input pl-9 py-2 text-sm"
+                      className="form-input pl-8 py-1.5 text-sm"
                       placeholder="16"
                     />
                   </div>
                 </div>
                 
                 <div className="space-y-1">
-                  <label className="form-label text-sm">Blood Pressure (mmHg)</label>
+                  <label className="form-label text-xs">Blood Pressure (mmHg)</label>
                   <div className="flex items-center space-x-2">
                     <div className="relative flex-1">
                       <input
                         type="number"
                         {...register('vitalSigns.bloodPressureSystolic')}
-                        className="form-input py-2 text-sm"
+                        className="form-input py-1.5 text-sm"
                         placeholder="120"
                       />
                     </div>
@@ -699,7 +699,7 @@ const TriageForm: React.FC = () => {
                       <input
                         type="number"
                         {...register('vitalSigns.bloodPressureDiastolic')}
-                        className="form-input py-2 text-sm"
+                        className="form-input py-1.5 text-sm"
                         placeholder="80"
                       />
                     </div>
@@ -707,25 +707,25 @@ const TriageForm: React.FC = () => {
                 </div>
                 
                 <div className="space-y-1">
-                  <label className="form-label text-sm">Oxygen Saturation (%)</label>
+                  <label className="form-label text-xs">Oxygen Saturation (%)</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Droplets className="h-4 w-4 text-gray-400" />
+                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                      <Droplets className="h-3.5 w-3.5 text-gray-400" />
                     </div>
                     <input
                       type="number"
                       min="0"
                       max="100"
                       {...register('vitalSigns.oxygenSaturation')}
-                      className="form-input pl-9 py-2 text-sm"
+                      className="form-input pl-8 py-1.5 text-sm"
                       placeholder="98"
                     />
                   </div>
                 </div>
                 
                 <div className="space-y-1">
-                  <label className="form-label text-sm">Pain Level (0-10)</label>
-                  <div className="space-y-2">
+                  <label className="form-label text-xs">Pain Level (0-10)</label>
+                  <div className="space-y-1.5">
                     <Controller
                       name="vitalSigns.painLevel"
                       control={control}
@@ -738,9 +738,9 @@ const TriageForm: React.FC = () => {
                             step="1"
                             {...field}
                             onChange={(e) => field.onChange(parseInt(e.target.value))}
-                            className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                            className="w-full h-1.5 bg-gray-200 rounded-lg appearance-none cursor-pointer"
                           />
-                          <span className="ml-2 text-sm font-medium bg-primary-100 text-primary-800 px-2 py-1 rounded-md min-w-[2rem] text-center">
+                          <span className="ml-2 text-xs font-medium bg-primary-100 text-primary-800 px-1.5 py-0.5 rounded-md min-w-[1.75rem] text-center">
                             {field.value || 0}
                           </span>
                         </div>
@@ -755,47 +755,47 @@ const TriageForm: React.FC = () => {
                 </div>
                 
                 <div className="space-y-1">
-                  <label className="form-label text-sm">Weight (kg)</label>
+                  <label className="form-label text-xs">Weight (kg)</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Scale className="h-4 w-4 text-gray-400" />
+                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                      <Scale className="h-3.5 w-3.5 text-gray-400" />
                     </div>
                     <input
                       type="number"
                       step="0.1"
                       {...register('vitalSigns.weight')}
-                      className="form-input pl-9 py-2 text-sm"
+                      className="form-input pl-8 py-1.5 text-sm"
                       placeholder="70"
                     />
                   </div>
                 </div>
                 
                 <div className="space-y-1">
-                  <label className="form-label text-sm">Height (cm)</label>
+                  <label className="form-label text-xs">Height (cm)</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Ruler className="h-4 w-4 text-gray-400" />
+                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                      <Ruler className="h-3.5 w-3.5 text-gray-400" />
                     </div>
                     <input
                       type="number"
                       {...register('vitalSigns.height')}
-                      className="form-input pl-9 py-2 text-sm"
+                      className="form-input pl-8 py-1.5 text-sm"
                       placeholder="170"
                     />
                   </div>
                 </div>
                 
                 <div className="space-y-1">
-                  <label className="form-label text-sm">BMI</label>
+                  <label className="form-label text-xs">BMI</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Calculator className="h-4 w-4 text-gray-400" />
+                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                      <Calculator className="h-3.5 w-3.5 text-gray-400" />
                     </div>
                     <input
                       type="number"
                       step="0.1"
                       {...register('vitalSigns.bmi')}
-                      className="form-input pl-9 py-2 text-sm bg-gray-50"
+                      className="form-input pl-8 py-1.5 text-sm bg-gray-50"
                       placeholder="Calculated"
                       readOnly
                     />
@@ -804,12 +804,12 @@ const TriageForm: React.FC = () => {
               </div>
               
               {aiAnalysis && (
-                <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-lg">
+                <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-lg">
                   <div className="flex items-start">
-                    <Brain className="h-5 w-5 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
+                    <Brain className="h-4 w-4 text-blue-500 mt-0.5 mr-2 flex-shrink-0" />
                     <div>
-                      <h4 className="text-sm font-medium text-blue-700">AI Analysis</h4>
-                      <pre className="text-sm text-blue-600 whitespace-pre-wrap font-sans mt-2">{aiAnalysis}</pre>
+                      <h4 className="text-xs font-medium text-blue-700">AI Analysis</h4>
+                      <pre className="text-xs text-blue-600 whitespace-pre-wrap font-sans mt-1.5">{aiAnalysis}</pre>
                     </div>
                   </div>
                 </div>
@@ -820,110 +820,110 @@ const TriageForm: React.FC = () => {
           {/* Step 2: Medical History */}
           {currentStep === 2 && (
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Medical History</h3>
+              <h3 className="text-base font-medium text-gray-900 mb-3">Medical History</h3>
               
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
-                  <label className="form-label text-sm">Chronic Conditions</label>
-                  <div className="grid grid-cols-2 gap-2 mb-2">
-                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                  <label className="form-label text-xs">Chronic Conditions</label>
+                  <div className="grid grid-cols-2 gap-1.5 mb-2">
+                    <div className="flex items-center space-x-1.5 bg-gray-50 p-1.5 rounded-md">
                       <input
                         type="checkbox"
                         id="diabetes"
                         value="Diabetes Mellitus"
                         {...register('medicalHistory.chronicConditions')}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                        className="h-3.5 w-3.5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="diabetes" className="text-sm text-gray-700">
+                      <label htmlFor="diabetes" className="text-xs text-gray-700">
                         Diabetes Mellitus
                       </label>
                     </div>
-                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                    <div className="flex items-center space-x-1.5 bg-gray-50 p-1.5 rounded-md">
                       <input
                         type="checkbox"
                         id="hypertension"
                         value="Hypertension"
                         {...register('medicalHistory.chronicConditions')}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                        className="h-3.5 w-3.5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="hypertension" className="text-sm text-gray-700">
+                      <label htmlFor="hypertension" className="text-xs text-gray-700">
                         Hypertension
                       </label>
                     </div>
-                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                    <div className="flex items-center space-x-1.5 bg-gray-50 p-1.5 rounded-md">
                       <input
                         type="checkbox"
                         id="heartDisease"
                         value="Heart Disease"
                         {...register('medicalHistory.chronicConditions')}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                        className="h-3.5 w-3.5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="heartDisease" className="text-sm text-gray-700">
+                      <label htmlFor="heartDisease" className="text-xs text-gray-700">
                         Heart Disease
                       </label>
                     </div>
-                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                    <div className="flex items-center space-x-1.5 bg-gray-50 p-1.5 rounded-md">
                       <input
                         type="checkbox"
                         id="asthma"
                         value="Asthma"
                         {...register('medicalHistory.chronicConditions')}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                        className="h-3.5 w-3.5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="asthma" className="text-sm text-gray-700">
+                      <label htmlFor="asthma" className="text-xs text-gray-700">
                         Asthma
                       </label>
                     </div>
-                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                    <div className="flex items-center space-x-1.5 bg-gray-50 p-1.5 rounded-md">
                       <input
                         type="checkbox"
                         id="cancer"
                         value="Cancer"
                         {...register('medicalHistory.chronicConditions')}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                        className="h-3.5 w-3.5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="cancer" className="text-sm text-gray-700">
+                      <label htmlFor="cancer" className="text-xs text-gray-700">
                         Cancer
                       </label>
                     </div>
-                    <div className="flex items-center space-x-2 bg-gray-50 p-2 rounded-md">
+                    <div className="flex items-center space-x-1.5 bg-gray-50 p-1.5 rounded-md">
                       <input
                         type="checkbox"
                         id="surgeries"
                         value="Previous Surgeries"
                         {...register('medicalHistory.chronicConditions')}
-                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                        className="h-3.5 w-3.5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="surgeries" className="text-sm text-gray-700">
+                      <label htmlFor="surgeries" className="text-xs text-gray-700">
                         Previous Surgeries
                       </label>
                     </div>
                   </div>
                   
                   <div>
-                    <label className="form-label text-sm">Other Chronic Illnesses</label>
+                    <label className="form-label text-xs">Other Chronic Illnesses</label>
                     <textarea
                       {...register('medicalHistory.otherConditions')}
-                      className="form-input py-2 text-sm"
+                      className="form-input py-1.5 text-sm"
                       rows={2}
                       placeholder="Enter any other chronic illnesses..."
                     />
                   </div>
                 </div>
                 
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center mb-2">
-                    <AlertCircle className="h-4 w-4 text-warning-500 mr-2" />
-                    <label className="form-label text-sm mb-0 font-medium">Allergies</label>
+                <div className="p-3 bg-gray-50 rounded-lg">
+                  <div className="flex items-center mb-1.5">
+                    <AlertCircle className="h-3.5 w-3.5 text-warning-500 mr-1.5" />
+                    <label className="form-label text-xs mb-0 font-medium">Allergies</label>
                   </div>
-                  <div className="flex items-center mb-2">
+                  <div className="flex items-center mb-1.5">
                     <input
                       type="checkbox"
                       id="hasAllergies"
                       {...register('medicalHistory.allergies.hasAllergies')}
-                      className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      className="h-3.5 w-3.5 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                     />
-                    <label htmlFor="hasAllergies" className="ml-2 text-sm text-gray-700">
+                    <label htmlFor="hasAllergies" className="ml-1.5 text-xs text-gray-700">
                       Patient has allergies
                     </label>
                   </div>
@@ -931,7 +931,7 @@ const TriageForm: React.FC = () => {
                   {hasAllergies && (
                     <textarea
                       {...register('medicalHistory.allergies.allergyList')}
-                      className="form-input py-2 text-sm w-full"
+                      className="form-input py-1.5 text-sm w-full"
                       rows={2}
                       placeholder="List allergies, separated by commas (e.g., Penicillin, Peanuts, Latex)..."
                     />
@@ -939,23 +939,23 @@ const TriageForm: React.FC = () => {
                 </div>
                 
                 <div>
-                  <div className="flex items-center mb-2">
-                    <Pill className="h-4 w-4 text-gray-400 mr-2" />
-                    <label className="form-label text-sm mb-0">Current Medications</label>
+                  <div className="flex items-center mb-1.5">
+                    <Pill className="h-3.5 w-3.5 text-gray-400 mr-1.5" />
+                    <label className="form-label text-xs mb-0">Current Medications</label>
                   </div>
                   <textarea
                     {...register('medicalHistory.currentMedications')}
-                    className="form-input py-2 text-sm"
+                    className="form-input py-1.5 text-sm"
                     rows={2}
                     placeholder="Enter current medications, separated by commas (e.g., Lisinopril 10mg, Metformin 500mg)..."
                   />
                 </div>
                 
                 <div>
-                  <label className="form-label text-sm">Family History</label>
+                  <label className="form-label text-xs">Family History</label>
                   <textarea
                     {...register('medicalHistory.familyHistory')}
-                    className="form-input py-2 text-sm"
+                    className="form-input py-1.5 text-sm"
                     rows={2}
                     placeholder="Enter relevant family medical history..."
                   />
@@ -967,31 +967,31 @@ const TriageForm: React.FC = () => {
           {/* Step 3: Assessment */}
           {currentStep === 3 && (
             <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Assessment</h3>
+              <h3 className="text-base font-medium text-gray-900 mb-3">Assessment</h3>
               
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
-                  <label className="form-label text-sm required">Chief Complaint</label>
+                  <label className="form-label text-xs required">Chief Complaint</label>
                   <textarea
                     {...register('chiefComplaint', { required: 'Chief complaint is required' })}
-                    className={`form-input py-2 text-sm ${errors.chiefComplaint ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
-                    rows={3}
+                    className={`form-input py-1.5 text-sm ${errors.chiefComplaint ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    rows={2}
                     placeholder="Describe the patient's main complaint"
                   />
                   {errors.chiefComplaint && (
-                    <p className="form-error text-sm mt-1">{errors.chiefComplaint.message}</p>
+                    <p className="form-error text-xs mt-1">{errors.chiefComplaint.message}</p>
                   )}
                 </div>
                 
                 <div>
-                  <label className="form-label text-sm required">Acuity Level</label>
-                  <div className="grid grid-cols-5 gap-2">
+                  <label className="form-label text-xs required">Acuity Level</label>
+                  <div className="grid grid-cols-5 gap-1.5">
                     {[1, 2, 3, 4, 5].map((level) => (
                       <button
                         key={level}
                         type="button"
                         onClick={() => setValue('acuityLevel', level)}
-                        className={`p-3 text-sm font-medium rounded-lg flex flex-col items-center justify-center transition-colors ${
+                        className={`p-2 text-xs font-medium rounded-lg flex flex-col items-center justify-center transition-colors ${
                           acuityLevel === level
                             ? level === 1 ? 'bg-red-100 text-red-800 border border-red-200'
                             : level === 2 ? 'bg-orange-100 text-orange-800 border border-orange-200'
@@ -1001,7 +1001,7 @@ const TriageForm: React.FC = () => {
                             : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
                         }`}
                       >
-                        <span className="text-lg font-bold mb-1">{level}</span>
+                        <span className="text-base font-bold mb-0.5">{level}</span>
                         <span className="text-xs">
                           {level === 1 ? 'Critical' 
                           : level === 2 ? 'Emergency'
@@ -1015,14 +1015,14 @@ const TriageForm: React.FC = () => {
                 </div>
                 
                 <div>
-                  <label className="form-label text-sm required">Department</label>
+                  <label className="form-label text-xs required">Department</label>
                   <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <Building2 className="h-4 w-4 text-gray-400" />
+                    <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                      <Building2 className="h-3.5 w-3.5 text-gray-400" />
                     </div>
                     <select
                       {...register('departmentId', { required: 'Department is required' })}
-                      className={`form-input pl-9 py-2 text-sm w-full ${errors.departmentId ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                      className={`form-input pl-8 py-1.5 text-sm w-full ${errors.departmentId ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                     >
                       <option value="">Select department</option>
                       {departments.map((dept) => (
@@ -1031,29 +1031,29 @@ const TriageForm: React.FC = () => {
                     </select>
                   </div>
                   {errors.departmentId && (
-                    <p className="form-error text-sm mt-1">{errors.departmentId.message}</p>
+                    <p className="form-error text-xs mt-1">{errors.departmentId.message}</p>
                   )}
                 </div>
                 
                 <div>
-                  <label className="form-label text-sm">Notes</label>
+                  <label className="form-label text-xs">Notes</label>
                   <textarea
                     {...register('notes')}
-                    className="form-input py-2 text-sm"
-                    rows={3}
+                    className="form-input py-1.5 text-sm"
+                    rows={2}
                     placeholder="Additional notes about the patient's condition"
                   />
                 </div>
                 
-                <div className="flex items-center p-4 bg-gray-50 rounded-lg">
+                <div className="flex items-center p-3 bg-gray-50 rounded-lg">
                   <input
                     type="checkbox"
                     id="isEmergency"
                     {...register('isEmergency')}
-                    className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
+                    className="h-3.5 w-3.5 text-red-600 focus:ring-red-500 border-gray-300 rounded"
                   />
-                  <label htmlFor="isEmergency" className="ml-2 flex items-center text-sm font-medium text-red-700">
-                    <AlertTriangle className="h-4 w-4 mr-1 text-red-500" />
+                  <label htmlFor="isEmergency" className="ml-1.5 flex items-center text-xs font-medium text-red-700">
+                    <AlertTriangle className="h-3.5 w-3.5 mr-1 text-red-500" />
                     Mark as Emergency Case
                   </label>
                 </div>
@@ -1068,18 +1068,18 @@ const TriageForm: React.FC = () => {
             <button
               type="button"
               onClick={prevStep}
-              className="btn btn-outline flex items-center"
+              className="btn btn-outline flex items-center py-1.5 px-3 text-sm"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
               Back
             </button>
           ) : (
             <button
               type="button"
               onClick={() => navigate('/patients')}
-              className="btn btn-outline flex items-center"
+              className="btn btn-outline flex items-center py-1.5 px-3 text-sm"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
               Cancel
             </button>
           )}
@@ -1088,25 +1088,25 @@ const TriageForm: React.FC = () => {
             <button
               type="button"
               onClick={nextStep}
-              className="btn btn-primary flex items-center"
+              className="btn btn-primary flex items-center py-1.5 px-3 text-sm"
             >
               Next
-              <ChevronRight className="h-4 w-4 ml-2" />
+              <ChevronRight className="h-3.5 w-3.5 ml-1.5" />
             </button>
           ) : (
             <button
               type="submit"
               disabled={isSaving}
-              className="btn btn-primary flex items-center"
+              className="btn btn-primary flex items-center py-1.5 px-3 text-sm"
             >
               {isSaving ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
+                  <div className="animate-spin rounded-full h-3.5 w-3.5 border-t-2 border-b-2 border-white mr-1.5"></div>
                   Saving...
                 </>
               ) : (
                 <>
-                  <Save className="h-4 w-4 mr-2" />
+                  <Save className="h-3.5 w-3.5 mr-1.5" />
                   Complete Triage
                 </>
               )}
