@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore, useNotificationStore } from '../../lib/store';
+import { useNotificationStore } from '../../lib/store';
 import { useHybridStorage } from '../../lib/hooks/useHybridStorage';
 import { 
   User, 
@@ -9,164 +9,186 @@ import {
   Mail, 
   MapPin, 
   Calendar, 
-  AlertTriangle, 
-  Search,
-  CheckCircle,
-  ArrowLeft,
-  ArrowRight,
-  CreditCard,
-  Wallet,
+  ChevronRight, 
+  ChevronLeft, 
+  CheckCircle, 
+  CreditCard, 
+  Building2, 
+  AlertTriangle,
   ChevronDown,
   ChevronUp,
   Smartphone,
   Hash
 } from 'lucide-react';
 
-interface PatientFormData {
+interface PatientRegistrationFormData {
+  // Personal Information
   firstName: string;
   lastName: string;
+  dateOfBirth: string;
   age: number;
-  dateOfBirth?: string;
   gender: string;
+  patientId: string;
+  
+  // Contact Information
   contactNumber: string;
-  email?: string;
+  email: string;
   address: string;
+  
+  // Emergency Contact
   hasEmergencyContact: boolean;
-  emergencyContact?: {
-    name: string;
-    relationship: string;
-    phone: string;
-  };
-  medicalInfo: {
-    allergies?: string[];
-    chronicConditions?: string[];
-    currentMedications?: { name: string; dosage?: string }[];
-    bloodType?: string;
-    smoker?: boolean;
-    alcoholConsumption?: string;
-  };
-  paymentMethod: string;
-  insuranceInfo?: {
-    provider: string;
-    policyNumber: string;
-    groupNumber?: string;
-    holderName?: string;
-  };
-  mpesaInfo?: {
-    phoneNumber: string;
-    transactionId?: string;
-  };
-}
-
-interface ExistingPatient {
-  id: string;
-  first_name: string;
-  last_name: string;
-  date_of_birth?: string;
-  gender: string;
-  contact_number: string;
-  email?: string;
-  address: string;
+  emergencyContactName: string;
+  emergencyContactRelationship: string;
+  emergencyContactPhone: string;
+  
+  // Medical Information
+  allergies: string[];
+  chronicConditions: string[];
+  currentMedications: string;
+  bloodType: string;
+  
+  // Payment Information
+  paymentMethod: 'cash' | 'insurance' | 'credit_card' | 'mpesa';
+  insuranceProvider?: string;
+  insurancePolicyNumber?: string;
+  creditCardNumber?: string;
+  creditCardExpiry?: string;
+  creditCardCVV?: string;
+  mpesaPhoneNumber?: string;
+  mpesaTransactionId?: string;
+  
+  // Additional Information
+  isEmergency: boolean;
+  notes: string;
 }
 
 const PatientRegistrationForm: React.FC = () => {
   const navigate = useNavigate();
   const { addNotification } = useNotificationStore();
-  const { register, handleSubmit, control, setValue, watch, formState: { errors } } = useForm<PatientFormData>({
-    defaultValues: {
-      hasEmergencyContact: false
-    }
-  });
   const [currentStep, setCurrentStep] = useState(1);
-  const [patientType, setPatientType] = useState<'new' | 'existing' | 'emergency'>('new');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [searchResults, setSearchResults] = useState<ExistingPatient[]>([]);
-  const [selectedPatient, setSelectedPatient] = useState<ExistingPatient | null>(null);
-  const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showAllergies, setShowAllergies] = useState(false);
+  const [showChronicConditions, setShowChronicConditions] = useState(false);
   const [showEmergencyContact, setShowEmergencyContact] = useState(false);
-  const [patientId, setPatientId] = useState('');
+  const [generatedPatientId, setGeneratedPatientId] = useState('');
   
-  // Get the hybrid storage hook for patients
   const { 
-    saveItem: savePatient, 
-    fetchItems: fetchPatients,
-    data: existingPatients,
-    loading: patientsLoading
+    saveItem: savePatient,
+    error: saveError
   } = useHybridStorage<any>('patients');
   
-  // Watch form values
-  const watchPaymentMethod = watch('paymentMethod');
-  const watchHasEmergencyContact = watch('hasEmergencyContact');
-  
-  useEffect(() => {
-    // Fetch existing patients for search
-    fetchPatients();
-    
-    // Generate a patient ID
-    generatePatientId();
-  }, [fetchPatients]);
-  
-  useEffect(() => {
-    // Set priority level based on patient type
-    if (patientType === 'emergency') {
-      setValue('medicalInfo.priority', 'critical');
+  const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<PatientRegistrationFormData>({
+    defaultValues: {
+      firstName: '',
+      lastName: '',
+      dateOfBirth: '',
+      age: 0,
+      gender: '',
+      patientId: '',
+      contactNumber: '',
+      email: '',
+      address: '',
+      hasEmergencyContact: false,
+      emergencyContactName: '',
+      emergencyContactRelationship: '',
+      emergencyContactPhone: '',
+      allergies: [],
+      chronicConditions: [],
+      currentMedications: '',
+      bloodType: '',
+      paymentMethod: 'cash',
+      isEmergency: false,
+      notes: ''
     }
-  }, [patientType, setValue]);
+  });
   
-  // Generate a unique patient ID
+  const paymentMethod = watch('paymentMethod');
+  const hasEmergencyContact = watch('hasEmergencyContact');
+  const isEmergency = watch('isEmergency');
+  
+  // Generate a unique patient ID when the component mounts
+  useEffect(() => {
+    generatePatientId();
+  }, []);
+  
   const generatePatientId = () => {
-    const prefix = 'PT';
-    const randomNum = Math.floor(100000 + Math.random() * 900000);
-    setPatientId(`${prefix}${randomNum}`);
+    // Generate a unique ID with format PT + 6 random digits
+    const randomDigits = Math.floor(100000 + Math.random() * 900000);
+    const patientId = `PT${randomDigits}`;
+    setGeneratedPatientId(patientId);
+    setValue('patientId', patientId);
   };
   
-  const handleSearch = () => {
-    if (!searchTerm || searchTerm.length < 2) return;
-    
-    setIsSearching(true);
-    
+  const onSubmit = async (data: PatientRegistrationFormData) => {
     try {
-      // Filter existing patients based on search term
-      if (Array.isArray(existingPatients)) {
-        const results = existingPatients.filter(patient => {
-          const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
-          const contactNumber = patient.contact_number || '';
-          
-          return fullName.includes(searchTerm.toLowerCase()) || 
-                 contactNumber.includes(searchTerm);
-        });
-        
-        setSearchResults(results);
-      } else {
-        setSearchResults([]);
-      }
-    } catch (error) {
-      console.error('Error searching patients:', error);
+      setIsSubmitting(true);
+      
+      // Create patient object
+      const patient = {
+        id: crypto.randomUUID(),
+        first_name: data.firstName,
+        last_name: data.lastName,
+        date_of_birth: data.dateOfBirth,
+        gender: data.gender,
+        contact_number: data.contactNumber,
+        email: data.email,
+        address: data.address,
+        emergency_contact: data.hasEmergencyContact ? {
+          name: data.emergencyContactName,
+          relationship: data.emergencyContactRelationship,
+          phone: data.emergencyContactPhone
+        } : {
+          name: '',
+          relationship: '',
+          phone: ''
+        },
+        medical_info: {
+          allergies: data.allergies.filter(a => a),
+          chronicConditions: data.chronicConditions.filter(c => c),
+          currentMedications: data.currentMedications ? data.currentMedications.split(',').map(med => ({ name: med.trim() })) : [],
+          bloodType: data.bloodType
+        },
+        payment_info: {
+          method: data.paymentMethod,
+          details: data.paymentMethod === 'insurance' ? {
+            provider: data.insuranceProvider,
+            policyNumber: data.insurancePolicyNumber
+          } : data.paymentMethod === 'credit_card' ? {
+            cardNumber: data.creditCardNumber?.replace(/\d(?=\d{4})/g, '*'),
+            expiry: data.creditCardExpiry
+          } : data.paymentMethod === 'mpesa' ? {
+            phoneNumber: data.mpesaPhoneNumber,
+            transactionId: data.mpesaTransactionId
+          } : {}
+        },
+        status: 'active',
+        current_flow_step: data.isEmergency ? 'emergency' : 'registration',
+        priority_level: data.isEmergency ? 'critical' : 'normal',
+        patient_id: data.patientId || generatedPatientId,
+        created_at: new Date().toISOString()
+      };
+      
+      // Save patient data
+      await savePatient(patient, patient.id);
+      
+      // Show success notification
       addNotification({
-        message: 'Error searching for patients',
+        message: `Patient ${data.firstName} ${data.lastName} registered successfully`,
+        type: 'success'
+      });
+      
+      // Redirect to reception dashboard instead of triage
+      navigate('/reception');
+      
+    } catch (error: any) {
+      console.error('Error registering patient:', error);
+      addNotification({
+        message: `Error: ${error.message}`,
         type: 'error'
       });
     } finally {
-      setIsSearching(false);
+      setIsSubmitting(false);
     }
-  };
-  
-  const selectExistingPatient = (patient: ExistingPatient) => {
-    setSelectedPatient(patient);
-    setSearchResults([]);
-    setSearchTerm(`${patient.first_name} ${patient.last_name}`);
-    
-    // Pre-fill form with existing patient data
-    setValue('firstName', patient.first_name);
-    setValue('lastName', patient.last_name);
-    setValue('gender', patient.gender);
-    setValue('contactNumber', patient.contact_number);
-    setValue('email', patient.email || '');
-    setValue('address', patient.address);
-    
-    // Move to next step
-    setCurrentStep(2);
   };
   
   const nextStep = () => {
@@ -177,903 +199,930 @@ const PatientRegistrationForm: React.FC = () => {
     setCurrentStep(currentStep - 1);
   };
   
-  const toggleEmergencyContact = () => {
-    setShowEmergencyContact(!showEmergencyContact);
-    setValue('hasEmergencyContact', !showEmergencyContact);
-  };
-  
-  const onSubmit = async (data: PatientFormData) => {
-    setIsSubmitting(true);
-    
-    try {
-      // Prepare patient data
-      const patientData = {
-        id: selectedPatient?.id, // Will be undefined for new patients
-        first_name: data.firstName,
-        last_name: data.lastName,
-        age: data.age,
-        date_of_birth: data.dateOfBirth || null,
-        gender: data.gender,
-        contact_number: data.contactNumber,
-        email: data.email || null,
-        address: data.address,
-        emergency_contact: data.hasEmergencyContact && data.emergencyContact ? {
-          name: data.emergencyContact.name,
-          relationship: data.emergencyContact.relationship,
-          phone: data.emergencyContact.phone
-        } : null,
-        medical_info: {
-          allergies: data.medicalInfo?.allergies || [],
-          chronicConditions: data.medicalInfo?.chronicConditions || [],
-          currentMedications: data.medicalInfo?.currentMedications || [],
-          bloodType: data.medicalInfo?.bloodType || null,
-          smoker: data.medicalInfo?.smoker || false,
-          alcoholConsumption: data.medicalInfo?.alcoholConsumption || 'none'
-        },
-        payment_method: data.paymentMethod,
-        insurance_info: data.paymentMethod === 'insurance' ? data.insuranceInfo : null,
-        mpesa_info: data.paymentMethod === 'mpesa' ? data.mpesaInfo : null,
-        status: 'active',
-        current_flow_step: patientType === 'emergency' ? 'emergency' : 'triage',
-        priority_level: patientType === 'emergency' ? 'critical' : 'normal',
-        arrival_time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
-        patient_id: patientId
-      };
-      
-      // Save patient data
-      const savedPatient = await savePatient(patientData, selectedPatient?.id);
-      
-      // Show success notification
-      addNotification({
-        message: `Patient ${selectedPatient ? 'updated' : 'registered'} successfully`,
-        type: 'success'
-      });
-      
-      // Redirect to triage
-      navigate(`/patients/${savedPatient.id}/triage`);
-    } catch (error) {
-      console.error('Error saving patient:', error);
-      addNotification({
-        message: 'Error saving patient information',
-        type: 'error'
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
+  const renderStepIndicator = () => {
+    return (
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          {[1, 2, 3, 4, 5].map((step) => (
+            <div key={step} className="flex flex-col items-center">
+              <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                currentStep === step
+                  ? 'bg-primary-500 text-white'
+                  : currentStep > step
+                  ? 'bg-success-500 text-white'
+                  : 'bg-gray-200 text-gray-500'
+              }`}>
+                {currentStep > step ? (
+                  <CheckCircle className="h-5 w-5" />
+                ) : (
+                  <span>{step}</span>
+                )}
+              </div>
+              <span className="mt-1 text-xs text-gray-500">
+                {step === 1 && 'Patient Type'}
+                {step === 2 && 'Personal Info'}
+                {step === 3 && 'Contact'}
+                {step === 4 && 'Priority'}
+                {step === 5 && 'Review'}
+              </span>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 text-right text-xs text-gray-500">
+          Step {currentStep} of 5
+        </div>
+      </div>
+    );
   };
   
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="bg-teal-600 rounded-t-md p-3 mb-3">
+    <div className="max-w-3xl mx-auto">
+      <div className="bg-primary-600 p-4 rounded-t-lg">
         <div className="flex items-center">
-          <ArrowLeft className="h-5 w-5 text-white mr-2" onClick={() => navigate(-1)} style={{cursor: 'pointer'}} />
-          <h1 className="text-lg font-medium text-white">
-            Patient Registration
-          </h1>
-        </div>
-        <p className="text-xs text-teal-100 ml-7">Register new or manage existing patients</p>
-      </div>
-      
-      {/* Progress Steps */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-              currentStep >= 1 ? 'bg-teal-500 text-white' : 'bg-gray-200 text-gray-500'
-            }`}>
-              {currentStep > 1 ? <CheckCircle className="h-4 w-4" /> : 1}
-            </div>
-            <div className={`h-1 w-10 ${
-              currentStep > 1 ? 'bg-teal-500' : 'bg-gray-200'
-            }`}></div>
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-              currentStep >= 2 ? 'bg-teal-500 text-white' : 'bg-gray-200 text-gray-500'
-            }`}>
-              {currentStep > 2 ? <CheckCircle className="h-4 w-4" /> : 2}
-            </div>
-            <div className={`h-1 w-10 ${
-              currentStep > 2 ? 'bg-teal-500' : 'bg-gray-200'
-            }`}></div>
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-              currentStep >= 3 ? 'bg-teal-500 text-white' : 'bg-gray-200 text-gray-500'
-            }`}>
-              {currentStep > 3 ? <CheckCircle className="h-4 w-4" /> : 3}
-            </div>
-            <div className={`h-1 w-10 ${
-              currentStep > 3 ? 'bg-teal-500' : 'bg-gray-200'
-            }`}></div>
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-              currentStep >= 4 ? 'bg-teal-500 text-white' : 'bg-gray-200 text-gray-500'
-            }`}>
-              {currentStep > 4 ? <CheckCircle className="h-4 w-4" /> : 4}
-            </div>
-            <div className={`h-1 w-10 ${
-              currentStep > 4 ? 'bg-teal-500' : 'bg-gray-200'
-            }`}></div>
-            <div className={`w-7 h-7 rounded-full flex items-center justify-center ${
-              currentStep >= 5 ? 'bg-teal-500 text-white' : 'bg-gray-200 text-gray-500'
-            }`}>
-              5
-            </div>
+          <button 
+            onClick={() => navigate('/reception')}
+            className="text-white mr-2"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <div>
+            <h1 className="text-xl font-bold text-white">Patient Registration</h1>
+            <p className="text-primary-100 text-sm">Register new or manage existing patients</p>
           </div>
-          <div className="text-xs text-gray-500">
-            Step {currentStep} of 5
-          </div>
-        </div>
-        <div className="flex justify-between mt-1 text-xs text-gray-500">
-          <div className={currentStep === 1 ? 'text-teal-600 font-medium' : ''}>Patient Type</div>
-          <div className={currentStep === 2 ? 'text-teal-600 font-medium' : ''}>Personal Info</div>
-          <div className={currentStep === 3 ? 'text-teal-600 font-medium' : ''}>Contact</div>
-          <div className={currentStep === 4 ? 'text-teal-600 font-medium' : ''}>Priority</div>
-          <div className={currentStep === 5 ? 'text-teal-600 font-medium' : ''}>Review</div>
         </div>
       </div>
       
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <div className="bg-white rounded-md shadow-sm p-4">
-          {/* Step 1: Patient Type */}
-          {currentStep === 1 && (
-            <div>
-              <h2 className="text-base font-medium text-gray-900 mb-2">Patient Type</h2>
-              <p className="text-sm text-gray-600 mb-3">Select the appropriate patient type</p>
-              
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div 
-                  className={`border rounded-md p-3 cursor-pointer transition-colors ${
-                    patientType === 'new' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                  onClick={() => setPatientType('new')}
-                >
-                  <div className="flex items-center mb-1">
-                    <User className="h-5 w-5 text-teal-500 mr-2" />
-                    <h3 className="text-sm font-medium">New Patient</h3>
-                  </div>
-                  <p className="text-xs text-gray-500">Register a new patient</p>
+      <form onSubmit={handleSubmit(onSubmit)} className="bg-white rounded-b-lg shadow-sm p-6">
+        {renderStepIndicator()}
+        
+        {/* Step 1: Patient Type */}
+        {currentStep === 1 && (
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Patient Type</h2>
+            <p className="text-sm text-gray-600 mb-6">Select the appropriate patient type</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="border rounded-lg p-4 bg-primary-50 border-primary-200">
+                <div className="flex items-center mb-2">
+                  <User className="h-5 w-5 text-primary-500 mr-2" />
+                  <h3 className="font-medium text-gray-900">New Patient</h3>
                 </div>
-                
-                <div 
-                  className={`border rounded-md p-3 cursor-pointer transition-colors ${
-                    patientType === 'existing' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                  onClick={() => setPatientType('existing')}
-                >
-                  <div className="flex items-center mb-1">
-                    <Search className="h-5 w-5 text-teal-500 mr-2" />
-                    <h3 className="text-sm font-medium">Existing Patient</h3>
-                  </div>
-                  <p className="text-xs text-gray-500">Find patient records</p>
-                </div>
-                
-                <div 
-                  className={`border rounded-md p-3 cursor-pointer transition-colors ${
-                    patientType === 'emergency' ? 'border-red-500 bg-red-50' : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                  onClick={() => setPatientType('emergency')}
-                >
-                  <div className="flex items-center mb-1">
-                    <AlertTriangle className="h-5 w-5 text-red-500 mr-2" />
-                    <h3 className="text-sm font-medium">Emergency</h3>
-                  </div>
-                  <p className="text-xs text-gray-500">Fast-track emergency case</p>
+                <p className="text-sm text-gray-600 mb-3">Register a new patient</p>
+                <div className="flex justify-end">
+                  <CheckCircle className="h-5 w-5 text-primary-500" />
                 </div>
               </div>
               
-              {patientType === 'existing' && (
-                <div className="mt-4">
-                  <div className="flex items-center mb-2">
-                    <Search className="h-4 w-4 text-gray-400 mr-2" />
-                    <h3 className="text-sm font-medium">Search Existing Patient</h3>
+              <div className="border rounded-lg p-4 hover:bg-gray-50 cursor-pointer" onClick={() => navigate('/patients/search')}>
+                <div className="flex items-center mb-2">
+                  <User className="h-5 w-5 text-gray-400 mr-2" />
+                  <h3 className="font-medium text-gray-900">Existing Patient</h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">Find patient records</p>
+              </div>
+              
+              <div 
+                className={`border rounded-lg p-4 ${isEmergency ? 'bg-error-50 border-error-200' : 'hover:bg-gray-50'} cursor-pointer`}
+                onClick={() => setValue('isEmergency', !isEmergency)}
+              >
+                <div className="flex items-center mb-2">
+                  <AlertTriangle className={`h-5 w-5 ${isEmergency ? 'text-error-500' : 'text-gray-400'} mr-2`} />
+                  <h3 className="font-medium text-gray-900">Emergency</h3>
+                </div>
+                <p className="text-sm text-gray-600 mb-3">Fast-track emergency case</p>
+                {isEmergency && (
+                  <div className="flex justify-end">
+                    <CheckCircle className="h-5 w-5 text-error-500" />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Step 2: Personal Information */}
+        {currentStep === 2 && (
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Personal Information</h2>
+            <p className="text-sm text-gray-600 mb-6">Enter the patient's personal details</p>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="form-label required">First Name</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    {...register('firstName', { required: 'First name is required' })}
+                    className={`form-input pl-10 ${errors.firstName ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                  />
+                </div>
+                {errors.firstName && <p className="form-error">{errors.firstName.message}</p>}
+              </div>
+              
+              <div>
+                <label className="form-label required">Last Name</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <User className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    {...register('lastName', { required: 'Last name is required' })}
+                    className={`form-input pl-10 ${errors.lastName ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                  />
+                </div>
+                {errors.lastName && <p className="form-error">{errors.lastName.message}</p>}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="form-label">Date of Birth</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Calendar className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="date"
+                    {...register('dateOfBirth')}
+                    className="form-input pl-10"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <label className="form-label required">Age</label>
+                <input
+                  type="number"
+                  {...register('age', { 
+                    required: 'Age is required',
+                    min: { value: 0, message: 'Age must be a positive number' },
+                    max: { value: 150, message: 'Age cannot exceed 150' }
+                  })}
+                  className={`form-input ${errors.age ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                />
+                {errors.age && <p className="form-error">{errors.age.message}</p>}
+              </div>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="form-label required">Gender</label>
+                <select
+                  {...register('gender', { required: 'Gender is required' })}
+                  className={`form-input ${errors.gender ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                >
+                  <option value="">Select gender</option>
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+                {errors.gender && <p className="form-error">{errors.gender.message}</p>}
+              </div>
+              
+              <div>
+                <label className="form-label">Patient ID</label>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <Hash className="h-5 w-5 text-gray-400" />
+                  </div>
+                  <input
+                    type="text"
+                    value={generatedPatientId}
+                    readOnly
+                    className="form-input pl-10 bg-gray-50"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 mt-1">Auto-generated unique identifier</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Step 3: Contact Information */}
+        {currentStep === 3 && (
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Contact Information</h2>
+            <p className="text-sm text-gray-600 mb-6">Enter the patient's contact details</p>
+            
+            <div className="mb-4">
+              <label className="form-label required">Phone Number</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Phone className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="tel"
+                  {...register('contactNumber', { required: 'Phone number is required' })}
+                  className={`form-input pl-10 ${errors.contactNumber ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                  placeholder="+1 (555) 000-0000"
+                />
+              </div>
+              {errors.contactNumber && <p className="form-error">{errors.contactNumber.message}</p>}
+            </div>
+            
+            <div className="mb-4">
+              <label className="form-label">Email Address</label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="email"
+                  {...register('email', { 
+                    pattern: {
+                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                      message: 'Invalid email address'
+                    }
+                  })}
+                  className={`form-input pl-10 ${errors.email ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                  placeholder="patient@example.com"
+                />
+              </div>
+              {errors.email && <p className="form-error">{errors.email.message}</p>}
+            </div>
+            
+            <div className="mb-6">
+              <label className="form-label required">Address</label>
+              <div className="relative">
+                <div className="absolute top-3 left-3 pointer-events-none">
+                  <MapPin className="h-5 w-5 text-gray-400" />
+                </div>
+                <textarea
+                  {...register('address', { required: 'Address is required' })}
+                  className={`form-input pl-10 ${errors.address ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                  rows={3}
+                  placeholder="Enter complete address"
+                />
+              </div>
+              {errors.address && <p className="form-error">{errors.address.message}</p>}
+            </div>
+            
+            {/* Collapsible Emergency Contact Section */}
+            <div className="border rounded-lg p-4 mb-4">
+              <div 
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => {
+                  setShowEmergencyContact(!showEmergencyContact);
+                  setValue('hasEmergencyContact', !showEmergencyContact);
+                }}
+              >
+                <div className="flex items-center">
+                  <Phone className="h-5 w-5 text-gray-400 mr-2" />
+                  <h3 className="font-medium text-gray-900">Emergency Contact</h3>
+                </div>
+                {showEmergencyContact ? (
+                  <ChevronUp className="h-5 w-5 text-gray-400" />
+                ) : (
+                  <ChevronDown className="h-5 w-5 text-gray-400" />
+                )}
+              </div>
+              
+              {showEmergencyContact && (
+                <div className="mt-4 space-y-4">
+                  <div>
+                    <label className="form-label required">Name</label>
+                    <input
+                      type="text"
+                      {...register('emergencyContactName', { 
+                        required: hasEmergencyContact ? 'Emergency contact name is required' : false
+                      })}
+                      className={`form-input ${errors.emergencyContactName ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    />
+                    {errors.emergencyContactName && <p className="form-error">{errors.emergencyContactName.message}</p>}
                   </div>
                   
-                  <div className="flex space-x-2">
-                    <div className="relative flex-grow">
-                      <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="form-input pl-8 py-1.5 text-sm w-full"
-                        placeholder="Search by name or phone number"
-                      />
-                      <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                        <Search className="h-4 w-4 text-gray-400" />
+                  <div>
+                    <label className="form-label required">Relationship</label>
+                    <input
+                      type="text"
+                      {...register('emergencyContactRelationship', { 
+                        required: hasEmergencyContact ? 'Relationship is required' : false
+                      })}
+                      className={`form-input ${errors.emergencyContactRelationship ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    />
+                    {errors.emergencyContactRelationship && <p className="form-error">{errors.emergencyContactRelationship.message}</p>}
+                  </div>
+                  
+                  <div>
+                    <label className="form-label required">Phone Number</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Phone className="h-5 w-5 text-gray-400" />
                       </div>
+                      <input
+                        type="tel"
+                        {...register('emergencyContactPhone', { 
+                          required: hasEmergencyContact ? 'Emergency contact phone is required' : false
+                        })}
+                        className={`form-input pl-10 ${errors.emergencyContactPhone ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                        placeholder="+1 (555) 000-0000"
+                      />
                     </div>
-                    <button
-                      type="button"
-                      onClick={handleSearch}
-                      disabled={isSearching || searchTerm.length < 2}
-                      className="btn btn-primary py-1.5 text-sm"
-                    >
-                      {isSearching ? 'Searching...' : 'Search'}
-                    </button>
+                    {errors.emergencyContactPhone && <p className="form-error">{errors.emergencyContactPhone.message}</p>}
                   </div>
-                  
-                  {isSearching ? (
-                    <div className="mt-2 text-center py-4">
-                      <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-teal-500 mx-auto"></div>
-                      <p className="text-sm text-gray-500 mt-1">Searching...</p>
-                    </div>
-                  ) : searchResults.length > 0 ? (
-                    <div className="mt-2 border rounded-md divide-y max-h-60 overflow-y-auto">
-                      {searchResults.map((patient) => (
-                        <div 
-                          key={patient.id}
-                          className="p-2 hover:bg-gray-50 cursor-pointer flex justify-between items-center"
-                          onClick={() => selectExistingPatient(patient)}
-                        >
-                          <div>
-                            <div className="text-sm font-medium">{patient.first_name} {patient.last_name}</div>
-                            <div className="text-xs text-gray-500">
-                              {patient.contact_number}
-                              {patient.date_of_birth && ` • ${new Date(patient.date_of_birth).toLocaleDateString()}`}
-                            </div>
-                          </div>
-                          <button
-                            type="button"
-                            className="text-xs text-teal-600 hover:text-teal-800"
-                          >
-                            Select
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                  ) : searchTerm && !isSearching ? (
-                    <div className="mt-2 text-center py-2">
-                      <p className="text-sm text-gray-500">No patients found matching "{searchTerm}"</p>
-                    </div>
-                  ) : null}
                 </div>
               )}
             </div>
-          )}
-          
-          {/* Step 2: Personal Information */}
-          {currentStep === 2 && (
-            <div>
-              <h2 className="text-base font-medium text-gray-900 mb-2">Personal Information</h2>
-              <p className="text-sm text-gray-600 mb-3">Enter the patient's personal details</p>
+          </div>
+        )}
+        
+        {/* Step 4: Medical & Payment Information */}
+        {currentStep === 4 && (
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Medical & Payment Information</h2>
+            <p className="text-sm text-gray-600 mb-6">Enter medical history and payment details</p>
+            
+            {/* Medical Information */}
+            <div className="mb-6">
+              <h3 className="text-md font-medium text-gray-800 mb-3">Medical Information</h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                <div>
-                  <label className="form-label text-xs required">First Name</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                      <User className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      {...register('firstName', { required: 'First name is required' })}
-                      className={`form-input pl-7 py-1.5 text-sm ${errors.firstName ? 'border-red-300' : ''}`}
-                    />
-                  </div>
-                  {errors.firstName && <p className="text-red-500 text-xs mt-1">{errors.firstName.message}</p>}
-                </div>
-                
-                <div>
-                  <label className="form-label text-xs required">Last Name</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                      <User className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      {...register('lastName', { required: 'Last name is required' })}
-                      className={`form-input pl-7 py-1.5 text-sm ${errors.lastName ? 'border-red-300' : ''}`}
-                    />
-                  </div>
-                  {errors.lastName && <p className="text-red-500 text-xs mt-1">{errors.lastName.message}</p>}
-                </div>
-                
-                <div>
-                  <label className="form-label text-xs required">Age</label>
-                  <input
-                    type="number"
-                    {...register('age', { 
-                      required: 'Age is required',
-                      min: { value: 0, message: 'Age must be positive' },
-                      max: { value: 120, message: 'Age must be less than 120' }
-                    })}
-                    className={`form-input py-1.5 text-sm ${errors.age ? 'border-red-300' : ''}`}
-                  />
-                  {errors.age && <p className="text-red-500 text-xs mt-1">{errors.age.message}</p>}
-                </div>
-                
-                <div>
-                  <label className="form-label text-xs">Date of Birth</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                      <Calendar className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="date"
-                      {...register('dateOfBirth')}
-                      className="form-input pl-7 py-1.5 text-sm"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="form-label text-xs required">Gender</label>
-                  <select
-                    {...register('gender', { required: 'Gender is required' })}
-                    className={`form-input py-1.5 text-sm ${errors.gender ? 'border-red-300' : ''}`}
-                  >
-                    <option value="">Select gender</option>
-                    <option value="Male">Male</option>
-                    <option value="Female">Female</option>
-                    <option value="Other">Other</option>
-                  </select>
-                  {errors.gender && <p className="text-red-500 text-xs mt-1">{errors.gender.message}</p>}
-                </div>
-                
-                <div>
-                  <label className="form-label text-xs">Patient ID</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                      <Hash className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="text"
-                      value={patientId}
-                      readOnly
-                      className="form-input pl-7 py-1.5 text-sm bg-gray-50"
-                    />
-                  </div>
-                  <p className="text-xs text-gray-500 mt-1">Auto-generated unique identifier</p>
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Step 3: Contact Information */}
-          {currentStep === 3 && (
-            <div>
-              <h2 className="text-base font-medium text-gray-900 mb-2">Contact Information</h2>
-              <p className="text-sm text-gray-600 mb-3">Enter the patient's contact details</p>
-              
-              <div className="space-y-3">
-                <div>
-                  <label className="form-label text-xs required">Phone Number</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                      <Phone className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="tel"
-                      {...register('contactNumber', { required: 'Phone number is required' })}
-                      className={`form-input pl-7 py-1.5 text-sm ${errors.contactNumber ? 'border-red-300' : ''}`}
-                      placeholder="(123) 456-7890"
-                    />
-                  </div>
-                  {errors.contactNumber && <p className="text-red-500 text-xs mt-1">{errors.contactNumber.message}</p>}
-                </div>
-                
-                <div>
-                  <label className="form-label text-xs">Email Address</label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                      <Mail className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <input
-                      type="email"
-                      {...register('email')}
-                      className="form-input pl-7 py-1.5 text-sm"
-                      placeholder="patient@example.com"
-                    />
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="form-label text-xs required">Address</label>
-                  <div className="relative">
-                    <div className="absolute top-2 left-2 flex-shrink-0">
-                      <MapPin className="h-4 w-4 text-gray-400" />
-                    </div>
-                    <textarea
-                      {...register('address', { required: 'Address is required' })}
-                      className={`form-input pl-7 py-1.5 text-sm ${errors.address ? 'border-red-300' : ''}`}
-                      rows={2}
-                    />
-                  </div>
-                  {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address.message}</p>}
-                </div>
-                
-                {/* Collapsible Emergency Contact Section */}
-                <div className="border-t border-gray-200 pt-3 mt-3">
-                  <button 
-                    type="button" 
-                    className="flex items-center justify-between w-full text-left"
-                    onClick={toggleEmergencyContact}
-                  >
-                    <h3 className="text-sm font-medium text-gray-900">Emergency Contact</h3>
-                    <div className="flex items-center">
-                      <span className="text-xs text-gray-500 mr-2">
-                        {showEmergencyContact ? 'Hide' : 'Add'} emergency contact
-                      </span>
-                      {showEmergencyContact ? (
-                        <ChevronUp className="h-4 w-4 text-gray-400" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4 text-gray-400" />
-                      )}
-                    </div>
-                  </button>
-                  
-                  {showEmergencyContact && (
-                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <div>
-                        <label className="form-label text-xs required">Name</label>
-                        <input
-                          type="text"
-                          {...register('emergencyContact.name', { 
-                            required: watchHasEmergencyContact ? 'Emergency contact name is required' : false 
-                          })}
-                          className={`form-input py-1.5 text-sm ${errors.emergencyContact?.name ? 'border-red-300' : ''}`}
-                        />
-                        {errors.emergencyContact?.name && <p className="text-red-500 text-xs mt-1">{errors.emergencyContact.name.message}</p>}
-                      </div>
-                      
-                      <div>
-                        <label className="form-label text-xs required">Relationship</label>
-                        <input
-                          type="text"
-                          {...register('emergencyContact.relationship', { 
-                            required: watchHasEmergencyContact ? 'Relationship is required' : false 
-                          })}
-                          className={`form-input py-1.5 text-sm ${errors.emergencyContact?.relationship ? 'border-red-300' : ''}`}
-                        />
-                        {errors.emergencyContact?.relationship && <p className="text-red-500 text-xs mt-1">{errors.emergencyContact.relationship.message}</p>}
-                      </div>
-                      
-                      <div className="md:col-span-2">
-                        <label className="form-label text-xs required">Phone Number</label>
-                        <div className="relative">
-                          <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                            <Phone className="h-4 w-4 text-gray-400" />
-                          </div>
-                          <input
-                            type="tel"
-                            {...register('emergencyContact.phone', { 
-                              required: watchHasEmergencyContact ? 'Emergency contact phone is required' : false 
-                            })}
-                            className={`form-input pl-7 py-1.5 text-sm ${errors.emergencyContact?.phone ? 'border-red-300' : ''}`}
-                            placeholder="(123) 456-7890"
-                          />
-                        </div>
-                        {errors.emergencyContact?.phone && <p className="text-red-500 text-xs mt-1">{errors.emergencyContact.phone.message}</p>}
-                      </div>
-                    </div>
+              <div className="mb-4">
+                <div 
+                  className="flex items-center justify-between cursor-pointer mb-2"
+                  onClick={() => setShowAllergies(!showAllergies)}
+                >
+                  <label className="form-label mb-0">Allergies</label>
+                  {showAllergies ? (
+                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-gray-400" />
                   )}
                 </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Step 4: Priority & Payment */}
-          {currentStep === 4 && (
-            <div>
-              <h2 className="text-base font-medium text-gray-900 mb-2">Priority & Payment</h2>
-              <p className="text-sm text-gray-600 mb-3">Set priority level and payment information</p>
-              
-              <div className="space-y-4">
-                {/* Priority Section */}
-                <div className="mb-4">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Priority Level</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+                
+                {showAllergies && (
+                  <div className="space-y-2">
                     <div className="flex items-center">
                       <input
-                        type="radio"
-                        id="priority-normal"
-                        value="normal"
-                        {...register('medicalInfo.priority')}
-                        className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-gray-300"
-                        disabled={patientType === 'emergency'}
+                        type="checkbox"
+                        id="allergy-penicillin"
+                        value="Penicillin"
+                        {...register('allergies')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="priority-normal" className="ml-2 block text-sm text-gray-700">
-                        Normal
+                      <label htmlFor="allergy-penicillin" className="ml-2 block text-sm text-gray-900">
+                        Penicillin
                       </label>
                     </div>
-                    
                     <div className="flex items-center">
                       <input
-                        type="radio"
-                        id="priority-urgent"
-                        value="urgent"
-                        {...register('medicalInfo.priority')}
-                        className="h-4 w-4 text-yellow-600 focus:ring-yellow-500 border-gray-300"
-                        disabled={patientType === 'emergency'}
+                        type="checkbox"
+                        id="allergy-nsaids"
+                        value="NSAIDs"
+                        {...register('allergies')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="priority-urgent" className="ml-2 block text-sm text-gray-700">
-                        Urgent
+                      <label htmlFor="allergy-nsaids" className="ml-2 block text-sm text-gray-900">
+                        NSAIDs (Aspirin, Ibuprofen)
                       </label>
                     </div>
-                    
                     <div className="flex items-center">
                       <input
-                        type="radio"
-                        id="priority-critical"
-                        value="critical"
-                        {...register('medicalInfo.priority')}
-                        className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300"
-                        checked={patientType === 'emergency'}
-                        readOnly={patientType === 'emergency'}
+                        type="checkbox"
+                        id="allergy-latex"
+                        value="Latex"
+                        {...register('allergies')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
                       />
-                      <label htmlFor="priority-critical" className="ml-2 block text-sm text-gray-700">
-                        Critical
+                      <label htmlFor="allergy-latex" className="ml-2 block text-sm text-gray-900">
+                        Latex
                       </label>
                     </div>
-                  </div>
-                  
-                  {patientType === 'emergency' && (
-                    <div className="mt-2 p-2 bg-red-50 border border-red-200 rounded-md flex items-start">
-                      <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
-                      <p className="text-xs text-red-700">
-                        This patient has been marked as an emergency case and will be prioritized accordingly.
-                      </p>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Payment Method Section */}
-                <div>
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Payment Method</h3>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-                    <div 
-                      className={`border rounded-md p-2 cursor-pointer transition-colors ${
-                        watchPaymentMethod === 'cash' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setValue('paymentMethod', 'cash')}
-                    >
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="payment-cash"
-                          value="cash"
-                          {...register('paymentMethod')}
-                          className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-gray-300"
-                        />
-                        <label htmlFor="payment-cash" className="ml-2 flex items-center text-sm text-gray-700">
-                          <Wallet className="h-4 w-4 mr-1.5 text-gray-500" />
-                          Cash
-                        </label>
-                      </div>
-                    </div>
-                    
-                    <div 
-                      className={`border rounded-md p-2 cursor-pointer transition-colors ${
-                        watchPaymentMethod === 'card' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setValue('paymentMethod', 'card')}
-                    >
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="payment-card"
-                          value="card"
-                          {...register('paymentMethod')}
-                          className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-gray-300"
-                        />
-                        <label htmlFor="payment-card" className="ml-2 flex items-center text-sm text-gray-700">
-                          <CreditCard className="h-4 w-4 mr-1.5 text-gray-500" />
-                          Credit/Debit Card
-                        </label>
-                      </div>
-                    </div>
-                    
-                    <div 
-                      className={`border rounded-md p-2 cursor-pointer transition-colors ${
-                        watchPaymentMethod === 'mpesa' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setValue('paymentMethod', 'mpesa')}
-                    >
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="payment-mpesa"
-                          value="mpesa"
-                          {...register('paymentMethod')}
-                          className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-gray-300"
-                        />
-                        <label htmlFor="payment-mpesa" className="ml-2 flex items-center text-sm text-gray-700">
-                          <Smartphone className="h-4 w-4 mr-1.5 text-gray-500" />
-                          M-Pesa
-                        </label>
-                      </div>
-                    </div>
-                    
-                    <div 
-                      className={`border rounded-md p-2 cursor-pointer transition-colors ${
-                        watchPaymentMethod === 'insurance' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setValue('paymentMethod', 'insurance')}
-                    >
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="payment-insurance"
-                          value="insurance"
-                          {...register('paymentMethod')}
-                          className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-gray-300"
-                        />
-                        <label htmlFor="payment-insurance" className="ml-2 flex items-center text-sm text-gray-700">
-                          <CreditCard className="h-4 w-4 mr-1.5 text-gray-500" />
-                          Insurance
-                        </label>
-                      </div>
-                    </div>
-                    
-                    <div 
-                      className={`border rounded-md p-2 cursor-pointer transition-colors ${
-                        watchPaymentMethod === 'free' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                      onClick={() => setValue('paymentMethod', 'free')}
-                    >
-                      <div className="flex items-center">
-                        <input
-                          type="radio"
-                          id="payment-free"
-                          value="free"
-                          {...register('paymentMethod')}
-                          className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-gray-300"
-                        />
-                        <label htmlFor="payment-free" className="ml-2 flex items-center text-sm text-gray-700">
-                          <CheckCircle className="h-4 w-4 mr-1.5 text-gray-500" />
-                          Free Treatment
-                        </label>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* M-Pesa Information */}
-                  {watchPaymentMethod === 'mpesa' && (
-                    <div className="mt-3 p-3 border border-gray-200 rounded-md">
-                      <h4 className="text-xs font-medium text-gray-900 mb-2">M-Pesa Information</h4>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div>
-                          <label className="form-label text-xs required">Phone Number</label>
-                          <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                              <Smartphone className="h-4 w-4 text-gray-400" />
-                            </div>
-                            <input
-                              type="tel"
-                              {...register('mpesaInfo.phoneNumber', { 
-                                required: watchPaymentMethod === 'mpesa' ? 'Phone number is required' : false 
-                              })}
-                              className="form-input pl-7 py-1.5 text-sm"
-                              placeholder="e.g., 254712345678"
-                            />
-                          </div>
-                        </div>
-                        
-                        <div>
-                          <label className="form-label text-xs">Transaction ID</label>
-                          <input
-                            type="text"
-                            {...register('mpesaInfo.transactionId')}
-                            className="form-input py-1.5 text-sm"
-                            placeholder="Optional - if already paid"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Insurance Information */}
-                  {watchPaymentMethod === 'insurance' && (
-                    <div className="mt-3 p-3 border border-gray-200 rounded-md">
-                      <h4 className="text-xs font-medium text-gray-900 mb-2">Insurance Information</h4>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                        <div>
-                          <label className="form-label text-xs required">Provider</label>
-                          <input
-                            type="text"
-                            {...register('insuranceInfo.provider', { 
-                              required: watchPaymentMethod === 'insurance' ? 'Provider is required' : false 
-                            })}
-                            className="form-input py-1.5 text-sm"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="form-label text-xs required">Policy Number</label>
-                          <input
-                            type="text"
-                            {...register('insuranceInfo.policyNumber', { 
-                              required: watchPaymentMethod === 'insurance' ? 'Policy number is required' : false 
-                            })}
-                            className="form-input py-1.5 text-sm"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="form-label text-xs">Group Number</label>
-                          <input
-                            type="text"
-                            {...register('insuranceInfo.groupNumber')}
-                            className="form-input py-1.5 text-sm"
-                          />
-                        </div>
-                        
-                        <div>
-                          <label className="form-label text-xs">Policy Holder Name</label>
-                          <input
-                            type="text"
-                            {...register('insuranceInfo.holderName')}
-                            className="form-input py-1.5 text-sm"
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-          
-          {/* Step 5: Review */}
-          {currentStep === 5 && (
-            <div>
-              <h2 className="text-base font-medium text-gray-900 mb-2">Review Information</h2>
-              <p className="text-sm text-gray-600 mb-3">Please review the patient information before submitting</p>
-              
-              <div className="space-y-4">
-                <div className="border-b border-gray-200 pb-3">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Personal Information</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">Name:</span>
-                      <span className="ml-1 font-medium">{watch('firstName')} {watch('lastName')}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Age:</span>
-                      <span className="ml-1 font-medium">{watch('age')}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Gender:</span>
-                      <span className="ml-1 font-medium">{watch('gender')}</span>
-                    </div>
-                    {watch('dateOfBirth') && (
-                      <div>
-                        <span className="text-gray-500">Date of Birth:</span>
-                        <span className="ml-1 font-medium">{watch('dateOfBirth')}</span>
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-gray-500">Patient ID:</span>
-                      <span className="ml-1 font-medium">{patientId}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="border-b border-gray-200 pb-3">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Contact Information</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">Phone:</span>
-                      <span className="ml-1 font-medium">{watch('contactNumber')}</span>
-                    </div>
-                    {watch('email') && (
-                      <div>
-                        <span className="text-gray-500">Email:</span>
-                        <span className="ml-1 font-medium">{watch('email')}</span>
-                      </div>
-                    )}
-                    <div className="col-span-2">
-                      <span className="text-gray-500">Address:</span>
-                      <span className="ml-1 font-medium">{watch('address')}</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {watchHasEmergencyContact && watch('emergencyContact') && (
-                  <div className="border-b border-gray-200 pb-3">
-                    <h3 className="text-sm font-medium text-gray-900 mb-2">Emergency Contact</h3>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-gray-500">Name:</span>
-                        <span className="ml-1 font-medium">{watch('emergencyContact.name')}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Relationship:</span>
-                        <span className="ml-1 font-medium">{watch('emergencyContact.relationship')}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-500">Phone:</span>
-                        <span className="ml-1 font-medium">{watch('emergencyContact.phone')}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                
-                <div className="border-b border-gray-200 pb-3">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Priority & Payment</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">Priority:</span>
-                      <span className={`ml-1 font-medium ${
-                        watch('medicalInfo.priority') === 'critical' ? 'text-red-600' :
-                        watch('medicalInfo.priority') === 'urgent' ? 'text-yellow-600' :
-                        'text-green-600'
-                      }`}>
-                        {watch('medicalInfo.priority')?.charAt(0).toUpperCase() + watch('medicalInfo.priority')?.slice(1) || 'Normal'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Payment Method:</span>
-                      <span className="ml-1 font-medium">
-                        {watch('paymentMethod') === 'mpesa' ? 'M-Pesa' : 
-                         watch('paymentMethod')?.charAt(0).toUpperCase() + watch('paymentMethod')?.slice(1) || 'Not specified'}
-                      </span>
-                    </div>
-                    
-                    {watch('paymentMethod') === 'insurance' && watch('insuranceInfo') && (
-                      <>
-                        <div>
-                          <span className="text-gray-500">Insurance Provider:</span>
-                          <span className="ml-1 font-medium">{watch('insuranceInfo.provider')}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-500">Policy Number:</span>
-                          <span className="ml-1 font-medium">{watch('insuranceInfo.policyNumber')}</span>
-                        </div>
-                      </>
-                    )}
-                    
-                    {watch('paymentMethod') === 'mpesa' && watch('mpesaInfo') && (
-                      <>
-                        <div>
-                          <span className="text-gray-500">M-Pesa Phone:</span>
-                          <span className="ml-1 font-medium">{watch('mpesaInfo.phoneNumber')}</span>
-                        </div>
-                        {watch('mpesaInfo.transactionId') && (
-                          <div>
-                            <span className="text-gray-500">Transaction ID:</span>
-                            <span className="ml-1 font-medium">{watch('mpesaInfo.transactionId')}</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-                </div>
-                
-                {patientType === 'emergency' && (
-                  <div className="p-2 bg-red-50 border border-red-200 rounded-md flex items-start">
-                    <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 mr-2 flex-shrink-0" />
-                    <div>
-                      <p className="text-xs font-medium text-red-800">Emergency Case</p>
-                      <p className="text-xs text-red-700">
-                        This patient will be fast-tracked through the system as an emergency case.
-                      </p>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="allergy-nuts"
+                        value="Nuts"
+                        {...register('allergies')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="allergy-nuts" className="ml-2 block text-sm text-gray-900">
+                        Nuts
+                      </label>
                     </div>
                   </div>
                 )}
               </div>
+              
+              <div className="mb-4">
+                <div 
+                  className="flex items-center justify-between cursor-pointer mb-2"
+                  onClick={() => setShowChronicConditions(!showChronicConditions)}
+                >
+                  <label className="form-label mb-0">Chronic Conditions</label>
+                  {showChronicConditions ? (
+                    <ChevronUp className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-gray-400" />
+                  )}
+                </div>
+                
+                {showChronicConditions && (
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="condition-diabetes"
+                        value="Diabetes"
+                        {...register('chronicConditions')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="condition-diabetes" className="ml-2 block text-sm text-gray-900">
+                        Diabetes
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="condition-hypertension"
+                        value="Hypertension"
+                        {...register('chronicConditions')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="condition-hypertension" className="ml-2 block text-sm text-gray-900">
+                        Hypertension
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="condition-asthma"
+                        value="Asthma"
+                        {...register('chronicConditions')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="condition-asthma" className="ml-2 block text-sm text-gray-900">
+                        Asthma
+                      </label>
+                    </div>
+                    <div className="flex items-center">
+                      <input
+                        type="checkbox"
+                        id="condition-heart-disease"
+                        value="Heart Disease"
+                        {...register('chronicConditions')}
+                        className="h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                      />
+                      <label htmlFor="condition-heart-disease" className="ml-2 block text-sm text-gray-900">
+                        Heart Disease
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="mb-4">
+                <label className="form-label">Current Medications</label>
+                <textarea
+                  {...register('currentMedications')}
+                  className="form-input"
+                  rows={2}
+                  placeholder="Enter current medications, separated by commas"
+                />
+              </div>
+              
+              <div className="mb-4">
+                <label className="form-label">Blood Type</label>
+                <select
+                  {...register('bloodType')}
+                  className="form-input"
+                >
+                  <option value="">Select blood type</option>
+                  <option value="A+">A+</option>
+                  <option value="A-">A-</option>
+                  <option value="B+">B+</option>
+                  <option value="B-">B-</option>
+                  <option value="AB+">AB+</option>
+                  <option value="AB-">AB-</option>
+                  <option value="O+">O+</option>
+                  <option value="O-">O-</option>
+                </select>
+              </div>
             </div>
-          )}
-        </div>
+            
+            {/* Payment Information */}
+            <div>
+              <h3 className="text-md font-medium text-gray-800 mb-3">Payment Information</h3>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <div 
+                  className={`border rounded-lg p-3 cursor-pointer ${paymentMethod === 'cash' ? 'bg-primary-50 border-primary-200' : 'hover:bg-gray-50'}`}
+                  onClick={() => setValue('paymentMethod', 'cash')}
+                >
+                  <div className="flex flex-col items-center">
+                    <DollarSign className={`h-6 w-6 ${paymentMethod === 'cash' ? 'text-primary-500' : 'text-gray-400'}`} />
+                    <span className="mt-1 text-sm font-medium">Cash</span>
+                  </div>
+                </div>
+                
+                <div 
+                  className={`border rounded-lg p-3 cursor-pointer ${paymentMethod === 'insurance' ? 'bg-primary-50 border-primary-200' : 'hover:bg-gray-50'}`}
+                  onClick={() => setValue('paymentMethod', 'insurance')}
+                >
+                  <div className="flex flex-col items-center">
+                    <Building2 className={`h-6 w-6 ${paymentMethod === 'insurance' ? 'text-primary-500' : 'text-gray-400'}`} />
+                    <span className="mt-1 text-sm font-medium">Insurance</span>
+                  </div>
+                </div>
+                
+                <div 
+                  className={`border rounded-lg p-3 cursor-pointer ${paymentMethod === 'credit_card' ? 'bg-primary-50 border-primary-200' : 'hover:bg-gray-50'}`}
+                  onClick={() => setValue('paymentMethod', 'credit_card')}
+                >
+                  <div className="flex flex-col items-center">
+                    <CreditCard className={`h-6 w-6 ${paymentMethod === 'credit_card' ? 'text-primary-500' : 'text-gray-400'}`} />
+                    <span className="mt-1 text-sm font-medium">Credit Card</span>
+                  </div>
+                </div>
+                
+                <div 
+                  className={`border rounded-lg p-3 cursor-pointer ${paymentMethod === 'mpesa' ? 'bg-primary-50 border-primary-200' : 'hover:bg-gray-50'}`}
+                  onClick={() => setValue('paymentMethod', 'mpesa')}
+                >
+                  <div className="flex flex-col items-center">
+                    <Smartphone className={`h-6 w-6 ${paymentMethod === 'mpesa' ? 'text-primary-500' : 'text-gray-400'}`} />
+                    <span className="mt-1 text-sm font-medium">M-Pesa</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Insurance Information */}
+              {paymentMethod === 'insurance' && (
+                <div className="border rounded-lg p-4 mb-4">
+                  <h4 className="text-sm font-medium text-gray-800 mb-3">Insurance Information</h4>
+                  
+                  <div className="mb-3">
+                    <label className="form-label required">Insurance Provider</label>
+                    <input
+                      type="text"
+                      {...register('insuranceProvider', { 
+                        required: paymentMethod === 'insurance' ? 'Insurance provider is required' : false
+                      })}
+                      className={`form-input ${errors.insuranceProvider ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    />
+                    {errors.insuranceProvider && <p className="form-error">{errors.insuranceProvider.message}</p>}
+                  </div>
+                  
+                  <div>
+                    <label className="form-label required">Policy Number</label>
+                    <input
+                      type="text"
+                      {...register('insurancePolicyNumber', { 
+                        required: paymentMethod === 'insurance' ? 'Policy number is required' : false
+                      })}
+                      className={`form-input ${errors.insurancePolicyNumber ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    />
+                    {errors.insurancePolicyNumber && <p className="form-error">{errors.insurancePolicyNumber.message}</p>}
+                  </div>
+                </div>
+              )}
+              
+              {/* Credit Card Information */}
+              {paymentMethod === 'credit_card' && (
+                <div className="border rounded-lg p-4 mb-4">
+                  <h4 className="text-sm font-medium text-gray-800 mb-3">Credit Card Information</h4>
+                  
+                  <div className="mb-3">
+                    <label className="form-label required">Card Number</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <CreditCard className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        {...register('creditCardNumber', { 
+                          required: paymentMethod === 'credit_card' ? 'Card number is required' : false,
+                          pattern: {
+                            value: /^[0-9]{16}$/,
+                            message: 'Please enter a valid 16-digit card number'
+                          }
+                        })}
+                        className={`form-input pl-10 ${errors.creditCardNumber ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                        placeholder="1234 5678 9012 3456"
+                      />
+                    </div>
+                    {errors.creditCardNumber && <p className="form-error">{errors.creditCardNumber.message}</p>}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label required">Expiry Date</label>
+                      <input
+                        type="text"
+                        {...register('creditCardExpiry', { 
+                          required: paymentMethod === 'credit_card' ? 'Expiry date is required' : false,
+                          pattern: {
+                            value: /^(0[1-9]|1[0-2])\/([0-9]{2})$/,
+                            message: 'Please enter a valid expiry date (MM/YY)'
+                          }
+                        })}
+                        className={`form-input ${errors.creditCardExpiry ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                        placeholder="MM/YY"
+                      />
+                      {errors.creditCardExpiry && <p className="form-error">{errors.creditCardExpiry.message}</p>}
+                    </div>
+                    
+                    <div>
+                      <label className="form-label required">CVV</label>
+                      <input
+                        type="text"
+                        {...register('creditCardCVV', { 
+                          required: paymentMethod === 'credit_card' ? 'CVV is required' : false,
+                          pattern: {
+                            value: /^[0-9]{3,4}$/,
+                            message: 'Please enter a valid CVV'
+                          }
+                        })}
+                        className={`form-input ${errors.creditCardCVV ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                        placeholder="123"
+                      />
+                      {errors.creditCardCVV && <p className="form-error">{errors.creditCardCVV.message}</p>}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* M-Pesa Information */}
+              {paymentMethod === 'mpesa' && (
+                <div className="border rounded-lg p-4 mb-4">
+                  <h4 className="text-sm font-medium text-gray-800 mb-3">M-Pesa Information</h4>
+                  
+                  <div className="mb-3">
+                    <label className="form-label required">Phone Number</label>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Smartphone className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        {...register('mpesaPhoneNumber', { 
+                          required: paymentMethod === 'mpesa' ? 'Phone number is required' : false,
+                          pattern: {
+                            value: /^[0-9+]{10,15}$/,
+                            message: 'Please enter a valid phone number'
+                          }
+                        })}
+                        className={`form-input pl-10 ${errors.mpesaPhoneNumber ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                        placeholder="e.g., 254712345678"
+                      />
+                    </div>
+                    {errors.mpesaPhoneNumber && <p className="form-error">{errors.mpesaPhoneNumber.message}</p>}
+                  </div>
+                  
+                  <div>
+                    <label className="form-label required">Transaction ID</label>
+                    <input
+                      type="text"
+                      {...register('mpesaTransactionId', { 
+                        required: paymentMethod === 'mpesa' ? 'Transaction ID is required' : false
+                      })}
+                      className={`form-input ${errors.mpesaTransactionId ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                      placeholder="e.g., QJI5XTKLA9"
+                    />
+                    {errors.mpesaTransactionId && <p className="form-error">{errors.mpesaTransactionId.message}</p>}
+                  </div>
+                </div>
+              )}
+              
+              <div>
+                <label className="form-label">Additional Notes</label>
+                <textarea
+                  {...register('notes')}
+                  className="form-input"
+                  rows={3}
+                  placeholder="Enter any additional information about the patient"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+        
+        {/* Step 5: Review */}
+        {currentStep === 5 && (
+          <div>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Review Information</h2>
+            <p className="text-sm text-gray-600 mb-6">Please review the patient information before submitting</p>
+            
+            {isEmergency && (
+              <div className="bg-error-50 border border-error-200 rounded-lg p-4 mb-6 flex items-start">
+                <AlertTriangle className="h-5 w-5 text-error-500 mt-0.5 mr-3" />
+                <div>
+                  <h3 className="text-error-800 font-medium">Emergency Case</h3>
+                  <p className="text-error-600 text-sm">This patient will be fast-tracked through the system.</p>
+                </div>
+              </div>
+            )}
+            
+            <div className="border rounded-lg divide-y">
+              {/* Personal Information */}
+              <div className="p-4">
+                <h3 className="text-md font-medium text-gray-800 mb-3 flex items-center">
+                  <User className="h-5 w-5 text-gray-400 mr-2" />
+                  Personal Information
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Name</p>
+                    <p className="text-sm font-medium">{watch('firstName')} {watch('lastName')}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Gender</p>
+                    <p className="text-sm font-medium">{watch('gender')}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Age</p>
+                    <p className="text-sm font-medium">{watch('age')} years</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Date of Birth</p>
+                    <p className="text-sm font-medium">{watch('dateOfBirth') || 'Not provided'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Patient ID</p>
+                    <p className="text-sm font-medium">{generatedPatientId}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Contact Information */}
+              <div className="p-4">
+                <h3 className="text-md font-medium text-gray-800 mb-3 flex items-center">
+                  <Phone className="h-5 w-5 text-gray-400 mr-2" />
+                  Contact Information
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Phone</p>
+                    <p className="text-sm font-medium">{watch('contactNumber')}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Email</p>
+                    <p className="text-sm font-medium">{watch('email') || 'Not provided'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <p className="text-sm text-gray-500">Address</p>
+                    <p className="text-sm font-medium">{watch('address')}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Emergency Contact */}
+              {hasEmergencyContact && (
+                <div className="p-4">
+                  <h3 className="text-md font-medium text-gray-800 mb-3 flex items-center">
+                    <AlertTriangle className="h-5 w-5 text-gray-400 mr-2" />
+                    Emergency Contact
+                  </h3>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Name</p>
+                      <p className="text-sm font-medium">{watch('emergencyContactName')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Relationship</p>
+                      <p className="text-sm font-medium">{watch('emergencyContactRelationship')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Phone</p>
+                      <p className="text-sm font-medium">{watch('emergencyContactPhone')}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {/* Medical Information */}
+              <div className="p-4">
+                <h3 className="text-md font-medium text-gray-800 mb-3 flex items-center">
+                  <Activity className="h-5 w-5 text-gray-400 mr-2" />
+                  Medical Information
+                </h3>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-sm text-gray-500">Allergies</p>
+                    <p className="text-sm font-medium">
+                      {watch('allergies')?.filter(Boolean).length > 0 
+                        ? watch('allergies').filter(Boolean).join(', ') 
+                        : 'None reported'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Chronic Conditions</p>
+                    <p className="text-sm font-medium">
+                      {watch('chronicConditions')?.filter(Boolean).length > 0 
+                        ? watch('chronicConditions').filter(Boolean).join(', ') 
+                        : 'None reported'}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Current Medications</p>
+                    <p className="text-sm font-medium">{watch('currentMedications') || 'None reported'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Blood Type</p>
+                    <p className="text-sm font-medium">{watch('bloodType') || 'Not specified'}</p>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Payment Information */}
+              <div className="p-4">
+                <h3 className="text-md font-medium text-gray-800 mb-3 flex items-center">
+                  <CreditCard className="h-5 w-5 text-gray-400 mr-2" />
+                  Payment Information
+                </h3>
+                
+                <div>
+                  <p className="text-sm text-gray-500">Payment Method</p>
+                  <p className="text-sm font-medium">
+                    {paymentMethod === 'cash' && 'Cash'}
+                    {paymentMethod === 'insurance' && 'Insurance'}
+                    {paymentMethod === 'credit_card' && 'Credit Card'}
+                    {paymentMethod === 'mpesa' && 'M-Pesa'}
+                  </p>
+                </div>
+                
+                {paymentMethod === 'insurance' && (
+                  <div className="mt-2 grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Insurance Provider</p>
+                      <p className="text-sm font-medium">{watch('insuranceProvider')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Policy Number</p>
+                      <p className="text-sm font-medium">{watch('insurancePolicyNumber')}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {paymentMethod === 'credit_card' && (
+                  <div className="mt-2 grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">Card Number</p>
+                      <p className="text-sm font-medium">
+                        {watch('creditCardNumber')?.replace(/\d(?=\d{4})/g, '*')}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Expiry Date</p>
+                      <p className="text-sm font-medium">{watch('creditCardExpiry')}</p>
+                    </div>
+                  </div>
+                )}
+                
+                {paymentMethod === 'mpesa' && (
+                  <div className="mt-2 grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm text-gray-500">M-Pesa Phone Number</p>
+                      <p className="text-sm font-medium">{watch('mpesaPhoneNumber')}</p>
+                    </div>
+                    <div>
+                      <p className="text-sm text-gray-500">Transaction ID</p>
+                      <p className="text-sm font-medium">{watch('mpesaTransactionId')}</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              {/* Additional Notes */}
+              {watch('notes') && (
+                <div className="p-4">
+                  <h3 className="text-md font-medium text-gray-800 mb-3 flex items-center">
+                    <FileText className="h-5 w-5 text-gray-400 mr-2" />
+                    Additional Notes
+                  </h3>
+                  
+                  <p className="text-sm">{watch('notes')}</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         
         {/* Navigation Buttons */}
-        <div className="flex justify-between mt-4">
+        <div className="flex justify-between mt-8">
           {currentStep > 1 ? (
             <button
               type="button"
               onClick={prevStep}
-              className="btn btn-outline py-1.5 px-3 text-sm flex items-center"
+              className="btn btn-outline flex items-center"
             >
-              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              <ChevronLeft className="h-5 w-5 mr-2" />
               Back
             </button>
           ) : (
             <button
               type="button"
-              onClick={() => navigate(-1)}
-              className="btn btn-outline py-1.5 px-3 text-sm flex items-center"
+              onClick={() => navigate('/reception')}
+              className="btn btn-outline flex items-center"
             >
-              <ArrowLeft className="h-4 w-4 mr-1.5" />
+              <ChevronLeft className="h-5 w-5 mr-2" />
               Cancel
             </button>
           )}
@@ -1082,30 +1131,26 @@ const PatientRegistrationForm: React.FC = () => {
             <button
               type="button"
               onClick={nextStep}
-              disabled={
-                (currentStep === 1 && !patientType) ||
-                (patientType === 'existing' && currentStep === 1 && !selectedPatient)
-              }
-              className="btn btn-primary py-1.5 px-3 text-sm flex items-center"
+              className="btn btn-primary flex items-center"
             >
               Next
-              <ArrowRight className="h-4 w-4 ml-1.5" />
+              <ChevronRight className="h-5 w-5 ml-2" />
             </button>
           ) : (
             <button
               type="submit"
               disabled={isSubmitting}
-              className="btn btn-primary py-1.5 px-3 text-sm flex items-center"
+              className="btn btn-primary flex items-center"
             >
               {isSubmitting ? (
                 <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-1.5"></div>
-                  Submitting...
+                  <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white mr-2"></div>
+                  Registering...
                 </>
               ) : (
                 <>
                   Register Patient
-                  <ArrowRight className="h-4 w-4 ml-1.5" />
+                  <CheckCircle className="h-5 w-5 ml-2" />
                 </>
               )}
             </button>
