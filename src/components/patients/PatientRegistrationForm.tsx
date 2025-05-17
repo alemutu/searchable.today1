@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
-import { useAuthStore, useNotificationStore } from '../lib/store';
-import { useHybridStorage } from '../lib/hooks/useHybridStorage';
+import { useAuthStore, useNotificationStore } from '../../lib/store';
+import { useHybridStorage } from '../../lib/hooks/useHybridStorage';
 import { 
   User, 
   Phone, 
