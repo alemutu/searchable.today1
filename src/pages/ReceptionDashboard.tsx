@@ -143,7 +143,7 @@ const ReceptionDashboard: React.FC = () => {
   const getInitials = (firstName: string | undefined, lastName: string | undefined) => {
     const firstInitial = firstName?.charAt(0) || '';
     const lastInitial = lastName?.charAt(0) || '';
-    return firstInitial + lastInitial || '??';
+    return (firstInitial + lastInitial) || '??';
   };
 
   return (
@@ -422,7 +422,7 @@ const ReceptionDashboard: React.FC = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-medium rounded-full ${getPriorityColor(patient.priority_level)}`}>
-                          {patient.priority_level.charAt(0).toUpperCase() + patient.priority_level.slice(1)}
+                          {patient.priority_level?.charAt(0).toUpperCase() + (patient.priority_level?.slice(1) || '')}
                         </span>
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-xs text-gray-500">
@@ -479,7 +479,7 @@ const ReceptionDashboard: React.FC = () => {
                       </div>
                     </div>
                     <span className={`px-2 py-0.5 inline-flex text-xs leading-5 font-medium rounded-full ${getPriorityColor(patient.priority_level)}`}>
-                      {patient.priority_level.charAt(0).toUpperCase() + patient.priority_level.slice(1)}
+                      {patient.priority_level?.charAt(0).toUpperCase() + (patient.priority_level?.slice(1) || '')}
                     </span>
                   </div>
                   
