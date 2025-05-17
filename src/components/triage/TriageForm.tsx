@@ -22,7 +22,8 @@ import {
   Clock, 
   Calculator, 
   AlertCircle,
-  ChevronRight
+  ChevronRight,
+  CheckCircle
 } from 'lucide-react';
 import { useHybridStorage } from '../../lib/hooks/useHybridStorage';
 
