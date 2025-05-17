@@ -106,12 +106,14 @@ const PatientRegistrationForm: React.FC = () => {
         id: patientId,
         first_name: data.firstName,
         last_name: data.lastName,
-        date_of_birth: data.dateOfBirth,
+        date_of_birth: data.dateOfBirth || new Date().toISOString().split('T')[0], // Default to today if not provided
         gender: data.gender,
-        contact_number: data.contactNumber,
+        contact_number: data.contactNumber || 'Unknown', // Default value for emergency cases
         email: data.email,
-        address: data.address,
-        emergency_contact: data.emergencyContact,
+        address: data.address || 'To be updated', // Default value for emergency cases
+        emergency_contact: data.patientType === 'emergency' ? 
+          { name: 'To be updated', relationship: 'To be updated', phone: 'To be updated' } : 
+          data.emergencyContact,
         medical_history: null,
         status: 'active',
         current_flow_step: initialFlowStep,
@@ -247,47 +249,20 @@ const PatientRegistrationForm: React.FC = () => {
                 <div>
                   <h3 className="text-sm font-medium text-error-800">Emergency Registration</h3>
                   <p className="mt-1 text-sm text-error-700">
-                    This patient will be prioritized in the system. Please complete the basic information below and provide emergency details.
+                    Only patient name is required for emergency registration. All other details can be filled later.
                   </p>
                 </div>
               </div>
               
-              <div className="mt-3 space-y-3">
+              <div className="mt-3">
                 <div>
-                  <label className="form-label required">Chief Complaint</label>
+                  <label className="form-label">Chief Complaint (Optional)</label>
                   <textarea
-                    {...register('emergencyDetails.chiefComplaint', { 
-                      required: patientType === 'emergency' ? 'Chief complaint is required for emergency patients' : false 
-                    })}
-                    className={`form-input ${errors.emergencyDetails?.chiefComplaint ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
+                    {...register('emergencyDetails.chiefComplaint')}
+                    className="form-input"
                     rows={2}
-                    placeholder="Describe the emergency condition"
+                    placeholder="Brief description of emergency condition (can be filled later)"
                   />
-                  {errors.emergencyDetails?.chiefComplaint && (
-                    <p className="form-error">{errors.emergencyDetails.chiefComplaint.message}</p>
-                  )}
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="form-label">Referred By</label>
-                    <input
-                      type="text"
-                      {...register('emergencyDetails.referredBy')}
-                      className="form-input"
-                      placeholder="Doctor or facility name"
-                    />
-                  </div>
-                  
-                  <div>
-                    <label className="form-label">Referred From</label>
-                    <input
-                      type="text"
-                      {...register('emergencyDetails.referredFrom')}
-                      className="form-input"
-                      placeholder="Hospital or clinic name"
-                    />
-                  </div>
                 </div>
               </div>
             </div>
@@ -332,14 +307,16 @@ const PatientRegistrationForm: React.FC = () => {
             </div>
             
             <div>
-              <label className="form-label required">Date of Birth</label>
+              <label className={`form-label ${patientType === 'emergency' ? '' : 'required'}`}>Date of Birth</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Calendar className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   type="date"
-                  {...register('dateOfBirth', { required: 'Date of birth is required' })}
+                  {...register('dateOfBirth', { 
+                    required: patientType === 'emergency' ? false : 'Date of birth is required' 
+                  })}
                   className={`form-input pl-10 ${errors.dateOfBirth ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                   max={new Date().toISOString().split('T')[0]}
                 />
@@ -367,20 +344,27 @@ const PatientRegistrationForm: React.FC = () => {
           </div>
         </div>
         
-        {/* Contact Information */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Contact Information</h2>
+        {/* Contact Information - Only required for regular patients */}
+        <div className={`bg-white rounded-lg shadow-sm p-6 mb-6 ${patientType === 'emergency' ? 'opacity-70' : ''}`}>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-medium text-gray-900">Contact Information</h2>
+            {patientType === 'emergency' && (
+              <div className="text-sm text-gray-500 italic">Optional for emergency cases</div>
+            )}
+          </div>
           
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div>
-              <label className="form-label required">Phone Number</label>
+              <label className={`form-label ${patientType === 'emergency' ? '' : 'required'}`}>Phone Number</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Phone className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   type="tel"
-                  {...register('contactNumber', { required: 'Phone number is required' })}
+                  {...register('contactNumber', { 
+                    required: patientType === 'emergency' ? false : 'Phone number is required' 
+                  })}
                   className={`form-input pl-10 ${errors.contactNumber ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                   placeholder="Enter phone number"
                 />
@@ -404,13 +388,15 @@ const PatientRegistrationForm: React.FC = () => {
             </div>
             
             <div className="md:col-span-2">
-              <label className="form-label required">Address</label>
+              <label className={`form-label ${patientType === 'emergency' ? '' : 'required'}`}>Address</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <MapPin className="h-5 w-5 text-gray-400" />
                 </div>
                 <textarea
-                  {...register('address', { required: 'Address is required' })}
+                  {...register('address', { 
+                    required: patientType === 'emergency' ? false : 'Address is required' 
+                  })}
                   className={`form-input pl-10 ${errors.address ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                   rows={3}
                   placeholder="Enter full address"
@@ -421,20 +407,27 @@ const PatientRegistrationForm: React.FC = () => {
           </div>
         </div>
         
-        {/* Emergency Contact */}
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <h2 className="text-lg font-medium text-gray-900 mb-4">Emergency Contact</h2>
+        {/* Emergency Contact - Only required for regular patients */}
+        <div className={`bg-white rounded-lg shadow-sm p-6 mb-6 ${patientType === 'emergency' ? 'opacity-70' : ''}`}>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-lg font-medium text-gray-900">Emergency Contact</h2>
+            {patientType === 'emergency' && (
+              <div className="text-sm text-gray-500 italic">Optional for emergency cases</div>
+            )}
+          </div>
           
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div>
-              <label className="form-label required">Contact Name</label>
+              <label className={`form-label ${patientType === 'emergency' ? '' : 'required'}`}>Contact Name</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <User className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   type="text"
-                  {...register('emergencyContact.name', { required: 'Emergency contact name is required' })}
+                  {...register('emergencyContact.name', { 
+                    required: patientType === 'emergency' ? false : 'Emergency contact name is required' 
+                  })}
                   className={`form-input pl-10 ${errors.emergencyContact?.name ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                   placeholder="Enter emergency contact name"
                 />
@@ -443,10 +436,12 @@ const PatientRegistrationForm: React.FC = () => {
             </div>
             
             <div>
-              <label className="form-label required">Relationship</label>
+              <label className={`form-label ${patientType === 'emergency' ? '' : 'required'}`}>Relationship</label>
               <input
                 type="text"
-                {...register('emergencyContact.relationship', { required: 'Relationship is required' })}
+                {...register('emergencyContact.relationship', { 
+                  required: patientType === 'emergency' ? false : 'Relationship is required' 
+                })}
                 className={`form-input ${errors.emergencyContact?.relationship ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                 placeholder="e.g., Spouse, Parent, Sibling"
               />
@@ -454,14 +449,16 @@ const PatientRegistrationForm: React.FC = () => {
             </div>
             
             <div>
-              <label className="form-label required">Phone Number</label>
+              <label className={`form-label ${patientType === 'emergency' ? '' : 'required'}`}>Phone Number</label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                   <Phone className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   type="tel"
-                  {...register('emergencyContact.phone', { required: 'Emergency contact phone is required' })}
+                  {...register('emergencyContact.phone', { 
+                    required: patientType === 'emergency' ? false : 'Emergency contact phone is required' 
+                  })}
                   className={`form-input pl-10 ${errors.emergencyContact?.phone ? 'border-error-300 focus:ring-error-500 focus:border-error-500' : ''}`}
                   placeholder="Enter emergency contact phone"
                 />
