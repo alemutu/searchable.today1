@@ -22,7 +22,9 @@ import {
   FileText,
   CheckCircle,
   ChevronDown,
-  Hash
+  Hash,
+  Zap,
+  Star
 } from 'lucide-react';
 
 interface PatientFormData {
@@ -634,67 +636,133 @@ const PatientRegistrationForm: React.FC = () => {
             <div>
               {/* Priority Section */}
               <div className="mb-6">
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Priority</h2>
+                <h2 className="text-lg font-medium text-gray-900 mb-4">Priority Status</h2>
                 
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-4">
                   <div 
-                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                      priority === 'normal' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
+                    className={`relative overflow-hidden rounded-lg border transition-all ${
+                      priority === 'normal' 
+                        ? 'border-primary-500 ring-2 ring-primary-200' 
+                        : 'border-gray-200 hover:border-gray-300'
                     }`}
                     onClick={() => setValue('priority', 'normal')}
                   >
-                    <div className="flex items-center justify-center mb-2">
-                      <Clock className="h-6 w-6 text-primary-500" />
+                    {priority === 'normal' && (
+                      <div className="absolute top-0 right-0">
+                        <div className="w-8 h-8 bg-primary-500 rotate-45 transform origin-bottom-left"></div>
+                        <CheckCircle className="h-3 w-3 text-white absolute top-1 right-1" />
+                      </div>
+                    )}
+                    <div className="p-4 cursor-pointer">
+                      <div className="flex items-center justify-center mb-3">
+                        <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center">
+                          <Clock className="h-6 w-6 text-primary-600" />
+                        </div>
+                      </div>
+                      <p className="text-center font-medium text-gray-900">Normal</p>
+                      <p className="text-center text-xs text-gray-500 mt-1">Standard priority</p>
                     </div>
-                    <p className="text-center text-sm font-medium">Normal</p>
                   </div>
                   
                   <div 
-                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                      priority === 'emergency' ? 'border-error-500 bg-error-50' : 'border-gray-200 hover:border-gray-300'
+                    className={`relative overflow-hidden rounded-lg border transition-all ${
+                      priority === 'emergency' 
+                        ? 'border-error-500 ring-2 ring-error-200' 
+                        : 'border-gray-200 hover:border-gray-300'
                     }`}
                     onClick={() => setValue('priority', 'emergency')}
                   >
-                    <div className="flex items-center justify-center mb-2">
-                      <AlertTriangle className="h-6 w-6 text-error-500" />
+                    {priority === 'emergency' && (
+                      <div className="absolute top-0 right-0">
+                        <div className="w-8 h-8 bg-error-500 rotate-45 transform origin-bottom-left"></div>
+                        <CheckCircle className="h-3 w-3 text-white absolute top-1 right-1" />
+                      </div>
+                    )}
+                    <div className="p-4 cursor-pointer">
+                      <div className="flex items-center justify-center mb-3">
+                        <div className="w-12 h-12 rounded-full bg-error-100 flex items-center justify-center">
+                          <AlertTriangle className="h-6 w-6 text-error-600" />
+                        </div>
+                      </div>
+                      <p className="text-center font-medium text-gray-900">Emergency</p>
+                      <p className="text-center text-xs text-gray-500 mt-1">Urgent medical attention</p>
                     </div>
-                    <p className="text-center text-sm font-medium">Emergency</p>
                   </div>
                   
                   <div 
-                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                      priority === 'referral' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
+                    className={`relative overflow-hidden rounded-lg border transition-all ${
+                      priority === 'referral' 
+                        ? 'border-secondary-500 ring-2 ring-secondary-200' 
+                        : 'border-gray-200 hover:border-gray-300'
                     }`}
                     onClick={() => setValue('priority', 'referral')}
                   >
-                    <div className="flex items-center justify-center mb-2">
-                      <FileText className="h-6 w-6 text-primary-500" />
+                    {priority === 'referral' && (
+                      <div className="absolute top-0 right-0">
+                        <div className="w-8 h-8 bg-secondary-500 rotate-45 transform origin-bottom-left"></div>
+                        <CheckCircle className="h-3 w-3 text-white absolute top-1 right-1" />
+                      </div>
+                    )}
+                    <div className="p-4 cursor-pointer">
+                      <div className="flex items-center justify-center mb-3">
+                        <div className="w-12 h-12 rounded-full bg-secondary-100 flex items-center justify-center">
+                          <FileText className="h-6 w-6 text-secondary-600" />
+                        </div>
+                      </div>
+                      <p className="text-center font-medium text-gray-900">Referral</p>
+                      <p className="text-center text-xs text-gray-500 mt-1">From another facility</p>
                     </div>
-                    <p className="text-center text-sm font-medium">Referral</p>
                   </div>
                   
                   <div 
-                    className={`border rounded-lg p-3 cursor-pointer transition-colors ${
-                      priority === 'vip' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
+                    className={`relative overflow-hidden rounded-lg border transition-all ${
+                      priority === 'vip' 
+                        ? 'border-accent-500 ring-2 ring-accent-200' 
+                        : 'border-gray-200 hover:border-gray-300'
                     }`}
                     onClick={() => setValue('priority', 'vip')}
                   >
-                    <div className="flex items-center justify-center mb-2">
-                      <Shield className="h-6 w-6 text-primary-500" />
+                    {priority === 'vip' && (
+                      <div className="absolute top-0 right-0">
+                        <div className="w-8 h-8 bg-accent-500 rotate-45 transform origin-bottom-left"></div>
+                        <CheckCircle className="h-3 w-3 text-white absolute top-1 right-1" />
+                      </div>
+                    )}
+                    <div className="p-4 cursor-pointer">
+                      <div className="flex items-center justify-center mb-3">
+                        <div className="w-12 h-12 rounded-full bg-accent-100 flex items-center justify-center">
+                          <Star className="h-6 w-6 text-accent-600" />
+                        </div>
+                      </div>
+                      <p className="text-center font-medium text-gray-900">VIP</p>
+                      <p className="text-center text-xs text-gray-500 mt-1">Special attention</p>
                     </div>
-                    <p className="text-center text-sm font-medium">VIP</p>
                   </div>
                 </div>
                 
                 {(priority === 'emergency' || priority === 'referral' || priority === 'vip') && (
-                  <div className="mt-4">
-                    <label className="form-label">Priority Notes</label>
+                  <div className="mt-4 p-4 rounded-lg bg-gray-50 border border-gray-200">
+                    <label className="form-label mb-2">
+                      {priority === 'emergency' ? 'Emergency Details' : 
+                       priority === 'referral' ? 'Referral Information' : 
+                       'VIP Notes'}
+                    </label>
                     <textarea
                       {...register('priorityNotes')}
-                      className="form-input"
-                      rows={2}
-                      placeholder={`Please provide details about this ${priority} case...`}
+                      className="form-input w-full"
+                      rows={3}
+                      placeholder={
+                        priority === 'emergency' ? 'Describe the emergency situation and immediate needs...' : 
+                        priority === 'referral' ? 'Enter referral details, referring doctor, and reason...' : 
+                        'Enter any special requirements or arrangements needed...'
+                      }
                     />
+                    {priority === 'emergency' && (
+                      <div className="mt-2 flex items-start text-xs text-error-600">
+                        <AlertTriangle className="h-4 w-4 mr-1 mt-0.5 flex-shrink-0" />
+                        <span>Emergency cases will be fast-tracked through the system and can bypass payment requirements.</span>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
