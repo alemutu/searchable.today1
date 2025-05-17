@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { useNavigate } from 'react-router-dom';
 import { useAuthStore, useNotificationStore } from '../../lib/store';
+import { useHybridStorage } from '../../lib/hooks/useHybridStorage';
 import { 
   User, 
   Mail, 
@@ -17,7 +18,9 @@ import {
   Check,
   Clock,
   Activity,
-  Siren
+  Siren,
+  Search,
+  X
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -44,6 +47,17 @@ interface PatientFormData {
     policyNumber: string;
     groupNumber: string;
   };
+}
+
+interface ExistingPatient {
+  id: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth: string;
+  gender: string;
+  contact_number: string;
+  email: string | null;
+  address: string;
 }
 
 const PatientRegistrationForm: React.FC = () => {
@@ -75,6 +89,17 @@ const PatientRegistrationForm: React.FC = () => {
   const [showEmergencyContact, setShowEmergencyContact] = useState(false);
   const [patientId, setPatientId] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<ExistingPatient[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<ExistingPatient | null>(null);
+  
+  // Use the hybrid storage hook to access patient data
+  const { 
+    data: patients,
+    loading: patientsLoading,
+    fetchItems: fetchPatients
+  } = useHybridStorage<ExistingPatient>('patients');
   
   const patientType = watch('patientType');
   const priority = watch('priority');
@@ -87,6 +112,13 @@ const PatientRegistrationForm: React.FC = () => {
     const uniqueId = `PT${Math.floor(100000 + Math.random() * 900000)}`;
     setPatientId(uniqueId);
   }, []);
+  
+  // Fetch patients when in existing patient mode
+  useEffect(() => {
+    if (patientType === 'existing') {
+      fetchPatients();
+    }
+  }, [patientType, fetchPatients]);
   
   const nextStep = () => {
     setCurrentStep(currentStep + 1);
@@ -151,6 +183,68 @@ const PatientRegistrationForm: React.FC = () => {
       default:
         return 'Add notes about priority if needed';
     }
+  };
+  
+  const handleSearch = () => {
+    if (!searchTerm || !Array.isArray(patients)) return;
+    
+    setIsSearching(true);
+    
+    try {
+      // Filter patients based on search term
+      const results = patients.filter(patient => {
+        const fullName = `${patient.first_name} ${patient.last_name}`.toLowerCase();
+        const phone = patient.contact_number.toLowerCase();
+        
+        return fullName.includes(searchTerm.toLowerCase()) || 
+               phone.includes(searchTerm.toLowerCase()) ||
+               (patient.email && patient.email.toLowerCase().includes(searchTerm.toLowerCase()));
+      });
+      
+      setSearchResults(results);
+    } catch (error) {
+      console.error('Error searching patients:', error);
+      addNotification({
+        message: 'Error searching for patients',
+        type: 'error'
+      });
+    } finally {
+      setIsSearching(false);
+    }
+  };
+  
+  const selectExistingPatient = (patient: ExistingPatient) => {
+    setSelectedPatient(patient);
+    
+    // Fill the form with the selected patient's data
+    setValue('firstName', patient.first_name);
+    setValue('lastName', patient.last_name);
+    setValue('dateOfBirth', patient.date_of_birth);
+    setValue('gender', patient.gender);
+    setValue('phone', patient.contact_number);
+    setValue('email', patient.email || '');
+    setValue('address', patient.address);
+    
+    // Calculate age from date of birth
+    calculateAge(patient.date_of_birth);
+    
+    // Clear search results
+    setSearchResults([]);
+    setSearchTerm('');
+  };
+  
+  const clearSelectedPatient = () => {
+    setSelectedPatient(null);
+    
+    // Reset form fields
+    setValue('firstName', '');
+    setValue('lastName', '');
+    setValue('dateOfBirth', '');
+    setValue('age', 0);
+    setValue('gender', '');
+    setValue('phone', '');
+    setValue('email', '');
+    setValue('address', '');
   };
   
   return (
@@ -245,7 +339,10 @@ const PatientRegistrationForm: React.FC = () => {
                       ? 'border-primary-500 bg-primary-50' 
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
-                  onClick={() => setValue('patientType', 'new')}
+                  onClick={() => {
+                    setValue('patientType', 'new');
+                    clearSelectedPatient();
+                  }}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center">
@@ -293,7 +390,11 @@ const PatientRegistrationForm: React.FC = () => {
                       ? 'border-error-500 bg-error-50' 
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
-                  onClick={() => setValue('patientType', 'emergency')}
+                  onClick={() => {
+                    setValue('patientType', 'emergency');
+                    setValue('priority', 'emergency');
+                    clearSelectedPatient();
+                  }}
                 >
                   <div className="flex justify-between items-start">
                     <div className="flex items-center">
@@ -313,17 +414,101 @@ const PatientRegistrationForm: React.FC = () => {
               </div>
               
               {patientType === 'existing' && (
-                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
-                  <p className="text-sm text-blue-800">
-                    Please use the search function to find an existing patient.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => navigate('/patients/search')}
-                    className="mt-2 btn btn-primary text-sm py-1.5"
-                  >
-                    Search Patients
-                  </button>
+                <div className="mt-4">
+                  <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                    <h3 className="text-sm font-medium text-gray-900 mb-2">Search Existing Patients</h3>
+                    
+                    {selectedPatient ? (
+                      <div className="bg-white p-3 rounded-lg border border-gray-200 mb-3">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {selectedPatient.first_name} {selectedPatient.last_name}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {calculateAge(selectedPatient.date_of_birth)} years • {selectedPatient.gender}
+                            </p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {selectedPatient.contact_number}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={clearSelectedPatient}
+                            className="text-gray-400 hover:text-gray-500"
+                          >
+                            <X className="h-5 w-5" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex space-x-2 mb-3">
+                          <div className="relative flex-grow">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                              <Search className="h-4 w-4 text-gray-400" />
+                            </div>
+                            <input
+                              type="text"
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                              className="form-input pl-9 py-2 text-sm w-full"
+                              placeholder="Search by name, phone, or email"
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={handleSearch}
+                            disabled={isSearching || !searchTerm}
+                            className="btn btn-primary py-2 text-sm"
+                          >
+                            {isSearching ? (
+                              <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                            ) : (
+                              'Search'
+                            )}
+                          </button>
+                        </div>
+                        
+                        {searchResults.length > 0 ? (
+                          <div className="max-h-60 overflow-y-auto">
+                            <div className="space-y-2">
+                              {searchResults.map((patient) => (
+                                <div 
+                                  key={patient.id}
+                                  className="bg-white p-2 rounded-lg border border-gray-200 hover:border-primary-300 cursor-pointer"
+                                  onClick={() => selectExistingPatient(patient)}
+                                >
+                                  <p className="text-sm font-medium text-gray-900">
+                                    {patient.first_name} {patient.last_name}
+                                  </p>
+                                  <div className="flex justify-between items-center mt-1">
+                                    <p className="text-xs text-gray-500">
+                                      {calculateAge(patient.date_of_birth)} years • {patient.gender}
+                                    </p>
+                                    <p className="text-xs text-gray-500">
+                                      {patient.contact_number}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ) : searchTerm && !isSearching ? (
+                          <div className="text-center p-3 bg-gray-100 rounded-lg">
+                            <p className="text-sm text-gray-500">No patients found matching "{searchTerm}"</p>
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+                    
+                    <div className="mt-3 text-xs text-gray-500">
+                      {selectedPatient ? 
+                        "You've selected an existing patient. Continue to update their information or register a new visit." :
+                        "Search for existing patients by name, phone number, or email address."
+                      }
+                    </div>
+                  </div>
                 </div>
               )}
               
@@ -451,7 +636,7 @@ const PatientRegistrationForm: React.FC = () => {
                     </div>
                     <input
                       type="text"
-                      value={patientId}
+                      value={selectedPatient ? selectedPatient.id : patientId}
                       readOnly
                       className="form-input pl-9 py-2 text-sm bg-gray-50"
                     />
@@ -720,7 +905,7 @@ const PatientRegistrationForm: React.FC = () => {
                 <div className="bg-gray-50 p-3 rounded-lg">
                   <h3 className="text-sm font-medium text-gray-900 mb-2">Personal Information</h3>
                   <div className="space-y-1 text-sm">
-                    <p><span className="font-medium">Patient ID:</span> {patientId}</p>
+                    <p><span className="font-medium">Patient ID:</span> {selectedPatient ? selectedPatient.id : patientId}</p>
                     <p><span className="font-medium">Name:</span> {watch('firstName')} {watch('lastName')}</p>
                     <p><span className="font-medium">Age:</span> {watch('age')} years</p>
                     <p><span className="font-medium">Gender:</span> {watch('gender')}</p>
@@ -779,6 +964,22 @@ const PatientRegistrationForm: React.FC = () => {
                       </p>
                       <p className="text-sm text-error-700 mt-1">
                         This patient will be registered as an emergency case and fast-tracked through the system.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {priority === 'urgent' && (
+                <div className="mt-4 p-3 bg-warning-50 rounded-lg border border-warning-100">
+                  <div className="flex items-start">
+                    <Siren className="h-5 w-5 text-warning-500 mt-0.5 mr-2" />
+                    <div>
+                      <p className="text-sm font-medium text-warning-800">
+                        Urgent Registration
+                      </p>
+                      <p className="text-sm text-warning-700 mt-1">
+                        This patient will be prioritized in the queue for prompt attention.
                       </p>
                     </div>
                   </div>
