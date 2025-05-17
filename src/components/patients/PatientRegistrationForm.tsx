@@ -21,6 +21,8 @@ import {
   ChevronLeft,
   Check,
   Search,
+  UserPlus,
+  Clock,
 } from "lucide-react";
 import { v4 as uuidv4 } from "uuid";
 
@@ -76,6 +78,7 @@ const PatientRegistrationForm: React.FC = () => {
   const [searchResults, setSearchResults] = useState<ExistingPatient[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [patientType, setPatientType] = useState<"new" | "existing" | "emergency">("new");
+  const [hasSearched, setHasSearched] = useState(false);
 
   const {
     register,
@@ -134,6 +137,7 @@ const PatientRegistrationForm: React.FC = () => {
     if (!searchTerm || searchTerm.length < 2) return;
     
     setIsSearching(true);
+    setHasSearched(true);
     try {
       const allPatients = await fetchItems();
       if (Array.isArray(allPatients)) {
@@ -224,12 +228,14 @@ const PatientRegistrationForm: React.FC = () => {
 
     if (currentStep < 5) {
       setCurrentStep(currentStep + 1);
+      window.scrollTo(0, 0);
     }
   };
 
   const prevStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+      window.scrollTo(0, 0);
     }
   };
 
@@ -352,40 +358,44 @@ const PatientRegistrationForm: React.FC = () => {
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <div 
-            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-              patientType === 'new' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
+            className={`border rounded-lg p-6 cursor-pointer transition-colors ${
+              patientType === 'new' ? 'border-primary-500 bg-primary-50 shadow-md' : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
             }`}
             onClick={() => {
               setPatientType("new");
               setValue("isEmergency", false);
             }}
           >
-            <div className="flex items-center mb-2">
-              <User className="h-5 w-5 text-primary-500 mr-2" />
-              <h3 className="text-base font-medium text-gray-900">New Patient</h3>
+            <div className="flex items-center mb-3">
+              <div className="p-2 bg-primary-100 rounded-full">
+                <UserPlus className="h-6 w-6 text-primary-600" />
+              </div>
             </div>
-            <p className="text-sm text-gray-500">Register a new patient</p>
+            <h3 className="text-base font-medium text-gray-900 mb-1">New Patient</h3>
+            <p className="text-sm text-gray-500">Register a new patient in the system</p>
           </div>
           
           <div 
-            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-              patientType === 'existing' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
+            className={`border rounded-lg p-6 cursor-pointer transition-colors ${
+              patientType === 'existing' ? 'border-primary-500 bg-primary-50 shadow-md' : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
             }`}
             onClick={() => {
               setPatientType("existing");
               setValue("isEmergency", false);
             }}
           >
-            <div className="flex items-center mb-2">
-              <Search className="h-5 w-5 text-primary-500 mr-2" />
-              <h3 className="text-base font-medium text-gray-900">Existing Patient</h3>
+            <div className="flex items-center mb-3">
+              <div className="p-2 bg-primary-100 rounded-full">
+                <Search className="h-6 w-6 text-primary-600" />
+              </div>
             </div>
-            <p className="text-sm text-gray-500">Find patient records</p>
+            <h3 className="text-base font-medium text-gray-900 mb-1">Existing Patient</h3>
+            <p className="text-sm text-gray-500">Find and update existing patient records</p>
           </div>
           
           <div 
-            className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-              patientType === 'emergency' ? 'border-error-500 bg-error-50' : 'border-gray-200 hover:border-gray-300'
+            className={`border rounded-lg p-6 cursor-pointer transition-colors ${
+              patientType === 'emergency' ? 'border-error-500 bg-error-50 shadow-md' : 'border-gray-200 hover:border-gray-300 hover:shadow-sm'
             }`}
             onClick={() => {
               setPatientType("emergency");
@@ -393,11 +403,13 @@ const PatientRegistrationForm: React.FC = () => {
               setValue("priorityLevel", "critical");
             }}
           >
-            <div className="flex items-center mb-2">
-              <AlertTriangle className="h-5 w-5 text-error-500 mr-2" />
-              <h3 className="text-base font-medium text-gray-900">Emergency</h3>
+            <div className="flex items-center mb-3">
+              <div className="p-2 bg-error-100 rounded-full">
+                <AlertTriangle className="h-6 w-6 text-error-600" />
+              </div>
             </div>
-            <p className="text-sm text-gray-500">Fast-track emergency case</p>
+            <h3 className="text-base font-medium text-gray-900 mb-1">Emergency</h3>
+            <p className="text-sm text-gray-500">Fast-track registration for emergency cases</p>
           </div>
         </div>
         
@@ -414,6 +426,12 @@ const PatientRegistrationForm: React.FC = () => {
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="form-input pl-10 w-full"
                   placeholder="Search by name or phone number"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      searchPatients();
+                    }
+                  }}
                 />
               </div>
               <button
@@ -423,7 +441,7 @@ const PatientRegistrationForm: React.FC = () => {
                 className="btn btn-primary"
               >
                 {isSearching ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white"></div>
+                  <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
                 ) : (
                   "Search"
                 )}
@@ -482,20 +500,40 @@ const PatientRegistrationForm: React.FC = () => {
                   </table>
                 </div>
               </div>
-            ) : searchTerm.length > 0 && !isSearching ? (
-              <div className="text-center p-4 bg-gray-50 rounded-lg">
-                <p className="text-gray-500">No patients found matching "{searchTerm}"</p>
+            ) : hasSearched && !isSearching ? (
+              <div className="text-center p-6 bg-gray-50 rounded-lg border border-gray-200">
+                <div className="mx-auto w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center mb-3">
+                  <Search className="h-6 w-6 text-gray-400" />
+                </div>
+                <p className="text-gray-700 font-medium">No patients found</p>
+                <p className="text-gray-500 text-sm mt-1">No patients found matching "{searchTerm}"</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPatientType("new");
+                    setValue("isEmergency", false);
+                  }}
+                  className="mt-4 btn btn-outline text-sm"
+                >
+                  Register as new patient
+                </button>
               </div>
             ) : null}
           </div>
         )}
         
         {patientType === "emergency" && (
-          <div className="mt-4 p-3 bg-error-50 border border-error-200 rounded-md">
-            <p className="text-sm text-error-700 flex items-start">
-              <AlertTriangle className="h-4 w-4 text-error-500 mt-0.5 mr-2 flex-shrink-0" />
-              Emergency cases will be prioritized and some information can be collected later.
-            </p>
+          <div className="mt-4 p-4 bg-error-50 border border-error-200 rounded-md">
+            <div className="flex">
+              <AlertTriangle className="h-5 w-5 text-error-500 mt-0.5 mr-3 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-error-800">Emergency Registration</p>
+                <p className="text-sm text-error-700 mt-1">
+                  This patient will be marked as an emergency case with critical priority. 
+                  Some information can be collected later if needed.
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -545,8 +583,15 @@ const PatientRegistrationForm: React.FC = () => {
               </div>
               <input
                 type="date"
-                {...register("dateOfBirth")}
+                {...register("dateOfBirth", {
+                  onChange: (e) => {
+                    if (e.target.value) {
+                      setValue("age", calculateAge(e.target.value));
+                    }
+                  }
+                })}
                 className="form-input pl-10"
+                max={new Date().toISOString().split('T')[0]}
               />
             </div>
           </div>
@@ -660,18 +705,29 @@ const PatientRegistrationForm: React.FC = () => {
               </div>
               <input
                 type="email"
-                {...register("email")}
-                className="form-input pl-10"
+                {...register("email", {
+                  pattern: {
+                    value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                    message: "Invalid email address",
+                  },
+                })}
+                className={`form-input pl-10 ${
+                  errors.email ? "border-error-300" : ""
+                }`}
                 placeholder="patient@example.com"
               />
             </div>
+            {errors.email && (
+              <p className="form-error">{errors.email.message}</p>
+            )}
           </div>
         </div>
         
         {/* Emergency Contact */}
         <div className="bg-gray-50 rounded-lg p-4 mb-4">
           <div className="flex justify-between items-center mb-3">
-            <h3 className="text-base font-medium text-gray-900">
+            <h3 className="text-base font-medium text-gray-900 flex items-center">
+              <Phone className="h-4 w-4 text-primary-500 mr-2" />
               Emergency Contact
             </h3>
             <button
@@ -756,20 +812,58 @@ const PatientRegistrationForm: React.FC = () => {
           {/* Priority Level */}
           <div>
             <label className="form-label required">Priority Level</label>
-            <select
-              {...register("priorityLevel", { required: "Priority level is required" })}
-              className={`form-input ${errors.priorityLevel ? "border-error-300" : ""}`}
-              disabled={isEmergency} // Disable if it's an emergency case
-            >
-              <option value="normal">Normal</option>
-              <option value="urgent">Urgent</option>
-              <option value="critical">Critical</option>
-            </select>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div 
+                className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                  !isEmergency && watch("priorityLevel") === 'normal' ? 'border-primary-500 bg-primary-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'
+                } ${isEmergency ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => !isEmergency && setValue("priorityLevel", "normal")}
+              >
+                <div className="flex items-center mb-2">
+                  <div className="p-1.5 bg-success-100 rounded-full mr-2">
+                    <Clock className="h-4 w-4 text-success-600" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-900">Normal</span>
+                </div>
+                <p className="text-xs text-gray-500">Standard priority for routine cases</p>
+              </div>
+
+              <div 
+                className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                  !isEmergency && watch("priorityLevel") === 'urgent' ? 'border-primary-500 bg-primary-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'
+                } ${isEmergency ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => !isEmergency && setValue("priorityLevel", "urgent")}
+              >
+                <div className="flex items-center mb-2">
+                  <div className="p-1.5 bg-warning-100 rounded-full mr-2">
+                    <Clock className="h-4 w-4 text-warning-600" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-900">Urgent</span>
+                </div>
+                <p className="text-xs text-gray-500">Higher priority for urgent cases</p>
+              </div>
+
+              <div 
+                className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                  watch("priorityLevel") === 'critical' ? 'border-error-500 bg-error-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'
+                } ${isEmergency ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={() => !isEmergency && setValue("priorityLevel", "critical")}
+              >
+                <div className="flex items-center mb-2">
+                  <div className="p-1.5 bg-error-100 rounded-full mr-2">
+                    <AlertTriangle className="h-4 w-4 text-error-600" />
+                  </div>
+                  <span className="text-sm font-medium text-gray-900">Critical</span>
+                </div>
+                <p className="text-xs text-gray-500">Highest priority for critical cases</p>
+              </div>
+            </div>
             {errors.priorityLevel && (
-              <p className="form-error">{errors.priorityLevel.message}</p>
+              <p className="form-error mt-2">{errors.priorityLevel.message}</p>
             )}
             {isEmergency && (
-              <p className="mt-1 text-xs text-error-600">
+              <p className="mt-2 text-xs text-error-600 flex items-center">
+                <AlertTriangle className="h-3.5 w-3.5 mr-1" />
                 Emergency cases are automatically set to critical priority
               </p>
             )}
@@ -781,38 +875,47 @@ const PatientRegistrationForm: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               <div 
                 className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                  paymentMethod === 'cash' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
+                  paymentMethod === 'cash' ? 'border-primary-500 bg-primary-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'
                 }`}
                 onClick={() => setValue("paymentMethod", "cash")}
               >
-                <div className="flex items-center">
-                  <CreditCard className="h-5 w-5 text-primary-500 mr-2" />
+                <div className="flex items-center mb-2">
+                  <div className="p-1.5 bg-primary-100 rounded-full mr-2">
+                    <CreditCard className="h-4 w-4 text-primary-600" />
+                  </div>
                   <span className="text-sm font-medium text-gray-900">Cash</span>
                 </div>
+                <p className="text-xs text-gray-500">Pay with cash at the facility</p>
               </div>
 
               <div 
                 className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                  paymentMethod === 'insurance' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
+                  paymentMethod === 'insurance' ? 'border-primary-500 bg-primary-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'
                 }`}
                 onClick={() => setValue("paymentMethod", "insurance")}
               >
-                <div className="flex items-center">
-                  <Building2 className="h-5 w-5 text-primary-500 mr-2" />
+                <div className="flex items-center mb-2">
+                  <div className="p-1.5 bg-primary-100 rounded-full mr-2">
+                    <Building2 className="h-4 w-4 text-primary-600" />
+                  </div>
                   <span className="text-sm font-medium text-gray-900">Insurance</span>
                 </div>
+                <p className="text-xs text-gray-500">Pay using health insurance</p>
               </div>
 
               <div 
                 className={`border rounded-lg p-4 cursor-pointer transition-colors ${
-                  paymentMethod === 'mpesa' ? 'border-primary-500 bg-primary-50' : 'border-gray-200 hover:border-gray-300'
+                  paymentMethod === 'mpesa' ? 'border-primary-500 bg-primary-50 shadow-sm' : 'border-gray-200 hover:border-gray-300'
                 }`}
                 onClick={() => setValue("paymentMethod", "mpesa")}
               >
-                <div className="flex items-center">
-                  <Smartphone className="h-5 w-5 text-primary-500 mr-2" />
+                <div className="flex items-center mb-2">
+                  <div className="p-1.5 bg-primary-100 rounded-full mr-2">
+                    <Smartphone className="h-4 w-4 text-primary-600" />
+                  </div>
                   <span className="text-sm font-medium text-gray-900">M-Pesa</span>
                 </div>
+                <p className="text-xs text-gray-500">Pay using mobile money</p>
               </div>
             </div>
             {errors.paymentMethod && (
@@ -822,7 +925,10 @@ const PatientRegistrationForm: React.FC = () => {
 
           {paymentMethod === "insurance" && (
             <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-base font-medium text-gray-900 mb-3">Insurance Details</h3>
+              <h3 className="text-base font-medium text-gray-900 mb-3 flex items-center">
+                <Building2 className="h-4 w-4 text-primary-500 mr-2" />
+                Insurance Details
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="form-label required">
@@ -839,6 +945,7 @@ const PatientRegistrationForm: React.FC = () => {
                     className={`form-input ${
                       errors.insuranceProvider ? "border-error-300" : ""
                     }`}
+                    placeholder="e.g., Blue Cross, Aetna"
                   />
                   {errors.insuranceProvider && (
                     <p className="form-error">
@@ -860,6 +967,7 @@ const PatientRegistrationForm: React.FC = () => {
                     className={`form-input ${
                       errors.insurancePolicyNumber ? "border-error-300" : ""
                     }`}
+                    placeholder="e.g., ABC123456789"
                   />
                   {errors.insurancePolicyNumber && (
                     <p className="form-error">
@@ -872,30 +980,36 @@ const PatientRegistrationForm: React.FC = () => {
                   <label className="form-label required">
                     Coverage Percentage
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    {...register("insuranceCoveragePercentage", {
-                      required:
-                        paymentMethod === "insurance"
-                          ? "Coverage percentage is required"
-                          : false,
-                      min: {
-                        value: 0,
-                        message: "Minimum coverage is 0%",
-                      },
-                      max: {
-                        value: 100,
-                        message: "Maximum coverage is 100%",
-                      },
-                    })}
-                    className={`form-input ${
-                      errors.insuranceCoveragePercentage
-                        ? "border-error-300"
-                        : ""
-                    }`}
-                  />
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      {...register("insuranceCoveragePercentage", {
+                        required:
+                          paymentMethod === "insurance"
+                            ? "Coverage percentage is required"
+                            : false,
+                        min: {
+                          value: 0,
+                          message: "Minimum coverage is 0%",
+                        },
+                        max: {
+                          value: 100,
+                          message: "Maximum coverage is 100%",
+                        },
+                      })}
+                      className={`form-input pr-8 ${
+                        errors.insuranceCoveragePercentage
+                          ? "border-error-300"
+                          : ""
+                      }`}
+                      placeholder="e.g., 80"
+                    />
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                      <span className="text-gray-500">%</span>
+                    </div>
+                  </div>
                   {errors.insuranceCoveragePercentage && (
                     <p className="form-error">
                       {errors.insuranceCoveragePercentage.message}
@@ -908,7 +1022,10 @@ const PatientRegistrationForm: React.FC = () => {
 
           {paymentMethod === "mpesa" && (
             <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-base font-medium text-gray-900 mb-3">M-Pesa Details</h3>
+              <h3 className="text-base font-medium text-gray-900 mb-3 flex items-center">
+                <Smartphone className="h-4 w-4 text-primary-500 mr-2" />
+                M-Pesa Details
+              </h3>
               <div>
                 <label className="form-label required">M-Pesa Number</label>
                 <div className="relative">
@@ -936,6 +1053,9 @@ const PatientRegistrationForm: React.FC = () => {
                 {errors.mpesaNumber && (
                   <p className="form-error">{errors.mpesaNumber.message}</p>
                 )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Enter the M-Pesa number in the format 254XXXXXXXXX or 07XXXXXXXX
+                </p>
               </div>
             </div>
           )}
@@ -954,8 +1074,11 @@ const PatientRegistrationForm: React.FC = () => {
         
         <div className="space-y-6">
           <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="text-base font-medium text-gray-900 mb-2">Personal Information</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
+            <h3 className="text-base font-medium text-gray-900 mb-3 flex items-center">
+              <User className="h-4 w-4 text-primary-500 mr-2" />
+              Personal Information
+            </h3>
+            <div className="grid grid-cols-2 gap-y-2 text-sm">
               <div className="text-gray-500">Patient ID:</div>
               <div className="font-medium">{formattedPatientId}</div>
               
@@ -966,7 +1089,7 @@ const PatientRegistrationForm: React.FC = () => {
               <div className="font-medium">{formData.age} years</div>
               
               <div className="text-gray-500">Gender:</div>
-              <div className="font-medium">{formData.gender}</div>
+              <div className="font-medium">{formData.gender.charAt(0).toUpperCase() + formData.gender.slice(1)}</div>
               
               <div className="text-gray-500">Contact:</div>
               <div className="font-medium">{formData.contactNumber}</div>
@@ -985,13 +1108,19 @@ const PatientRegistrationForm: React.FC = () => {
           
           {showEmergencyContact && formData.emergencyContact.name && (
             <div className="bg-gray-50 rounded-lg p-4">
-              <h3 className="text-base font-medium text-gray-900 mb-2">Emergency Contact</h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
+              <h3 className="text-base font-medium text-gray-900 mb-3 flex items-center">
+                <Phone className="h-4 w-4 text-primary-500 mr-2" />
+                Emergency Contact
+              </h3>
+              <div className="grid grid-cols-2 gap-y-2 text-sm">
                 <div className="text-gray-500">Name:</div>
                 <div className="font-medium">{formData.emergencyContact.name}</div>
                 
                 <div className="text-gray-500">Relationship:</div>
-                <div className="font-medium">{formData.emergencyContact.relationship}</div>
+                <div className="font-medium">
+                  {formData.emergencyContact.relationship.charAt(0).toUpperCase() + 
+                   formData.emergencyContact.relationship.slice(1)}
+                </div>
                 
                 <div className="text-gray-500">Phone:</div>
                 <div className="font-medium">{formData.emergencyContact.phone}</div>
@@ -1000,10 +1129,29 @@ const PatientRegistrationForm: React.FC = () => {
           )}
           
           <div className="bg-gray-50 rounded-lg p-4">
-            <h3 className="text-base font-medium text-gray-900 mb-2">Priority & Payment</h3>
-            <div className="grid grid-cols-2 gap-2 text-sm">
+            <h3 className="text-base font-medium text-gray-900 mb-3 flex items-center">
+              <CreditCard className="h-4 w-4 text-primary-500 mr-2" />
+              Priority & Payment
+            </h3>
+            <div className="grid grid-cols-2 gap-y-2 text-sm">
               <div className="text-gray-500">Priority Level:</div>
-              <div className="font-medium">{formData.priorityLevel.charAt(0).toUpperCase() + formData.priorityLevel.slice(1)}</div>
+              <div className="font-medium flex items-center">
+                {formData.priorityLevel === 'critical' && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-error-100 text-error-800 mr-1">
+                    Critical
+                  </span>
+                )}
+                {formData.priorityLevel === 'urgent' && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-warning-100 text-warning-800 mr-1">
+                    Urgent
+                  </span>
+                )}
+                {formData.priorityLevel === 'normal' && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-success-100 text-success-800 mr-1">
+                    Normal
+                  </span>
+                )}
+              </div>
               
               <div className="text-gray-500">Payment Method:</div>
               <div className="font-medium">{formData.paymentMethod.charAt(0).toUpperCase() + formData.paymentMethod.slice(1)}</div>
@@ -1116,6 +1264,7 @@ const PatientRegistrationForm: React.FC = () => {
               type="button"
               onClick={nextStep}
               className="btn btn-primary flex items-center"
+              disabled={currentStep === 1 && patientType === "existing" && searchResults.length === 0}
             >
               Next
               <ChevronRight className="h-4 w-4 ml-2" />
