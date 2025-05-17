@@ -15,7 +15,11 @@ import {
   ArrowLeft,
   ArrowRight,
   CreditCard,
-  Wallet
+  Wallet,
+  ChevronDown,
+  ChevronUp,
+  Smartphone,
+  Hash
 } from 'lucide-react';
 
 interface PatientFormData {
@@ -27,7 +31,8 @@ interface PatientFormData {
   contactNumber: string;
   email?: string;
   address: string;
-  emergencyContact: {
+  hasEmergencyContact: boolean;
+  emergencyContact?: {
     name: string;
     relationship: string;
     phone: string;
@@ -47,6 +52,10 @@ interface PatientFormData {
     groupNumber?: string;
     holderName?: string;
   };
+  mpesaInfo?: {
+    phoneNumber: string;
+    transactionId?: string;
+  };
 }
 
 interface ExistingPatient {
@@ -63,7 +72,11 @@ interface ExistingPatient {
 const PatientRegistrationForm: React.FC = () => {
   const navigate = useNavigate();
   const { addNotification } = useNotificationStore();
-  const { register, handleSubmit, control, setValue, watch, formState: { errors } } = useForm<PatientFormData>();
+  const { register, handleSubmit, control, setValue, watch, formState: { errors } } = useForm<PatientFormData>({
+    defaultValues: {
+      hasEmergencyContact: false
+    }
+  });
   const [currentStep, setCurrentStep] = useState(1);
   const [patientType, setPatientType] = useState<'new' | 'existing' | 'emergency'>('new');
   const [searchTerm, setSearchTerm] = useState('');
@@ -71,6 +84,8 @@ const PatientRegistrationForm: React.FC = () => {
   const [selectedPatient, setSelectedPatient] = useState<ExistingPatient | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showEmergencyContact, setShowEmergencyContact] = useState(false);
+  const [patientId, setPatientId] = useState('');
   
   // Get the hybrid storage hook for patients
   const { 
@@ -82,10 +97,14 @@ const PatientRegistrationForm: React.FC = () => {
   
   // Watch form values
   const watchPaymentMethod = watch('paymentMethod');
+  const watchHasEmergencyContact = watch('hasEmergencyContact');
   
   useEffect(() => {
     // Fetch existing patients for search
     fetchPatients();
+    
+    // Generate a patient ID
+    generatePatientId();
   }, [fetchPatients]);
   
   useEffect(() => {
@@ -94,6 +113,13 @@ const PatientRegistrationForm: React.FC = () => {
       setValue('medicalInfo.priority', 'critical');
     }
   }, [patientType, setValue]);
+  
+  // Generate a unique patient ID
+  const generatePatientId = () => {
+    const prefix = 'PT';
+    const randomNum = Math.floor(100000 + Math.random() * 900000);
+    setPatientId(`${prefix}${randomNum}`);
+  };
   
   const handleSearch = () => {
     if (!searchTerm || searchTerm.length < 2) return;
@@ -151,6 +177,11 @@ const PatientRegistrationForm: React.FC = () => {
     setCurrentStep(currentStep - 1);
   };
   
+  const toggleEmergencyContact = () => {
+    setShowEmergencyContact(!showEmergencyContact);
+    setValue('hasEmergencyContact', !showEmergencyContact);
+  };
+  
   const onSubmit = async (data: PatientFormData) => {
     setIsSubmitting(true);
     
@@ -166,25 +197,27 @@ const PatientRegistrationForm: React.FC = () => {
         contact_number: data.contactNumber,
         email: data.email || null,
         address: data.address,
-        emergency_contact: {
+        emergency_contact: data.hasEmergencyContact && data.emergencyContact ? {
           name: data.emergencyContact.name,
           relationship: data.emergencyContact.relationship,
           phone: data.emergencyContact.phone
-        },
+        } : null,
         medical_info: {
-          allergies: data.medicalInfo.allergies || [],
-          chronicConditions: data.medicalInfo.chronicConditions || [],
-          currentMedications: data.medicalInfo.currentMedications || [],
-          bloodType: data.medicalInfo.bloodType || null,
-          smoker: data.medicalInfo.smoker || false,
-          alcoholConsumption: data.medicalInfo.alcoholConsumption || 'none'
+          allergies: data.medicalInfo?.allergies || [],
+          chronicConditions: data.medicalInfo?.chronicConditions || [],
+          currentMedications: data.medicalInfo?.currentMedications || [],
+          bloodType: data.medicalInfo?.bloodType || null,
+          smoker: data.medicalInfo?.smoker || false,
+          alcoholConsumption: data.medicalInfo?.alcoholConsumption || 'none'
         },
         payment_method: data.paymentMethod,
         insurance_info: data.paymentMethod === 'insurance' ? data.insuranceInfo : null,
+        mpesa_info: data.paymentMethod === 'mpesa' ? data.mpesaInfo : null,
         status: 'active',
         current_flow_step: patientType === 'emergency' ? 'emergency' : 'triage',
         priority_level: patientType === 'emergency' ? 'critical' : 'normal',
-        arrival_time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+        arrival_time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+        patient_id: patientId
       };
       
       // Save patient data
@@ -472,6 +505,22 @@ const PatientRegistrationForm: React.FC = () => {
                   </select>
                   {errors.gender && <p className="text-red-500 text-xs mt-1">{errors.gender.message}</p>}
                 </div>
+                
+                <div>
+                  <label className="form-label text-xs">Patient ID</label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                      <Hash className="h-4 w-4 text-gray-400" />
+                    </div>
+                    <input
+                      type="text"
+                      value={patientId}
+                      readOnly
+                      className="form-input pl-7 py-1.5 text-sm bg-gray-50"
+                    />
+                  </div>
+                  <p className="text-xs text-gray-500 mt-1">Auto-generated unique identifier</p>
+                </div>
               </div>
             </div>
           )}
@@ -529,46 +578,71 @@ const PatientRegistrationForm: React.FC = () => {
                   {errors.address && <p className="text-red-500 text-xs mt-1">{errors.address.message}</p>}
                 </div>
                 
+                {/* Collapsible Emergency Contact Section */}
                 <div className="border-t border-gray-200 pt-3 mt-3">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Emergency Contact</h3>
+                  <button 
+                    type="button" 
+                    className="flex items-center justify-between w-full text-left"
+                    onClick={toggleEmergencyContact}
+                  >
+                    <h3 className="text-sm font-medium text-gray-900">Emergency Contact</h3>
+                    <div className="flex items-center">
+                      <span className="text-xs text-gray-500 mr-2">
+                        {showEmergencyContact ? 'Hide' : 'Add'} emergency contact
+                      </span>
+                      {showEmergencyContact ? (
+                        <ChevronUp className="h-4 w-4 text-gray-400" />
+                      ) : (
+                        <ChevronDown className="h-4 w-4 text-gray-400" />
+                      )}
+                    </div>
+                  </button>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
-                      <label className="form-label text-xs required">Name</label>
-                      <input
-                        type="text"
-                        {...register('emergencyContact.name', { required: 'Emergency contact name is required' })}
-                        className={`form-input py-1.5 text-sm ${errors.emergencyContact?.name ? 'border-red-300' : ''}`}
-                      />
-                      {errors.emergencyContact?.name && <p className="text-red-500 text-xs mt-1">{errors.emergencyContact.name.message}</p>}
-                    </div>
-                    
-                    <div>
-                      <label className="form-label text-xs required">Relationship</label>
-                      <input
-                        type="text"
-                        {...register('emergencyContact.relationship', { required: 'Relationship is required' })}
-                        className={`form-input py-1.5 text-sm ${errors.emergencyContact?.relationship ? 'border-red-300' : ''}`}
-                      />
-                      {errors.emergencyContact?.relationship && <p className="text-red-500 text-xs mt-1">{errors.emergencyContact.relationship.message}</p>}
-                    </div>
-                    
-                    <div className="md:col-span-2">
-                      <label className="form-label text-xs required">Phone Number</label>
-                      <div className="relative">
-                        <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
-                          <Phone className="h-4 w-4 text-gray-400" />
-                        </div>
+                  {showEmergencyContact && (
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <label className="form-label text-xs required">Name</label>
                         <input
-                          type="tel"
-                          {...register('emergencyContact.phone', { required: 'Emergency contact phone is required' })}
-                          className={`form-input pl-7 py-1.5 text-sm ${errors.emergencyContact?.phone ? 'border-red-300' : ''}`}
-                          placeholder="(123) 456-7890"
+                          type="text"
+                          {...register('emergencyContact.name', { 
+                            required: watchHasEmergencyContact ? 'Emergency contact name is required' : false 
+                          })}
+                          className={`form-input py-1.5 text-sm ${errors.emergencyContact?.name ? 'border-red-300' : ''}`}
                         />
+                        {errors.emergencyContact?.name && <p className="text-red-500 text-xs mt-1">{errors.emergencyContact.name.message}</p>}
                       </div>
-                      {errors.emergencyContact?.phone && <p className="text-red-500 text-xs mt-1">{errors.emergencyContact.phone.message}</p>}
+                      
+                      <div>
+                        <label className="form-label text-xs required">Relationship</label>
+                        <input
+                          type="text"
+                          {...register('emergencyContact.relationship', { 
+                            required: watchHasEmergencyContact ? 'Relationship is required' : false 
+                          })}
+                          className={`form-input py-1.5 text-sm ${errors.emergencyContact?.relationship ? 'border-red-300' : ''}`}
+                        />
+                        {errors.emergencyContact?.relationship && <p className="text-red-500 text-xs mt-1">{errors.emergencyContact.relationship.message}</p>}
+                      </div>
+                      
+                      <div className="md:col-span-2">
+                        <label className="form-label text-xs required">Phone Number</label>
+                        <div className="relative">
+                          <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                            <Phone className="h-4 w-4 text-gray-400" />
+                          </div>
+                          <input
+                            type="tel"
+                            {...register('emergencyContact.phone', { 
+                              required: watchHasEmergencyContact ? 'Emergency contact phone is required' : false 
+                            })}
+                            className={`form-input pl-7 py-1.5 text-sm ${errors.emergencyContact?.phone ? 'border-red-300' : ''}`}
+                            placeholder="(123) 456-7890"
+                          />
+                        </div>
+                        {errors.emergencyContact?.phone && <p className="text-red-500 text-xs mt-1">{errors.emergencyContact.phone.message}</p>}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -644,7 +718,7 @@ const PatientRegistrationForm: React.FC = () => {
                 <div>
                   <h3 className="text-sm font-medium text-gray-900 mb-2">Payment Method</h3>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div 
                       className={`border rounded-md p-2 cursor-pointer transition-colors ${
                         watchPaymentMethod === 'cash' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
@@ -683,6 +757,27 @@ const PatientRegistrationForm: React.FC = () => {
                         <label htmlFor="payment-card" className="ml-2 flex items-center text-sm text-gray-700">
                           <CreditCard className="h-4 w-4 mr-1.5 text-gray-500" />
                           Credit/Debit Card
+                        </label>
+                      </div>
+                    </div>
+                    
+                    <div 
+                      className={`border rounded-md p-2 cursor-pointer transition-colors ${
+                        watchPaymentMethod === 'mpesa' ? 'border-teal-500 bg-teal-50' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      onClick={() => setValue('paymentMethod', 'mpesa')}
+                    >
+                      <div className="flex items-center">
+                        <input
+                          type="radio"
+                          id="payment-mpesa"
+                          value="mpesa"
+                          {...register('paymentMethod')}
+                          className="h-4 w-4 text-teal-600 focus:ring-teal-500 border-gray-300"
+                        />
+                        <label htmlFor="payment-mpesa" className="ml-2 flex items-center text-sm text-gray-700">
+                          <Smartphone className="h-4 w-4 mr-1.5 text-gray-500" />
+                          M-Pesa
                         </label>
                       </div>
                     </div>
@@ -729,6 +824,42 @@ const PatientRegistrationForm: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                  
+                  {/* M-Pesa Information */}
+                  {watchPaymentMethod === 'mpesa' && (
+                    <div className="mt-3 p-3 border border-gray-200 rounded-md">
+                      <h4 className="text-xs font-medium text-gray-900 mb-2">M-Pesa Information</h4>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                        <div>
+                          <label className="form-label text-xs required">Phone Number</label>
+                          <div className="relative">
+                            <div className="absolute inset-y-0 left-0 pl-2 flex items-center pointer-events-none">
+                              <Smartphone className="h-4 w-4 text-gray-400" />
+                            </div>
+                            <input
+                              type="tel"
+                              {...register('mpesaInfo.phoneNumber', { 
+                                required: watchPaymentMethod === 'mpesa' ? 'Phone number is required' : false 
+                              })}
+                              className="form-input pl-7 py-1.5 text-sm"
+                              placeholder="e.g., 254712345678"
+                            />
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <label className="form-label text-xs">Transaction ID</label>
+                          <input
+                            type="text"
+                            {...register('mpesaInfo.transactionId')}
+                            className="form-input py-1.5 text-sm"
+                            placeholder="Optional - if already paid"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   
                   {/* Insurance Information */}
                   {watchPaymentMethod === 'insurance' && (
@@ -811,6 +942,10 @@ const PatientRegistrationForm: React.FC = () => {
                         <span className="ml-1 font-medium">{watch('dateOfBirth')}</span>
                       </div>
                     )}
+                    <div>
+                      <span className="text-gray-500">Patient ID:</span>
+                      <span className="ml-1 font-medium">{patientId}</span>
+                    </div>
                   </div>
                 </div>
                 
@@ -834,23 +969,25 @@ const PatientRegistrationForm: React.FC = () => {
                   </div>
                 </div>
                 
-                <div className="border-b border-gray-200 pb-3">
-                  <h3 className="text-sm font-medium text-gray-900 mb-2">Emergency Contact</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>
-                      <span className="text-gray-500">Name:</span>
-                      <span className="ml-1 font-medium">{watch('emergencyContact.name')}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Relationship:</span>
-                      <span className="ml-1 font-medium">{watch('emergencyContact.relationship')}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Phone:</span>
-                      <span className="ml-1 font-medium">{watch('emergencyContact.phone')}</span>
+                {watchHasEmergencyContact && watch('emergencyContact') && (
+                  <div className="border-b border-gray-200 pb-3">
+                    <h3 className="text-sm font-medium text-gray-900 mb-2">Emergency Contact</h3>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div>
+                        <span className="text-gray-500">Name:</span>
+                        <span className="ml-1 font-medium">{watch('emergencyContact.name')}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Relationship:</span>
+                        <span className="ml-1 font-medium">{watch('emergencyContact.relationship')}</span>
+                      </div>
+                      <div>
+                        <span className="text-gray-500">Phone:</span>
+                        <span className="ml-1 font-medium">{watch('emergencyContact.phone')}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
                 
                 <div className="border-b border-gray-200 pb-3">
                   <h3 className="text-sm font-medium text-gray-900 mb-2">Priority & Payment</h3>
@@ -868,11 +1005,12 @@ const PatientRegistrationForm: React.FC = () => {
                     <div>
                       <span className="text-gray-500">Payment Method:</span>
                       <span className="ml-1 font-medium">
-                        {watch('paymentMethod')?.charAt(0).toUpperCase() + watch('paymentMethod')?.slice(1) || 'Not specified'}
+                        {watch('paymentMethod') === 'mpesa' ? 'M-Pesa' : 
+                         watch('paymentMethod')?.charAt(0).toUpperCase() + watch('paymentMethod')?.slice(1) || 'Not specified'}
                       </span>
                     </div>
                     
-                    {watch('paymentMethod') === 'insurance' && (
+                    {watch('paymentMethod') === 'insurance' && watch('insuranceInfo') && (
                       <>
                         <div>
                           <span className="text-gray-500">Insurance Provider:</span>
@@ -882,6 +1020,21 @@ const PatientRegistrationForm: React.FC = () => {
                           <span className="text-gray-500">Policy Number:</span>
                           <span className="ml-1 font-medium">{watch('insuranceInfo.policyNumber')}</span>
                         </div>
+                      </>
+                    )}
+                    
+                    {watch('paymentMethod') === 'mpesa' && watch('mpesaInfo') && (
+                      <>
+                        <div>
+                          <span className="text-gray-500">M-Pesa Phone:</span>
+                          <span className="ml-1 font-medium">{watch('mpesaInfo.phoneNumber')}</span>
+                        </div>
+                        {watch('mpesaInfo.transactionId') && (
+                          <div>
+                            <span className="text-gray-500">Transaction ID:</span>
+                            <span className="ml-1 font-medium">{watch('mpesaInfo.transactionId')}</span>
+                          </div>
+                        )}
                       </>
                     )}
                   </div>
